@@ -1,0 +1,74 @@
+%YAML 1.2
+# Copyright (c) 2021-2023, NVIDIA CORPORATION.  All rights reserved.
+#
+# NVIDIA CORPORATION and its licensors retain all intellectual property
+# and proprietary rights in and to this software, related documentation
+# and any modifications thereto.  Any use, reproduction, disclosure or
+# distribution of this software and related documentation without an express
+# license agreement from NVIDIA CORPORATION is strictly prohibited.
+---
+name: tcp_server
+components:
+- name: channel_timestamp
+  type: nvidia::gxf::test::MockReceiver
+- name: allocator
+  type: nvidia::gxf::test::MockAllocator
+- name: component_serializer
+  type: nvidia::gxf::StdComponentSerializer
+  parameters:
+    allocator: allocator
+- name: entity_serializer
+  type: nvidia::gxf::StdEntitySerializer
+  parameters:
+    component_serializers: [ component_serializer ]
+- type: nvidia::gxf::TcpServer
+  parameters:
+    receivers: [ channel_timestamp ]
+    entity_serializer: entity_serializer
+    address: 127.0.0.1
+    port: 7000
+    timeout_period: 100ms
+    async_scheduling_term: async_st
+    max_duration_ms: 1000
+- name: async_st
+  type: nvidia::gxf::AsynchronousSchedulingTerm
+---
+name: clock_publisher
+components:
+- name: output
+  type: nvidia::gxf::test::MockTransmitter
+- type: nvidia::gxf::test::ClockSetter
+  parameters:
+    synthetic_clock: scheduler/clock
+    boolean_scheduling_term: boolean_scheduling_term
+    timestamps: [1100000000, 2200000000, 4400000000, 6600000000]
+- type: nvidia::gxf::ClockSyncPrimary
+  parameters:
+    tx_timestamp: output
+    clock: scheduler/clock
+- name: boolean_scheduling_term
+  type: nvidia::gxf::BooleanSchedulingTerm
+- type: nvidia::gxf::DownstreamReceptiveSchedulingTerm
+  parameters:
+    transmitter: output
+    min_size: 1
+---
+components:
+- type: nvidia::gxf::Connection
+  parameters:
+    source: clock_publisher/output
+    target: tcp_server/channel_timestamp
+---
+name: scheduler
+components:
+- name: clock
+  type: nvidia::gxf::SyntheticClock
+- type: nvidia::gxf::GreedyScheduler
+  parameters:
+    clock: clock
+    max_duration_ms: 10000
+- type: nvidia::gxf::JobStatistics
+  parameters:
+    clock: clock
+    codelet_statistics: true
+    json_file_path: '/tmp/test_tcp_server_source_statistics.json'

@@ -1,0 +1,82 @@
+# SPDX-FileCopyrightText: Copyright (c) 2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+%YAML 1.2
+---
+name: tx
+components:
+- name: signal
+  type: nvidia::gxf::DoubleBufferTransmitter
+- type: nvidia::gxf::DownstreamReceptiveSchedulingTerm
+  parameters:
+    transmitter: signal
+    min_size: 1
+- type: nvidia::gxf::PingTx
+  parameters:
+    signal: signal
+- type: nvidia::gxf::CountSchedulingTerm
+  parameters:
+    count: 10
+- name: step_count
+  type: nvidia::gxf::PyCodeletV0
+  parameters:
+    codelet_name: StepCount
+    codelet_file: gxf/python/tests/StepCount.py
+    codelet_params:
+      expected_count: 4
+---
+name: rx
+components:
+- name: signal
+  type: nvidia::gxf::DoubleBufferReceiver
+- type: nvidia::gxf::MessageAvailableSchedulingTerm
+  parameters:
+    receiver: signal
+    min_size: 1
+- name: mycount
+  type: nvidia::gxf::CountSchedulingTerm
+  parameters:
+    count: 3
+- name: python_codelet
+  type: nvidia::gxf::PyCodeletV0
+  parameters:
+    codelet_name: TestCountSchedulingTerm
+    codelet_file: gxf/python/tests/TestCountSchedulingTerm.py
+    codelet_params:
+      clock: scheduler/clock
+      count_scheduling_term: mycount
+      stop_after_count: 3
+      receiver: signal
+- name: step_count
+  type: nvidia::gxf::PyCodeletV0
+  parameters:
+    codelet_name: StepCount
+    codelet_file: gxf/python/tests/StepCount.py
+    codelet_params:
+      expected_count: 3
+---
+components:
+- type: nvidia::gxf::Connection
+  parameters:
+    source: tx/signal
+    target: rx/signal
+---
+name: scheduler
+components:
+- type: nvidia::gxf::GreedyScheduler
+  parameters:
+    max_duration_ms: 1000000
+    clock: clock
+- name: clock
+  type: nvidia::gxf::ManualClock

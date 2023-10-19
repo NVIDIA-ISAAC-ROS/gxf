@@ -1,0 +1,209 @@
+# SPDX-FileCopyrightText: Copyright (c) 2021 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+%YAML 1.2
+---
+name: root
+components:
+- name: root_controller
+  type: nvidia::gxf::EntityCountFailureRepeatController
+  parameters:
+    max_repeat_count: 0
+- name: root_st
+  type: nvidia::gxf::BTSchedulingTerm
+  parameters:
+    is_root: true
+- name: root_codelet
+  type: nvidia::gxf::SequenceBehavior
+  parameters:
+    children: [ child1/child1_st, child2/child2_st ]
+    s_term: root_st
+---
+name: child1
+components:
+- name: child1_controller
+  type: nvidia::gxf::EntityCountFailureRepeatController
+  parameters:
+    max_repeat_count: 0
+- name: child1_st
+  type: nvidia::gxf::BTSchedulingTerm
+  parameters:
+    is_root: false
+- name: child1_codelet
+  type: nvidia::gxf::ParallelBehavior
+  parameters:
+    children: [ child3/child3_st, child4/child4_st, child7/child7_st ]
+    s_term: child1_st
+    success_threshold: -1
+    failure_threshold: 1
+---
+name: child2
+components:
+- name: child2_controller
+  type: nvidia::gxf::EntityCountFailureRepeatController
+  parameters:
+    max_repeat_count: 0
+- name: child2_st
+  type: nvidia::gxf::BTSchedulingTerm
+  parameters:
+    is_root: false
+- name: child2_sel_codelet
+  type: nvidia::gxf::SelectorBehavior
+  parameters:
+    children: [ child8/child8_st, child10/child10_st ]
+    s_term: child2_st
+---
+name: child3
+components:
+- name: child3_controller
+  type: nvidia::gxf::EntityCountFailureRepeatController
+  parameters:
+    max_repeat_count: 0
+- name: child3_st
+  type: nvidia::gxf::BTSchedulingTerm
+  parameters:
+    is_root: false
+- name: child3_codelet
+  type: nvidia::gxf::ConstantBehavior
+  parameters:
+    s_term: child3_st
+    constant_status: 0
+---
+name: child4
+components:
+- name: child4_controller
+  type: nvidia::gxf::EntityCountFailureRepeatController
+  parameters:
+    max_repeat_count: 0
+- name: child4_st
+  type: nvidia::gxf::BTSchedulingTerm
+  parameters:
+    is_root: false
+- name: child4_codelet
+  type: nvidia::gxf::SwitchBehavior
+  parameters:
+    children: [ child5/child5_st, child6/child6_st ]
+    s_term: child4_st
+    desired_behavior: 0
+---
+name: child5
+components:
+- name: child5_controller
+  type: nvidia::gxf::EntityCountFailureRepeatController
+  parameters:
+    max_repeat_count: 0
+- name: child5_st
+  type: nvidia::gxf::BTSchedulingTerm
+  parameters:
+    is_root: false
+- name: child5_codelet
+  type: nvidia::gxf::ConstantBehavior
+  parameters:
+    s_term: child5_st
+    constant_status: 0
+---
+name: child6
+components:
+- name: child6_controller
+  type: nvidia::gxf::EntityCountFailureRepeatController
+  parameters:
+    max_repeat_count: 0
+- name: child6_st
+  type: nvidia::gxf::BTSchedulingTerm
+  parameters:
+    is_root: false
+- name: child6_codelet
+  type: nvidia::gxf::ConstantBehavior
+  parameters:
+    s_term: child6_st
+    constant_status: 0
+---
+name: child7
+components:
+- name: child7_controller
+  type: nvidia::gxf::EntityCountFailureRepeatController
+  parameters:
+    max_repeat_count: 0
+- name: child7_st
+  type: nvidia::gxf::BTSchedulingTerm
+  parameters:
+    is_root: false
+- name: child7_codelet
+  type: nvidia::gxf::TimerBehavior
+  parameters:
+    s_term: child7_st
+    clock: sched/clock
+    switch_status: 0
+    delay: 5
+---
+name: child8
+components:
+- name: child8_controller
+  type: nvidia::gxf::EntityCountFailureRepeatController
+  parameters:
+    max_repeat_count: 0
+- name: child8_st
+  type: nvidia::gxf::BTSchedulingTerm
+  parameters:
+    is_root: false
+- name: child8_codelet
+  type: nvidia::gxf::RepeatBehavior
+  parameters:
+    s_term: child8_st
+    children: [ child9/child9_st ]
+    repeat_after_failure: false
+---
+name: child9
+components:
+- name: child9_controller
+  type: nvidia::gxf::EntityCountFailureRepeatController
+  parameters:
+    max_repeat_count: 2
+    return_behavior_running_if_failure_repeat: true
+- name: child9_st
+  type: nvidia::gxf::BTSchedulingTerm
+  parameters:
+    is_root: false
+- name: child9_codelet
+  type: nvidia::gxf::TimerBehavior
+  parameters:
+    s_term: child9_st
+    clock: sched/clock
+    switch_status: 1
+    delay: 2
+---
+name: child10
+components:
+- name: child10_controller
+  type: nvidia::gxf::EntityCountFailureRepeatController
+  parameters:
+    max_repeat_count: 0
+- name: child10_st
+  type: nvidia::gxf::BTSchedulingTerm
+  parameters:
+    is_root: false
+- name: child10_codelet
+  type: nvidia::gxf::ConstantBehavior
+  parameters:
+    s_term: child10_st
+    constant_status: 0
+---
+name: sched
+components:
+- name: clock
+  type: nvidia::gxf::RealtimeClock
+- name: epoch
+  type: nvidia::gxf::EpochScheduler
+  parameters:
+    clock: clock

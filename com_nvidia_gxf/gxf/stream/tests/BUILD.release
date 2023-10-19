@@ -1,0 +1,75 @@
+"""
+ SPDX-FileCopyrightText: Copyright (c) 2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ SPDX-License-Identifier: Apache-2.0
+
+ Licensed under the Apache License, Version 2.0 (the "License");
+ you may not use this file except in compliance with the License.
+ You may obtain a copy of the License at
+
+ http://www.apache.org/licenses/LICENSE-2.0
+
+ Unless required by applicable law or agreed to in writing, software
+ distributed under the License is distributed on an "AS IS" BASIS,
+ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ See the License for the specific language governing permissions and
+ limitations under the License.
+"""
+
+load(
+    "//gxf:gxf.bzl",
+    "nv_gxf_cc_extension",
+    "nv_gxf_cc_library",
+    "nv_gxf_cc_test_group",
+)
+
+nv_gxf_cc_test_group(
+    name = "tests",
+    apps = [
+        "gxf/stream/tests/test_gxf_stream_cuda_dotproduct.yaml",
+    ],
+    extensions = [
+        "//gxf/std",
+        "//gxf/cuda",
+        "//gxf/stream",
+        "//gxf/stream/tests:test_stream_sync_cuda",
+        "//gxf/test/extensions:test",
+    ],
+    manifest_path_hack = "gxf/stream/tests/",
+    deps = ["//gxf/test:test_main", "//gxf/std:yaml_file_loader", "@yaml-cpp"],
+)
+
+nv_gxf_cc_extension(
+    name = "test_stream_sync_cuda",
+    srcs = ["test_stream_sync_cuda_ext.cpp"],
+    deps = [
+        "test_stream_sync_cuda_helper",
+        "//gxf/core:gxf",
+    ],
+    ext_deps = [
+        "//gxf/std",
+        "//gxf/cuda",
+        "//gxf/stream",
+    ],
+)
+
+nv_gxf_cc_library(
+    name = "test_stream_sync_cuda_helper",
+    hdrs = ["test_gxf_stream_sync_cuda_helper.hpp"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//gxf/cuda:cuda_event",
+        "//gxf/cuda:cuda_stream",
+        "//gxf/cuda:cuda_stream_id",
+        "//gxf/cuda:cuda_stream_pool",
+        "//gxf/cuda:cuda_common",
+        "//gxf/stream:stream_nvsci",
+        "//gxf/stream:stream_nvsci_sync",
+        "//gxf/std",
+        "//third_party:cublas",
+        "//third_party:cudart",
+        "//third_party:nvscievent",
+        "//third_party:nvscisync",
+        "//common",
+        "@yaml-cpp"
+    ],
+)

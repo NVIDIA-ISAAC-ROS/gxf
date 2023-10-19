@@ -1,0 +1,217 @@
+"""
+ SPDX-FileCopyrightText: Copyright (c) 2021-2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ SPDX-License-Identifier: Apache-2.0
+
+ Licensed under the Apache License, Version 2.0 (the "License");
+ you may not use this file except in compliance with the License.
+ You may obtain a copy of the License at
+
+ http://www.apache.org/licenses/LICENSE-2.0
+
+ Unless required by applicable law or agreed to in writing, software
+ distributed under the License is distributed on an "AS IS" BASIS,
+ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ See the License for the specific language governing permissions and
+ limitations under the License.
+"""
+
+load(
+    "//gxf:gxf.bzl",
+    "nv_gxf_ext_deps",
+)
+
+nv_gxf_ext_deps(name = "std_ext_deps",
+                 ext = "libgxf_std.so",
+                 ext_deps = [],
+                 visibility = ["//visibility:public"])
+
+alias(
+    name = "libgxf_std.so",
+    tags = ["manual"],
+    actual = select({
+        "@com_nvidia_gxf//engine/build:platform_x86_64_cuda_11_8": "//gxf_x86_64_cuda_11_8/std:libgxf_std.so_release",
+        "@com_nvidia_gxf//engine/build:platform_x86_64_cuda_12_1": "//gxf_x86_64_cuda_12_1/std:libgxf_std.so_release",
+        "@com_nvidia_gxf//engine/build:platform_hp11_sbsa": "//gxf_hp11_sbsa/std:libgxf_std.so_release",
+        "@com_nvidia_gxf//engine/build:platform_hp20_sbsa": "//gxf_hp20_sbsa/std:libgxf_std.so_release",
+        "@com_nvidia_gxf//engine/build:platform_hp21ea_sbsa": "//gxf_hp21ea_sbsa/std:libgxf_std.so_release",
+        "@com_nvidia_gxf//engine/build:platform_jetpack51": "//gxf_jetpack51/std:libgxf_std.so_release",
+    }),
+    visibility = ["//visibility:public"],
+)
+
+cc_library(
+    name = "libgxf_std_static.lo",
+    tags = ["manual"],
+    linkstatic = True,
+    alwayslink = True,
+    srcs = select({
+        "@com_nvidia_gxf//engine/build:platform_x86_64_cuda_11_8": ["//gxf_x86_64_cuda_11_8/std:libgxf_std_static.lo_release"],
+        "@com_nvidia_gxf//engine/build:platform_x86_64_cuda_12_1": ["//gxf_x86_64_cuda_12_1/std:libgxf_std_static.lo_release"],
+        "@com_nvidia_gxf//engine/build:platform_hp11_sbsa": ["//gxf_hp11_sbsa/std:libgxf_std_static.lo_release"],
+        "@com_nvidia_gxf//engine/build:platform_hp20_sbsa": ["//gxf_hp20_sbsa/std:libgxf_std_static.lo_release"],
+        "@com_nvidia_gxf//engine/build:platform_hp21ea_sbsa": ["//gxf_hp21ea_sbsa/std:libgxf_std_static.lo_release"],
+        "@com_nvidia_gxf//engine/build:platform_jetpack51": ["//gxf_jetpack51/std:libgxf_std_static.lo_release"],
+    }),
+    linkopts = ["-lpthread"],
+    visibility = ["//visibility:public"],
+)
+
+cc_library(
+    name = "std",
+    tags = ["manual"],
+    hdrs = [
+        "allocator.hpp",
+        "clock.hpp",
+        "codelet.hpp",
+        "complex.hpp",
+        "component_allocator.hpp",
+        "component_factory.hpp",
+        "cpu_thread.hpp",
+        "default_extension.hpp",
+        "double_buffer_receiver.hpp",
+        "extension.hpp",
+        "extension_factory_helper.hpp",
+        "memory_buffer.hpp",
+        "metric.hpp",
+        "monitor.hpp",
+        "new_component_allocator.hpp",
+        "parameter_parser.hpp",
+        "parameter_parser_std.hpp",
+        "parameter_registrar.hpp",
+        "parameter_storage.hpp",
+        "parameter_wrapper.hpp",
+        "queue.hpp",
+        "receiver.hpp",
+        "resources.hpp",
+        "resource_manager.hpp",
+        "resource_registrar.hpp",
+        "scheduling_condition.hpp",
+        "scheduling_term.hpp",
+        "scheduling_terms.hpp",
+        "system.hpp",
+        "tensor.hpp",
+        "timestamp.hpp",
+        "transmitter.hpp",
+        "type_registry.hpp",
+        "unbounded_allocator.hpp",
+        "vault.hpp",
+        "gems/staging_queue/staging_queue.hpp",
+        "gems/staging_queue/staging_queue_iterator.hpp",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+cc_import(
+    name = "libstd",
+    tags = ["manual"],
+    shared_library = ":libgxf_std.so",
+    static_library = ":libgxf_std_static.lo",
+    hdrs = [
+        "allocator.hpp",
+        "clock.hpp",
+        "codelet.hpp",
+        "complex.hpp",
+        "component_allocator.hpp",
+        "component_factory.hpp",
+        "cpu_thread.hpp",
+        "default_extension.hpp",
+        "double_buffer_receiver.hpp",
+        "extension.hpp",
+        "extension_factory_helper.hpp",
+        "memory_buffer.hpp",
+        "metric.hpp",
+        "monitor.hpp",
+        "new_component_allocator.hpp",
+        "parameter_parser.hpp",
+        "parameter_parser_std.hpp",
+        "parameter_registrar.hpp",
+        "parameter_storage.hpp",
+        "parameter_wrapper.hpp",
+        "queue.hpp",
+        "receiver.hpp",
+        "resources.hpp",
+        "resource_manager.hpp",
+        "resource_registrar.hpp",
+        "scheduling_condition.hpp",
+        "scheduling_term.hpp",
+        "scheduling_terms.hpp",
+        "system.hpp",
+        "tensor.hpp",
+        "timestamp.hpp",
+        "transmitter.hpp",
+        "type_registry.hpp",
+        "unbounded_allocator.hpp",
+        "vault.hpp",
+        "gems/staging_queue/staging_queue.hpp",
+        "gems/staging_queue/staging_queue_iterator.hpp",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+cc_library(
+    name = "default_extension",
+    tags = ["manual"],
+    linkstatic = True,
+    alwayslink = True,
+    hdrs = ["default_extension.hpp"],
+    srcs = select({
+        "@com_nvidia_gxf//engine/build:platform_x86_64_cuda_11_8": ["//gxf_x86_64_cuda_11_8/std:libdefault_extension.lo_release"],
+        "@com_nvidia_gxf//engine/build:platform_x86_64_cuda_12_1": ["//gxf_x86_64_cuda_12_1/std:libdefault_extension.lo_release"],
+        "@com_nvidia_gxf//engine/build:platform_hp11_sbsa": ["//gxf_hp11_sbsa/std:libdefault_extension.lo_release"],
+        "@com_nvidia_gxf//engine/build:platform_hp20_sbsa": ["//gxf_hp20_sbsa/std:libdefault_extension.lo_release"],
+        "@com_nvidia_gxf//engine/build:platform_hp21ea_sbsa": ["//gxf_hp21ea_sbsa/std:libdefault_extension.lo_release"],
+        "@com_nvidia_gxf//engine/build:platform_jetpack51": ["//gxf_jetpack51/std:libdefault_extension.lo_release"],
+    }),
+    visibility = ["//visibility:public"],
+)
+
+cc_library(
+    name = "metric",
+    tags = ["manual"],
+    linkstatic = True,
+    alwayslink = True,
+    hdrs = ["metric.hpp"],
+    srcs = select({
+        "@com_nvidia_gxf//engine/build:platform_x86_64_cuda_11_8": ["//gxf_x86_64_cuda_11_8/std:libmetric.lo_release"],
+        "@com_nvidia_gxf//engine/build:platform_x86_64_cuda_12_1": ["//gxf_x86_64_cuda_12_1/std:libmetric.lo_release"],
+        "@com_nvidia_gxf//engine/build:platform_hp11_sbsa": ["//gxf_hp11_sbsa/std:libmetric.lo_release"],
+        "@com_nvidia_gxf//engine/build:platform_hp20_sbsa": ["//gxf_hp20_sbsa/std:libmetric.lo_release"],
+        "@com_nvidia_gxf//engine/build:platform_hp21ea_sbsa": ["//gxf_hp21ea_sbsa/std:libmetric.lo_release"],
+        "@com_nvidia_gxf//engine/build:platform_jetpack51": ["//gxf_jetpack51/std:libmetric.lo_release"],
+    }),
+    visibility = ["//visibility:public"],
+)
+
+cc_library(
+    name = "tensor",
+    tags = ["manual"],
+    linkstatic = True,
+    alwayslink = True,
+    hdrs = ["tensor.hpp"],
+    srcs = select({
+        "@com_nvidia_gxf//engine/build:platform_x86_64_cuda_11_8": ["//gxf_x86_64_cuda_11_8/std:libtensor.lo_release"],
+        "@com_nvidia_gxf//engine/build:platform_x86_64_cuda_12_1": ["//gxf_x86_64_cuda_12_1/std:libtensor.lo_release"],
+        "@com_nvidia_gxf//engine/build:platform_hp11_sbsa": ["//gxf_hp11_sbsa/std:libtensor.lo_release"],
+        "@com_nvidia_gxf//engine/build:platform_hp20_sbsa": ["//gxf_hp20_sbsa/std:libtensor.lo_release"],
+        "@com_nvidia_gxf//engine/build:platform_hp21ea_sbsa": ["//gxf_hp21ea_sbsa/std:libtensor.lo_release"],
+        "@com_nvidia_gxf//engine/build:platform_jetpack51": ["//gxf_jetpack51/std:libtensor.lo_release"],
+    }),
+    visibility = ["//visibility:public"],
+)
+
+cc_library(
+    name = "yaml_file_loader",
+    tags = ["manual"],
+    linkstatic = True,
+    alwayslink = True,
+    hdrs = ["yaml_file_loader.hpp"],
+    srcs = select({
+        "@com_nvidia_gxf//engine/build:platform_x86_64_cuda_11_8": ["//gxf_x86_64_cuda_11_8/std:libyaml_file_loader.lo_release"],
+        "@com_nvidia_gxf//engine/build:platform_x86_64_cuda_12_1": ["//gxf_x86_64_cuda_12_1/std:libyaml_file_loader.lo_release"],
+        "@com_nvidia_gxf//engine/build:platform_hp11_sbsa": ["//gxf_hp11_sbsa/std:libyaml_file_loader.lo_release"],
+        "@com_nvidia_gxf//engine/build:platform_hp20_sbsa": ["//gxf_hp20_sbsa/std:libyaml_file_loader.lo_release"],
+        "@com_nvidia_gxf//engine/build:platform_hp21ea_sbsa": ["//gxf_hp21ea_sbsa/std:libyaml_file_loader.lo_release"],
+        "@com_nvidia_gxf//engine/build:platform_jetpack51": ["//gxf_jetpack51/std:libyaml_file_loader.lo_release"],
+    }),
+    visibility = ["//visibility:public"],
+)

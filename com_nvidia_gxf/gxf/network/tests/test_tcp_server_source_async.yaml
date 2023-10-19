@@ -1,0 +1,99 @@
+%YAML 1.2
+# Copyright (c) 2022-2023, NVIDIA CORPORATION.  All rights reserved.
+#
+# NVIDIA CORPORATION and its licensors retain all intellectual property
+# and proprietary rights in and to this software, related documentation
+# and any modifications thereto.  Any use, reproduction, disclosure or
+# distribution of this software and related documentation without an express
+# license agreement from NVIDIA CORPORATION is strictly prohibited.
+---
+name: server1
+components:
+- name: channel_11
+  type: nvidia::gxf::test::MockReceiver
+- name: channel_22
+  type: nvidia::gxf::test::MockReceiver
+- name: entity_serializer1
+  type: nvidia::gxf::StdEntityIdSerializer
+- type: nvidia::gxf::TcpServer
+  parameters:
+    receivers: [ channel_11, channel_22 ]
+    entity_serializer: entity_serializer1
+    address: 127.0.0.1
+    port: 7000
+    timeout_period: 100ms
+    async_scheduling_term: async_st
+    max_msg_delay_ms: 100
+- name: async_st
+  type: nvidia::gxf::AsynchronousSchedulingTerm
+---
+name: generator_11
+components:
+- name: output1
+  type: nvidia::gxf::test::MockTransmitter
+- name: allocator1
+  type: nvidia::gxf::test::MockAllocator
+- type: nvidia::gxf::test::TensorGenerator
+  parameters:
+    output: output1
+    allocator: allocator1
+    shape: [ 2, 2, 2 ]
+    storage_type: 0
+    enable_timestamps: false
+- type: nvidia::gxf::DownstreamReceptiveSchedulingTerm
+  parameters:
+    transmitter: output1
+    min_size: 1
+- type: nvidia::gxf::CountSchedulingTerm
+  parameters:
+    count: 1000
+---
+name: generator_22
+components:
+- name: output2
+  type: nvidia::gxf::test::MockTransmitter
+- name: allocator2
+  type: nvidia::gxf::test::MockAllocator
+- type: nvidia::gxf::test::TensorGenerator
+  parameters:
+    output: output2
+    allocator: allocator2
+    shape: [ 3, 3 ]
+    storage_type: 1
+    enable_timestamps: false
+- type: nvidia::gxf::DownstreamReceptiveSchedulingTerm
+  parameters:
+    transmitter: output2
+    min_size: 1
+- type: nvidia::gxf::CountSchedulingTerm
+  parameters:
+    count: 1000
+---
+name: conn1
+components:
+- type: nvidia::gxf::Connection
+  parameters:
+    source: generator_11/output1
+    target: server1/channel_11
+---
+name: conn2
+components:
+- type: nvidia::gxf::Connection
+  parameters:
+    source: generator_22/output2
+    target: server1/channel_22
+---
+name: sched1
+components:
+- name: clock
+  type: nvidia::gxf::RealtimeClock
+- name: gs1
+  type: nvidia::gxf::GreedyScheduler
+  parameters:
+    clock: clock
+    max_duration_ms: 5000
+- type: nvidia::gxf::JobStatistics
+  parameters:
+    clock: clock
+    codelet_statistics: true
+    json_file_path: '/tmp/test_tcp_server_source_async_statistics.json'

@@ -1,0 +1,26 @@
+# %YAML 1.2
+# Copyright (c) 2023, NVIDIA CORPORATION. All rights reserved.
+#
+# NVIDIA CORPORATION and its licensors retain all intellectual property
+# and proprietary rights in and to this software, related documentation
+# and any modifications thereto. Any use, reproduction, disclosure or
+# distribution of this software and related documentation without an express
+# license agreement from NVIDIA CORPORATION is strictly prohibited.
+---
+interfaces:
+- name: rx_signal
+  target: receiver/rx_signal
+---
+name: receiver
+components:
+- name: rx_signal
+  type: nvidia::gxf::DoubleBufferReceiver
+- name: python_codelet
+  type: nvidia::gxf::PingRx
+  parameters:
+    signal: rx_signal
+- name: st
+  type: nvidia::gxf::MessageAvailableSchedulingTerm
+  parameters:
+    receiver: rx_signal
+    min_size: 1

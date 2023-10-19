@@ -1,0 +1,51 @@
+%YAML 1.2
+# Copyright (c) 2021, NVIDIA CORPORATION.  All rights reserved.
+#
+# NVIDIA CORPORATION and its licensors retain all intellectual property
+# and proprietary rights in and to this software, related documentation
+# and any modifications thereto.  Any use, reproduction, disclosure or
+# distribution of this software and related documentation without an express
+# license agreement from NVIDIA CORPORATION is strictly prohibited.
+---
+name: tx
+components:
+  - name: signal
+    type: nvidia::gxf::test::MockTransmitter
+  - type: nvidia::gxf::DownstreamReceptiveSchedulingTerm
+    parameters:
+      transmitter: signal
+      min_size: 1
+  - type: nvidia::gxf::PingTx
+    parameters:
+      signal: signal
+---
+name: rx
+components:
+  - name: signal
+    type: nvidia::gxf::test::MockReceiver
+  - type: nvidia::gxf::MessageAvailableSchedulingTerm
+    parameters:
+      receiver: signal
+      min_size: 1
+  - type: nvidia::gxf::PingRx
+    parameters:
+      signal: signal
+---
+components:
+  - type: nvidia::gxf::Connection
+    parameters:
+      source: tx/signal
+      target: rx/signal
+---
+name: clock
+components:
+  - name: default
+    type: nvidia::gxf::RealtimeClock
+    parameters:
+      use_time_since_epoch: true
+---
+components:
+  - type: nvidia::gxf::GreedyScheduler
+    parameters:
+      max_duration_ms: 300
+      clock: clock/default

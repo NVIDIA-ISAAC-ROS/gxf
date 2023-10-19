@@ -1,0 +1,118 @@
+%YAML 1.2
+# Copyright (c) 2023, NVIDIA CORPORATION.  All rights reserved.
+#
+# NVIDIA CORPORATION and its licensors retain all intellectual property
+# and proprietary rights in and to this software, related documentation
+# and any modifications thereto.  Any use, reproduction, disclosure or
+# distribution of this software and related documentation without an express
+# license agreement from NVIDIA CORPORATION is strictly prohibited.
+---
+dependencies:
+- extension: StandardExtension
+  uuid: 8ec2d5d6-b5df-48bf-8dee-0252606fdd7e
+  version: 2.3.0
+- extension: SampleExtension
+  uuid: a6ad78b6-1682-11ec-9621-0242ac130002
+  version: 1.3.0
+- extension: TestHelperExtension
+  uuid: 1b99ffeb-c250-4ced-8117-62ac05969a50
+  version: 2.3.0
+---
+components:
+- name: downstream_receptive_scheduling_term0..f710
+  parameters:
+    min_size: 1
+    transmitter: double_buffer_transmitter1..4bd0
+  type: nvidia::gxf::DownstreamReceptiveSchedulingTerm
+- name: double_buffer_transmitter1..4bd0
+  parameters:
+    max_capacity: '1'
+  type: nvidia::gxf::test::MockTransmitter
+- name: count_scheduling_term2..3890
+  parameters:
+    count: 100
+  type: nvidia::gxf::CountSchedulingTerm
+- name: ping_tx6..7350
+  parameters:
+    clock: GreedyScheduler..b7d0/realtime_clock23..3f50
+    signal: double_buffer_transmitter1..4bd0
+  type: nvidia::gxf::PingTx
+- name: step_count27..8b90
+  parameters:
+    expected_count: 100
+    expected_start_count: 1
+    use_assert: 'True'
+  type: nvidia::gxf::test::StepCount
+name: tx..ec50
+ui_property:
+  position:
+    x: -35.0
+    y: 151.0
+  state: 0
+---
+components:
+- name: message_available_scheduling_term3..d5d0
+  parameters:
+    min_size: 1
+    receiver: double_buffer_receiver4..c390
+  type: nvidia::gxf::MessageAvailableSchedulingTerm
+- name: double_buffer_receiver4..c390
+  parameters:
+    max_capacity: '1'
+  type: nvidia::gxf::test::MockReceiver
+- name: ping_rx5..2090
+  parameters:
+    signal: double_buffer_receiver4..c390
+  type: nvidia::gxf::PingRx
+- name: step_count24..7e10
+  parameters:
+    expected_count: 100
+    expected_start_count: '1'
+    use_assert: 'True'
+  type: nvidia::gxf::test::StepCount
+- name: job_statistics25..40d0
+  parameters:
+    clock: GreedyScheduler..b7d0/realtime_clock23..3f50
+    codelet_statistics: true
+    json_file_path: '/tmp/gxf_performance_statistics.json'
+  type: nvidia::gxf::JobStatistics
+- name: entity_monitor26..a710
+  type: nvidia::gxf::test::EntityMonitor
+name: rx..4110
+ui_property:
+  position:
+    x: 891.0
+    y: 168.0
+  state: 0
+---
+components:
+- name: connection17..63d0
+  parameters:
+    source: tx..ec50/double_buffer_transmitter1..4bd0
+    target: rx..4110/double_buffer_receiver4..c390
+  type: nvidia::gxf::Connection
+name: Connection..6d50
+ui_property:
+  position:
+    x: 451.0
+    y: 227.0
+  state: 0
+---
+components:
+- name: greedy_scheduler22..4ed0
+  parameters:
+    clock: realtime_clock23..3f50
+    stop_on_deadlock: 'True'
+  type: nvidia::gxf::GreedyScheduler
+- name: realtime_clock23..3f50
+  parameters:
+    initial_time_offset: '0.0'
+    initial_time_scale: '1.0'
+    use_time_since_epoch: 'False'
+  type: nvidia::gxf::RealtimeClock
+name: GreedyScheduler..b7d0
+ui_property:
+  position:
+    x: 344.0
+    y: 475.0
+  state: 0

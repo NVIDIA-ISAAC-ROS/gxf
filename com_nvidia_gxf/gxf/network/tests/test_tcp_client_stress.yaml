@@ -1,0 +1,102 @@
+%YAML 1.2
+# Copyright (c) 2022-2023, NVIDIA CORPORATION.  All rights reserved.
+#
+# NVIDIA CORPORATION and its licensors retain all intellectual property
+# and proprietary rights in and to this software, related documentation
+# and any modifications thereto.  Any use, reproduction, disclosure or
+# distribution of this software and related documentation without an express
+# license agreement from NVIDIA CORPORATION is strictly prohibited.
+---
+name: client
+components:
+- name: channel
+  type: nvidia::gxf::test::MockTransmitter
+- name: allocator
+  type: nvidia::gxf::UnboundedAllocator
+- name: component_serializer
+  type: nvidia::gxf::StdComponentSerializer
+  parameters:
+    allocator: allocator
+- name: entity_serializer
+  type: nvidia::gxf::StdEntitySerializer
+  parameters:
+    component_serializers: [ component_serializer ]
+- name: tcp_client
+  type: nvidia::gxf::TcpClient
+  parameters:
+    transmitters: [ channel ]
+    entity_serializer: entity_serializer
+    address: 127.0.0.1
+    port: 7000
+    timeout_period: 100ms
+    async_scheduling_term: async_st
+    max_msg_delay_ms: 5000
+- name: async_st
+  type: nvidia::gxf::AsynchronousSchedulingTerm
+---
+name: generator
+components:
+- name: output
+  type: nvidia::gxf::test::MockTransmitter
+- name: allocator
+  type: nvidia::gxf::UnboundedAllocator
+- type: nvidia::gxf::test::TensorGenerator
+  parameters:
+    output: output
+    allocator: allocator
+    shape: [ 1920, 1080, 3 ]
+    storage_type: 2
+    enable_timestamps: false
+- type: nvidia::gxf::DownstreamReceptiveSchedulingTerm
+  parameters:
+    transmitter: output
+    min_size: 1
+- type: nvidia::gxf::CountSchedulingTerm
+  parameters:
+    count: 10
+---
+name: comparator
+components:
+- name: expected
+  type: nvidia::gxf::test::MockReceiver
+- name: actual
+  type: nvidia::gxf::test::MockReceiver
+- type: nvidia::gxf::test::TensorComparator
+  parameters:
+    expected: expected
+    actual: actual
+- type: nvidia::gxf::MessageAvailableSchedulingTerm
+  parameters:
+    receiver: expected
+    min_size: 1
+- type: nvidia::gxf::MessageAvailableSchedulingTerm
+  parameters:
+    receiver: actual
+    min_size: 1
+- type: nvidia::gxf::test::StepCount
+  parameters:
+    expected_count: 10
+---
+components:
+- type: nvidia::gxf::Connection
+  parameters:
+    source: generator/output
+    target: comparator/expected
+---
+components:
+- type: nvidia::gxf::Connection
+  parameters:
+    source: client/channel
+    target: comparator/actual
+---
+components:
+- name: clock
+  type: nvidia::gxf::RealtimeClock
+- type: nvidia::gxf::GreedyScheduler
+  parameters:
+    clock: clock
+    max_duration_ms: 50000
+- type: nvidia::gxf::JobStatistics
+  parameters:
+    clock: clock
+    codelet_statistics: true

@@ -1,0 +1,74 @@
+# SPDX-FileCopyrightText: Copyright (c) 2021 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+%YAML 1.2
+---
+name: root
+components:
+- name: root_controller
+  type: nvidia::gxf::EntityCountFailureRepeatController
+  parameters:
+    max_repeat_count: 0
+- name: root_st
+  type: nvidia::gxf::BTSchedulingTerm
+  parameters:
+    is_root: true
+- name: root_codelet
+  type: nvidia::gxf::SequenceBehavior
+  parameters:
+    children: [ child1/child1_st, child2/child2_st ]
+    s_term: root_st
+---
+name: child1
+components:
+- name: child1_controller
+  type: nvidia::gxf::EntityCountFailureRepeatController
+  parameters:
+    max_repeat_count: 0
+- name: child1_st
+  type: nvidia::gxf::BTSchedulingTerm
+  parameters:
+    is_root: false
+- name: child1_codelet
+  type: nvidia::gxf::ConstantBehavior
+  parameters:
+    s_term: child1_st
+    constant_status: 0
+---
+name: child2
+components:
+- name: child2_controller
+  type: nvidia::gxf::EntityCountFailureRepeatController
+  parameters:
+    max_repeat_count: 3
+    return_behavior_running_if_failure_repeat: true
+- name: child2_st
+  type: nvidia::gxf::BTSchedulingTerm
+  parameters:
+    is_root: false
+- name: child2_codelet
+  type: nvidia::gxf::ConstantBehavior
+  parameters:
+    s_term: child2_st
+    constant_status: 1
+---
+name: sched
+components:
+- name: clock
+  type: nvidia::gxf::RealtimeClock
+- name: greedy_scheduler
+  type: nvidia::gxf::GreedyScheduler
+  parameters:
+    max_duration_ms: 10000
+    clock: clock

@@ -1,0 +1,1285 @@
+# Copyright (c) 2022, NVIDIA CORPORATION.  All rights reserved.
+#
+# NVIDIA CORPORATION and its licensors retain all intellectual property
+# and proprietary rights in and to this software, related documentation
+# and any modifications thereto.  Any use, reproduction, disclosure or
+# distribution of this software and related documentation without an express
+# license agreement from NVIDIA CORPORATION is strictly prohibited.
+%YAML 1.2
+version: 2.0.0
+extension_library: libgxf_std.so
+name: StandardExtension
+author: NVIDIA
+description: Most commonly used interfaces and components in Gxf Core
+license: LICENSE
+uuid: 8ec2d5d6-b5df-48bf-8dee-0252606fdd7e
+headers:
+- gxf/std/BUILD.public
+- gxf/std/allocator.hpp
+- gxf/std/codelet.hpp
+- gxf/std/eos.hpp
+- gxf/std/queue.hpp
+- gxf/std/receiver.hpp
+- gxf/std/tensor.hpp
+- gxf/std/timestamp.hpp
+- gxf/std/transmitter.hpp
+- gxf/std/scheduling_term.hpp
+- gxf/std/scheduling_condition.hpp
+- gxf/std/system.hpp
+dependencies: []
+gxf_core_version: 2.4.0
+registry_version: 1.0.0
+labels:
+- gxf
+components:
+- typename: nvidia::gxf::test::DummyComponent
+  type_id: 5c6166fa-feed-41e7-bbff-bd48cd6e1014
+  base_typename: nvidia::gxf::Component
+  description: This ia a dummy component for testing.
+  is_abstract: true
+  parameters: []
+- typename: nvidia::gxf::Codelet
+  type_id: 5c6166fa-6eed-41e7-bbf0-bd48cd6e1014
+  base_typename: nvidia::gxf::Component
+  description: Interface for a component which can be executed to run custom code
+  is_abstract: true
+  parameters: []
+- typename: nvidia::gxf::Clock
+  type_id: 779e61c2-ae70-441d-a26c-8ca64b39f8e7
+  base_typename: nvidia::gxf::Component
+  description: Interface for clock components which provide time
+  is_abstract: true
+  parameters: []
+- typename: nvidia::gxf::RealtimeClock
+  type_id: 7b170b7b-cf1a-4f3f-997c-bfea25342381
+  base_typename: nvidia::gxf::Clock
+  description: A realtime clock which runs based off a system steady clock
+  is_abstract: false
+  parameters:
+  - key: initial_time_offset
+    headline: Initial Time Offset
+    description: The initial time offset used until time scale is changed manually.
+    gxf_parameter_type: GXF_PARAMETER_TYPE_FLOAT64
+    default: 0.0
+    handle_type: N/A
+    flags: GXF_PARAMETER_FLAGS_NONE
+    rank: 0
+    shape:
+    - 1
+    min_value: null
+    max_value: null
+    step_value: null
+  - key: initial_time_scale
+    headline: Initial Time Scale
+    description: The initial time scale used until time scale is changed manually.
+    gxf_parameter_type: GXF_PARAMETER_TYPE_FLOAT64
+    default: 1.0
+    handle_type: N/A
+    flags: GXF_PARAMETER_FLAGS_NONE
+    rank: 0
+    shape:
+    - 1
+    min_value: null
+    max_value: null
+    step_value: null
+  - key: use_time_since_epoch
+    headline: Use Time Since Epoch
+    description: If true, clock time is time since epoch + initial_time_offset at
+      initialize().Otherwise clock time is initial_time_offset at initialize().
+    gxf_parameter_type: GXF_PARAMETER_TYPE_BOOL
+    default: false
+    handle_type: N/A
+    flags: GXF_PARAMETER_FLAGS_NONE
+    rank: 0
+    shape:
+    - 1
+    min_value: null
+    max_value: null
+    step_value: null
+- typename: nvidia::gxf::ManualClock
+  type_id: 52fa1f97-eba8-472a-a8ca-4cff1a2c440f
+  base_typename: nvidia::gxf::Clock
+  description: A manual clock which is instrumented manually
+  is_abstract: false
+  parameters:
+  - key: initial_timestamp
+    headline: Initial Timestamp
+    description: The initial timestamp on the clock (in nanoseconds).
+    gxf_parameter_type: GXF_PARAMETER_TYPE_INT64
+    default: 0
+    handle_type: N/A
+    flags: GXF_PARAMETER_FLAGS_NONE
+    rank: 0
+    shape:
+    - 1
+    min_value: null
+    max_value: null
+    step_value: null
+- typename: nvidia::gxf::System
+  type_id: d1febca1-80df-454e-a3f2-715f2b3c6e69
+  base_typename: nvidia::gxf::Component
+  description: Component interface for systems which are run as part of the application
+    run cycle
+  is_abstract: true
+  parameters: []
+- typename: nvidia::gxf::SystemGroup
+  type_id: 3d23d470-0aed-41c6-ac92-685c1b5469a0
+  base_typename: nvidia::gxf::System
+  description: A group of systems
+  is_abstract: false
+  parameters: []
+- typename: nvidia::gxf::Queue
+  type_id: 792151bf-3138-4603-a912-5ca91828dea8
+  base_typename: nvidia::gxf::Component
+  description: Interface for storing entities in a queue
+  is_abstract: true
+  parameters: []
+- typename: nvidia::gxf::Router
+  type_id: 8b317aad-f55c-4c07-8520-8f66db92a19e
+  base_typename: ''
+  description: Interface for classes which are routing messages in and out of entities.
+  is_abstract: true
+  parameters: []
+- typename: nvidia::gxf::MessageRouter
+  type_id: 84fd5d56-fda6-4937-0b3c-c283252553d8
+  base_typename: nvidia::gxf::Router
+  description: A router which sends transmitted messages to receivers.
+  is_abstract: false
+  parameters: []
+- typename: nvidia::gxf::RouterGroup
+  type_id: ca64ee14-2280-4099-9f10-d4b501e09117
+  base_typename: nvidia::gxf::Router
+  description: A group of routers
+  is_abstract: false
+  parameters: []
+- typename: nvidia::gxf::Transmitter
+  type_id: c30cc60f-0db2-409d-92b6-b2db92e02cce
+  base_typename: nvidia::gxf::Queue
+  description: Interface for publishing entities
+  is_abstract: true
+  parameters: []
+- typename: nvidia::gxf::Receiver
+  type_id: a47d2f62-245f-40fc-90b7-5dc78ff2437e
+  base_typename: nvidia::gxf::Queue
+  description: Interface for receiving entities
+  is_abstract: true
+  parameters: []
+- typename: nvidia::gxf::DoubleBufferTransmitter
+  type_id: 0c3c0ec7-77f1-4389-aef1-6bae85bddc13
+  base_typename: nvidia::gxf::Transmitter
+  description: A transmitter which uses a double-buffered queue where messages are
+    pushed to a backstage after they are published
+  is_abstract: false
+  parameters:
+  - key: capacity
+    headline: Capacity
+    description: ''
+    gxf_parameter_type: GXF_PARAMETER_TYPE_UINT64
+    default: 1
+    handle_type: N/A
+    flags: GXF_PARAMETER_FLAGS_NONE
+    rank: 0
+    shape:
+    - 1
+    min_value: null
+    max_value: null
+    step_value: null
+  - key: policy
+    headline: Policy
+    description: '0: pop, 1: reject, 2: fault'
+    gxf_parameter_type: GXF_PARAMETER_TYPE_UINT64
+    default: 2
+    handle_type: N/A
+    flags: GXF_PARAMETER_FLAGS_NONE
+    rank: 0
+    shape:
+    - 1
+    min_value: null
+    max_value: null
+    step_value: null
+- typename: nvidia::gxf::DoubleBufferReceiver
+  type_id: ee45883d-bf84-4f99-8419-7c5e9deac6a5
+  base_typename: nvidia::gxf::Receiver
+  description: A receiver which uses a double-buffered queue where new messages are
+    first pushed to a backstage
+  is_abstract: false
+  parameters:
+  - key: capacity
+    headline: Capacity
+    description: ''
+    gxf_parameter_type: GXF_PARAMETER_TYPE_UINT64
+    default: 1
+    handle_type: N/A
+    flags: GXF_PARAMETER_FLAGS_NONE
+    rank: 0
+    shape:
+    - 1
+    min_value: null
+    max_value: null
+    step_value: null
+  - key: policy
+    headline: Policy
+    description: '0: pop, 1: reject, 2: fault'
+    gxf_parameter_type: GXF_PARAMETER_TYPE_UINT64
+    default: 2
+    handle_type: N/A
+    flags: GXF_PARAMETER_FLAGS_NONE
+    rank: 0
+    shape:
+    - 1
+    min_value: null
+    max_value: null
+    step_value: null
+- typename: nvidia::gxf::Connection
+  type_id: cc71afae-5ede-47e9-b267-60a5c750a89a
+  base_typename: nvidia::gxf::Component
+  description: A component which establishes a connection between two other components
+  is_abstract: false
+  parameters:
+  - key: source
+    headline: Source channel
+    description: ''
+    gxf_parameter_type: GXF_PARAMETER_TYPE_HANDLE
+    default: N/A
+    handle_type: nvidia::gxf::Transmitter
+    flags: GXF_PARAMETER_FLAGS_NONE
+    rank: 0
+    shape:
+    - 1
+    min_value: null
+    max_value: null
+    step_value: null
+  - key: target
+    headline: Target channel
+    description: ''
+    gxf_parameter_type: GXF_PARAMETER_TYPE_HANDLE
+    default: N/A
+    handle_type: nvidia::gxf::Receiver
+    flags: GXF_PARAMETER_FLAGS_NONE
+    rank: 0
+    shape:
+    - 1
+    min_value: null
+    max_value: null
+    step_value: null
+- typename: nvidia::gxf::Scheduler
+  type_id: f0103b75-d2e1-4d70-9b13-3fe5b40209be
+  base_typename: nvidia::gxf::System
+  description: A simple poll-based single-threaded scheduler which executes codelets
+  is_abstract: true
+  parameters: []
+- typename: nvidia::gxf::SchedulingTerm
+  type_id: 184d8e4e-086c-475a-903a-69d723f95d19
+  base_typename: nvidia::gxf::Component
+  description: Interface for terms used by a scheduler to determine if codelets in
+    an entity are ready to step
+  is_abstract: true
+  parameters: []
+- typename: nvidia::gxf::PeriodicSchedulingTerm
+  type_id: d392c98a-9b08-49b4-a422-d5fe6cd72e3e
+  base_typename: nvidia::gxf::SchedulingTerm
+  description: A component which specifies that an entity shall be executed periodically
+  is_abstract: false
+  parameters:
+  - key: recess_period
+    headline: Recess Period
+    description: 'The recess period indicates the miniumum amount of time which has
+      to pass before the entity is permitted to execute again. The period is specified
+      as a string containing of a number and an (optional) unit. If no unit is given
+      the value is assumed to be in nanoseconds. Supported units are: Hz, s, ms. Example:
+      10ms, 10000000, 0.2s, 50Hz'
+    gxf_parameter_type: GXF_PARAMETER_TYPE_STRING
+    default: N/A
+    handle_type: N/A
+    flags: GXF_PARAMETER_FLAGS_NONE
+    rank: 0
+    shape:
+    - 1
+    min_value: null
+    max_value: null
+    step_value: null
+- typename: nvidia::gxf::CountSchedulingTerm
+  type_id: f89da2e4-fddf-4aa2-9a80-1119ba3fde05
+  base_typename: nvidia::gxf::SchedulingTerm
+  description: A component which specifies that an entity shall be executed exactly
+    a given number of times
+  is_abstract: false
+  parameters:
+  - key: count
+    headline: Count
+    description: The total number of time this term will permit execution.
+    gxf_parameter_type: GXF_PARAMETER_TYPE_INT64
+    default: N/A
+    handle_type: N/A
+    flags: GXF_PARAMETER_FLAGS_NONE
+    rank: 0
+    shape:
+    - 1
+    min_value: null
+    max_value: null
+    step_value: null
+- typename: nvidia::gxf::TargetTimeSchedulingTerm
+  type_id: e4aaf5c3-2b10-4c9a-c463-ebf6084149bf
+  base_typename: nvidia::gxf::SchedulingTerm
+  description: A component where the next execution time of the entity needsto be
+    specified after every tick
+  is_abstract: false
+  parameters:
+  - key: clock
+    headline: Clock
+    description: The clock used to define target time.
+    gxf_parameter_type: GXF_PARAMETER_TYPE_HANDLE
+    default: N/A
+    handle_type: nvidia::gxf::Clock
+    flags: GXF_PARAMETER_FLAGS_NONE
+    rank: 0
+    shape:
+    - 1
+    min_value: null
+    max_value: null
+    step_value: null
+- typename: nvidia::gxf::DownstreamReceptiveSchedulingTerm
+  type_id: 9de75119-8d0f-4819-9a71-2aeaefd23f71
+  base_typename: nvidia::gxf::SchedulingTerm
+  description: A component which specifies that an entity shall be executed if receivers
+    for a certain transmitter can accept new messages
+  is_abstract: false
+  parameters:
+  - key: transmitter
+    headline: Transmitter
+    description: The term permits execution if this transmitter can publish a message,
+      i.e. if the receiver which is connected to this transmitter can receive messages.
+    gxf_parameter_type: GXF_PARAMETER_TYPE_HANDLE
+    default: N/A
+    handle_type: nvidia::gxf::Transmitter
+    flags: GXF_PARAMETER_FLAGS_NONE
+    rank: 0
+    shape:
+    - 1
+    min_value: null
+    max_value: null
+    step_value: null
+  - key: min_size
+    headline: Minimum size
+    description: The term permits execution if the receiver connected to the transmitter
+      has at least the specified number of free slots in its back buffer.
+    gxf_parameter_type: GXF_PARAMETER_TYPE_UINT64
+    default: N/A
+    handle_type: N/A
+    flags: GXF_PARAMETER_FLAGS_NONE
+    rank: 0
+    shape:
+    - 1
+    min_value: null
+    max_value: null
+    step_value: null
+- typename: nvidia::gxf::MessageAvailableSchedulingTerm
+  type_id: fe799e65-f78b-48eb-beb6-e73083a12d5b
+  base_typename: nvidia::gxf::SchedulingTerm
+  description: A scheduling term which specifies that an entity can be executed when
+    the total number of messages over a set of input channels is at least a given
+    number of messages.
+  is_abstract: false
+  parameters:
+  - key: receiver
+    headline: Queue channel
+    description: The scheduling term permits execution if this channel has at least
+      a given number of messages available.
+    gxf_parameter_type: GXF_PARAMETER_TYPE_HANDLE
+    default: N/A
+    handle_type: nvidia::gxf::Receiver
+    flags: GXF_PARAMETER_FLAGS_NONE
+    rank: 0
+    shape:
+    - 1
+    min_value: null
+    max_value: null
+    step_value: null
+  - key: min_size
+    headline: Minimum message count
+    description: The scheduling term permits execution if the given receiver has at
+      least the given number of messages available.
+    gxf_parameter_type: GXF_PARAMETER_TYPE_UINT64
+    default: N/A
+    handle_type: N/A
+    flags: GXF_PARAMETER_FLAGS_NONE
+    rank: 0
+    shape:
+    - 1
+    min_value: null
+    max_value: null
+    step_value: null
+  - key: front_stage_max_size
+    headline: Maximum front stage message count
+    description: If set the scheduling term will only allow execution if the number
+      of messages in the front stage does not exceed this count. It can for example
+      be used in combination with codelets which do not clear the front stage in every
+      tick.
+    gxf_parameter_type: GXF_PARAMETER_TYPE_UINT64
+    default: N/A
+    handle_type: N/A
+    flags: GXF_PARAMETER_FLAGS_OPTIONAL
+    rank: 0
+    shape:
+    - 1
+    min_value: null
+    max_value: null
+    step_value: null
+- typename: nvidia::gxf::MultiMessageAvailableSchedulingTerm
+  type_id: f15dbeaa-afd6-47a6-9ffc-7afd7e1b4c52
+  base_typename: nvidia::gxf::SchedulingTerm
+  description: A component which specifies that an entity shall be executed when a
+    queue has at least a certain number of elements
+  is_abstract: false
+  parameters:
+  - key: receivers
+    headline: Receivers
+    description: The scheduling term permits execution if the given channels have
+      at least a given number of messages available.
+    gxf_parameter_type: GXF_PARAMETER_TYPE_HANDLE
+    default: N/A
+    handle_type: nvidia::gxf::Receiver
+    flags: GXF_PARAMETER_FLAGS_NONE
+    rank: 1
+    shape:
+    - -1
+    min_value: null
+    max_value: null
+    step_value: null
+  - key: min_size
+    headline: Minimum message count
+    description: The scheduling term permits execution if all given receivers together
+      have at least the given number of messages available.
+    gxf_parameter_type: GXF_PARAMETER_TYPE_UINT64
+    default: N/A
+    handle_type: N/A
+    flags: GXF_PARAMETER_FLAGS_NONE
+    rank: 0
+    shape:
+    - 1
+    min_value: null
+    max_value: null
+    step_value: null
+- typename: nvidia::gxf::ExpiringMessageAvailableSchedulingTerm
+  type_id: eb22280c-76ff-11eb-b341-cf6b417c95c9
+  base_typename: nvidia::gxf::SchedulingTerm
+  description: A component which tries to wait for specified number of messages in
+    queue for at most specified time.
+  is_abstract: false
+  parameters:
+  - key: max_batch_size
+    headline: Maximum Batch Size
+    description: 'The maximum number of messages to be batched together. '
+    gxf_parameter_type: GXF_PARAMETER_TYPE_INT64
+    default: N/A
+    handle_type: N/A
+    flags: GXF_PARAMETER_FLAGS_NONE
+    rank: 0
+    shape:
+    - 1
+    min_value: null
+    max_value: null
+    step_value: null
+  - key: max_delay_ns
+    headline: Maximum delay in nano seconds.
+    description: The maximum delay from first message to wait before submitting workload
+      anyway.
+    gxf_parameter_type: GXF_PARAMETER_TYPE_INT64
+    default: N/A
+    handle_type: N/A
+    flags: GXF_PARAMETER_FLAGS_NONE
+    rank: 0
+    shape:
+    - 1
+    min_value: null
+    max_value: null
+    step_value: null
+  - key: receiver
+    headline: Receiver
+    description: Receiver to watch on.
+    gxf_parameter_type: GXF_PARAMETER_TYPE_HANDLE
+    default: N/A
+    handle_type: nvidia::gxf::Receiver
+    flags: GXF_PARAMETER_FLAGS_NONE
+    rank: 0
+    shape:
+    - 1
+    min_value: null
+    max_value: null
+    step_value: null
+  - key: clock
+    headline: Clock
+    description: Clock to get time from.
+    gxf_parameter_type: GXF_PARAMETER_TYPE_HANDLE
+    default: N/A
+    handle_type: nvidia::gxf::Clock
+    flags: GXF_PARAMETER_FLAGS_NONE
+    rank: 0
+    shape:
+    - 1
+    min_value: null
+    max_value: null
+    step_value: null
+- typename: nvidia::gxf::BooleanSchedulingTerm
+  type_id: e07a0dc4-3908-4df8-8134-7ce38e60fbef
+  base_typename: nvidia::gxf::SchedulingTerm
+  description: A component which acts as a boolean AND term that can be used to control
+    the execution of the entity.
+  is_abstract: false
+  parameters:
+  - key: enable_tick
+    headline: Enable Tick
+    description: The default initial condition for enabling tick.
+    gxf_parameter_type: GXF_PARAMETER_TYPE_BOOL
+    default: true
+    handle_type: N/A
+    flags: GXF_PARAMETER_FLAGS_DYNAMIC
+    rank: 0
+    shape:
+    - 1
+    min_value: null
+    max_value: null
+    step_value: null
+- typename: nvidia::gxf::BTSchedulingTerm
+  type_id: 0161ca51-2fed-4a8c-8f24-67cf1b5e330a
+  base_typename: nvidia::gxf::SchedulingTerm
+  description: A component which is used to control the execution of the behavior
+    tree entities.
+  is_abstract: false
+  parameters:
+  - key: is_root
+    headline: is_root
+    description: N/A
+    gxf_parameter_type: GXF_PARAMETER_TYPE_BOOL
+    default: N/A
+    handle_type: N/A
+    flags: GXF_PARAMETER_FLAGS_NONE
+    rank: 0
+    shape:
+    - 1
+    min_value: null
+    max_value: null
+    step_value: null
+- typename: nvidia::gxf::AsynchronousSchedulingTerm
+  type_id: 56be1662-ff63-4179-9200-3fcd8dc38673
+  base_typename: nvidia::gxf::SchedulingTerm
+  description: A component which is used to inform of that an entity is dependent
+    upon an async event for its execution
+  is_abstract: false
+  parameters: []
+- typename: nvidia::gxf::GreedyScheduler
+  type_id: 869d30ca-a443-4619-b988-7a52e657f39b
+  base_typename: nvidia::gxf::Scheduler
+  description: A simple poll-based single-threaded scheduler which executes codelets
+  is_abstract: false
+  parameters:
+  - key: clock
+    headline: Clock
+    description: The clock used by the scheduler to define flow of time. Typical choices
+      are a RealtimeClock or a ManualClock.
+    gxf_parameter_type: GXF_PARAMETER_TYPE_HANDLE
+    default: N/A
+    handle_type: nvidia::gxf::Clock
+    flags: GXF_PARAMETER_FLAGS_OPTIONAL
+    rank: 0
+    shape:
+    - 1
+    min_value: null
+    max_value: null
+    step_value: null
+  - key: realtime
+    headline: Realtime (deprecated)
+    description: This parameter is deprecated. Assign a clock directly.
+    gxf_parameter_type: GXF_PARAMETER_TYPE_BOOL
+    default: N/A
+    handle_type: N/A
+    flags: GXF_PARAMETER_FLAGS_OPTIONAL
+    rank: 0
+    shape:
+    - 1
+    min_value: null
+    max_value: null
+    step_value: null
+  - key: max_duration_ms
+    headline: Max Duration [ms]
+    description: The maximum duration for which the scheduler will execute (in ms).
+      If not specified the scheduler will run until all work is done. If periodic
+      terms are present this means the application will run indefinitely.
+    gxf_parameter_type: GXF_PARAMETER_TYPE_INT64
+    default: N/A
+    handle_type: N/A
+    flags: GXF_PARAMETER_FLAGS_OPTIONAL
+    rank: 0
+    shape:
+    - 1
+    min_value: null
+    max_value: null
+    step_value: null
+  - key: stop_on_deadlock
+    headline: Stop on dead end
+    description: If enabled the scheduler will stop when all entities are in a waiting
+      state, but no periodic entity exists to break the dead end. Should be disabled
+      when scheduling conditions can be changed by external actors, for example by
+      clearing queues manually.
+    gxf_parameter_type: GXF_PARAMETER_TYPE_BOOL
+    default: true
+    handle_type: N/A
+    flags: GXF_PARAMETER_FLAGS_NONE
+    rank: 0
+    shape:
+    - 1
+    min_value: null
+    max_value: null
+    step_value: null
+- typename: nvidia::gxf::MultiThreadScheduler
+  type_id: de5e0646-7fa5-11eb-a5c4-330ebfa81bbf
+  base_typename: nvidia::gxf::Scheduler
+  description: A multi thread scheduler that executes codelets for maximum throughput.
+  is_abstract: false
+  parameters:
+  - key: clock
+    headline: Clock
+    description: The clock used by the scheduler to define flow of time. Typical choices
+      are a RealtimeClock or a ManualClock.
+    gxf_parameter_type: GXF_PARAMETER_TYPE_HANDLE
+    default: N/A
+    handle_type: nvidia::gxf::Clock
+    flags: GXF_PARAMETER_FLAGS_NONE
+    rank: 0
+    shape:
+    - 1
+    min_value: null
+    max_value: null
+    step_value: null
+  - key: max_duration_ms
+    headline: Max Duration [ms]
+    description: The maximum duration for which the scheduler will execute (in ms).
+      If not specified the scheduler will run until all work is done. If periodic
+      terms are present this means the application will run indefinitely.
+    gxf_parameter_type: GXF_PARAMETER_TYPE_INT64
+    default: N/A
+    handle_type: N/A
+    flags: GXF_PARAMETER_FLAGS_OPTIONAL
+    rank: 0
+    shape:
+    - 1
+    min_value: null
+    max_value: null
+    step_value: null
+  - key: check_recession_period_ms
+    headline: Duration to sleep before checking the condition of an entity again [ms]
+    description: The maximum duration for which the scheduler would wait (in ms) when
+      an entity is not ready to run yet.
+    gxf_parameter_type: GXF_PARAMETER_TYPE_INT64
+    default: 5
+    handle_type: N/A
+    flags: GXF_PARAMETER_FLAGS_NONE
+    rank: 0
+    shape:
+    - 1
+    min_value: null
+    max_value: null
+    step_value: null
+  - key: stop_on_deadlock
+    headline: Stop on dead end
+    description: If enabled the scheduler will stop when all entities are in a waiting
+      state, but no periodic entity exists to break the dead end. Should be disabled
+      when scheduling conditions can be changed by external actors, for example by
+      clearing queues manually.
+    gxf_parameter_type: GXF_PARAMETER_TYPE_BOOL
+    default: true
+    handle_type: N/A
+    flags: GXF_PARAMETER_FLAGS_NONE
+    rank: 0
+    shape:
+    - 1
+    min_value: null
+    max_value: null
+    step_value: null
+  - key: worker_thread_number
+    headline: Thread Number
+    description: Number of threads.
+    gxf_parameter_type: GXF_PARAMETER_TYPE_INT64
+    default: 1
+    handle_type: N/A
+    flags: GXF_PARAMETER_FLAGS_NONE
+    rank: 0
+    shape:
+    - 1
+    min_value: null
+    max_value: null
+    step_value: null
+- typename: nvidia::gxf::Allocator
+  type_id: 3cdd82d0-2326-4867-8de2-d565dbe28e03
+  base_typename: nvidia::gxf::Component
+  description: Provides allocation and deallocation of memory
+  is_abstract: true
+  parameters: []
+- typename: nvidia::gxf::BlockMemoryPool
+  type_id: 92b627a3-5dd3-4c3c-976c-4700e8a3b96a
+  base_typename: nvidia::gxf::Allocator
+  description: A memory pools which provides a maximum number of equally sized blocks
+    of memory
+  is_abstract: false
+  parameters:
+  - key: storage_type
+    headline: Storage type
+    description: The memory storage type used by this allocator. Can be kHost (0),
+      kDevice (1) or kSystem (2)
+    gxf_parameter_type: GXF_PARAMETER_TYPE_INT32
+    default: 0
+    handle_type: N/A
+    flags: GXF_PARAMETER_FLAGS_NONE
+    rank: 0
+    shape:
+    - 1
+    min_value: null
+    max_value: null
+    step_value: null
+  - key: block_size
+    headline: Block size
+    description: The size of one block of memory in byte. Allocation requests can
+      only be fullfilled if they fit into one block. If less memory is requested still
+      a full block is issued.
+    gxf_parameter_type: GXF_PARAMETER_TYPE_UINT64
+    default: N/A
+    handle_type: N/A
+    flags: GXF_PARAMETER_FLAGS_NONE
+    rank: 0
+    shape:
+    - 1
+    min_value: null
+    max_value: null
+    step_value: null
+  - key: num_blocks
+    headline: Number of blocks
+    description: The total number of blocks which are allocated by the pool. If more
+      blocks are requested allocation requests will fail.
+    gxf_parameter_type: GXF_PARAMETER_TYPE_UINT64
+    default: N/A
+    handle_type: N/A
+    flags: GXF_PARAMETER_FLAGS_NONE
+    rank: 0
+    shape:
+    - 1
+    min_value: null
+    max_value: null
+    step_value: null
+- typename: nvidia::gxf::UnboundedAllocator
+  type_id: c3951b16-a01c-539f-d87e-1dc18d911ea0
+  base_typename: nvidia::gxf::Allocator
+  description: Allocator that uses dynamic memory allocation without an upper bound
+  is_abstract: false
+  parameters: []
+- typename: nvidia::gxf::Tensor
+  type_id: 377501d6-9abf-447c-a617-0114d4f33ab8
+  base_typename: ''
+  description: A component which holds a single tensor
+  is_abstract: false
+  parameters: []
+- typename: nvidia::gxf::Shape
+  type_id: 469cc839-a6ab-470b-9d09-b8bf978c13cd
+  base_typename: ''
+  description: A component which describes the shape of a tensor
+  is_abstract: false
+  parameters: []
+- typename: nvidia::gxf::Timestamp
+  type_id: d1095b10-5c90-4bbc-bc89-601134cb4e03
+  base_typename: ''
+  description: Holds message publishing and acquisition related timing information
+  is_abstract: false
+  parameters: []
+- typename: nvidia::gxf::Metric
+  type_id: f7cef803-5beb-46f1-186a-05d3919842ac
+  base_typename: nvidia::gxf::Component
+  description: Collects, aggregates, and evaluates metric data.
+  is_abstract: false
+  parameters:
+  - key: aggregation_policy
+    headline: Aggregation Policy
+    description: Aggregation policy used to aggregate individual metric samples. Choices:{mean,
+      min, max}.
+    gxf_parameter_type: GXF_PARAMETER_TYPE_STRING
+    default: N/A
+    handle_type: N/A
+    flags: GXF_PARAMETER_FLAGS_OPTIONAL
+    rank: 0
+    shape:
+    - 1
+    min_value: null
+    max_value: null
+    step_value: null
+  - key: lower_threshold
+    headline: Lower threshold
+    description: Lower threshold of the metric's expected range
+    gxf_parameter_type: GXF_PARAMETER_TYPE_FLOAT64
+    default: N/A
+    handle_type: N/A
+    flags: GXF_PARAMETER_FLAGS_OPTIONAL
+    rank: 0
+    shape:
+    - 1
+    min_value: null
+    max_value: null
+    step_value: null
+  - key: upper_threshold
+    headline: Upper threshold
+    description: Upper threshold of the metric's expected range
+    gxf_parameter_type: GXF_PARAMETER_TYPE_FLOAT64
+    default: N/A
+    handle_type: N/A
+    flags: GXF_PARAMETER_FLAGS_OPTIONAL
+    rank: 0
+    shape:
+    - 1
+    min_value: null
+    max_value: null
+    step_value: null
+- typename: nvidia::gxf::JobStatistics
+  type_id: 2093b91a-7c82-11eb-a92b-3f1304ecc959
+  base_typename: nvidia::gxf::Component
+  description: Collects runtime statistics.
+  is_abstract: false
+  parameters:
+  - key: clock
+    headline: Clock
+    description: The clock component instance to retrieve time from.
+    gxf_parameter_type: GXF_PARAMETER_TYPE_HANDLE
+    default: N/A
+    handle_type: nvidia::gxf::Clock
+    flags: GXF_PARAMETER_FLAGS_NONE
+    rank: 0
+    shape:
+    - 1
+    min_value: null
+    max_value: null
+    step_value: null
+  - key: codelet_statistics
+    headline: Codelet Statistics
+    description: Parameter to enable/disable statistics collection for Codelets
+    gxf_parameter_type: GXF_PARAMETER_TYPE_BOOL
+    default: false
+    handle_type: N/A
+    flags: GXF_PARAMETER_FLAGS_NONE
+    rank: 0
+    shape:
+    - 1
+    min_value: null
+    max_value: null
+    step_value: null
+  - key: json_file_path
+    headline: JSON File Path
+    description: JSON file path to save statistics output
+    gxf_parameter_type: GXF_PARAMETER_TYPE_FILE
+    default: N/A
+    handle_type: N/A
+    flags: GXF_PARAMETER_FLAGS_OPTIONAL
+    rank: 0
+    shape:
+    - 1
+    min_value: null
+    max_value: null
+    step_value: null
+- typename: nvidia::gxf::Monitor
+  type_id: 9ccf9421-b35b-8c79-e1f0-97dc23bd38ea
+  base_typename: nvidia::gxf::Component
+  description: Monitors entities during execution.
+  is_abstract: true
+  parameters: []
+- typename: nvidia::gxf::Controller
+  type_id: c8e80475-3c79-43a4-9083-eaf294b0600d
+  base_typename: nvidia::gxf::Component
+  description: Controls entities' termination policy and tracks behavior status during
+    execution.
+  is_abstract: true
+  parameters: []
+- typename: nvidia::gxf::Broadcast
+  type_id: 3daadb31-0bca-47e5-9924-342b9984a014
+  base_typename: nvidia::gxf::Codelet
+  description: Messages arrived on the input channel are distributed to all transmitters.
+  is_abstract: false
+  parameters:
+  - key: source
+    headline: Source channel
+    description: ''
+    gxf_parameter_type: GXF_PARAMETER_TYPE_HANDLE
+    default: N/A
+    handle_type: nvidia::gxf::Receiver
+    flags: GXF_PARAMETER_FLAGS_NONE
+    rank: 0
+    shape:
+    - 1
+    min_value: null
+    max_value: null
+    step_value: null
+  - key: mode
+    headline: Broadcast Mode
+    description: The broadcast mode. Can be Broadcast or RoundRobin.
+    gxf_parameter_type: GXF_PARAMETER_TYPE_CUSTOM
+    default: N/A
+    handle_type: N/A
+    flags: GXF_PARAMETER_FLAGS_NONE
+    rank: 0
+    shape:
+    - 1
+    min_value: null
+    max_value: null
+    step_value: null
+- typename: nvidia::gxf::Gather
+  type_id: 85f64c84-8236-4035-9b9a-3843a6a2026f
+  base_typename: nvidia::gxf::Codelet
+  description: All messages arriving on any input channel are published on the single
+    output channel.
+  is_abstract: false
+  parameters:
+  - key: sink
+    headline: Sink
+    description: The output channel for gathered messages.
+    gxf_parameter_type: GXF_PARAMETER_TYPE_HANDLE
+    default: N/A
+    handle_type: nvidia::gxf::Transmitter
+    flags: GXF_PARAMETER_FLAGS_NONE
+    rank: 0
+    shape:
+    - 1
+    min_value: null
+    max_value: null
+    step_value: null
+  - key: tick_source_limit
+    headline: Tick Source Limit
+    description: Maximum number of messages to take from each source in one tick.
+      0 means no limit.
+    gxf_parameter_type: GXF_PARAMETER_TYPE_INT64
+    default: 0
+    handle_type: N/A
+    flags: GXF_PARAMETER_FLAGS_NONE
+    rank: 0
+    shape:
+    - 1
+    min_value: null
+    max_value: null
+    step_value: null
+- typename: nvidia::gxf::TensorCopier
+  type_id: c07680f4-75b3-189b-8886-4b5e448e7bb6
+  base_typename: nvidia::gxf::Codelet
+  description: Copies tensor either from host to device or from device to host
+  is_abstract: false
+  parameters:
+  - key: receiver
+    headline: Receiver
+    description: Receiver for incoming entities
+    gxf_parameter_type: GXF_PARAMETER_TYPE_HANDLE
+    default: N/A
+    handle_type: nvidia::gxf::Receiver
+    flags: GXF_PARAMETER_FLAGS_NONE
+    rank: 0
+    shape:
+    - 1
+    min_value: null
+    max_value: null
+    step_value: null
+  - key: transmitter
+    headline: Transmitter
+    description: 'Transmitter for outgoing entities '
+    gxf_parameter_type: GXF_PARAMETER_TYPE_HANDLE
+    default: N/A
+    handle_type: nvidia::gxf::Transmitter
+    flags: GXF_PARAMETER_FLAGS_NONE
+    rank: 0
+    shape:
+    - 1
+    min_value: null
+    max_value: null
+    step_value: null
+  - key: allocator
+    headline: Allocator
+    description: Memory allocator for tensor data
+    gxf_parameter_type: GXF_PARAMETER_TYPE_HANDLE
+    default: N/A
+    handle_type: nvidia::gxf::Allocator
+    flags: GXF_PARAMETER_FLAGS_NONE
+    rank: 0
+    shape:
+    - 1
+    min_value: null
+    max_value: null
+    step_value: null
+  - key: mode
+    headline: Copy mode
+    description: Configuration to select what tensors to copy - kCopyToDevice (0)
+      - copies to device memory, ignores device allocation; kCopyToHost (1) - copies
+      to pinned host memory, ignores host allocation; kCopyToSystem (2) - copies to
+      system memory, ignores system allocation
+    gxf_parameter_type: GXF_PARAMETER_TYPE_INT32
+    default: N/A
+    handle_type: N/A
+    flags: GXF_PARAMETER_FLAGS_NONE
+    rank: 0
+    shape:
+    - 1
+    min_value: null
+    max_value: null
+    step_value: null
+- typename: nvidia::gxf::TimedThrottler
+  type_id: ccf7729c-f62c-4250-5cf7-f4f3ec80454b
+  base_typename: nvidia::gxf::Codelet
+  description: Publishes the received entity respecting the timestamp within the entity
+  is_abstract: false
+  parameters:
+  - key: transmitter
+    headline: Transmitter
+    description: Transmitter channel publishing messages at appropriate timesteps
+    gxf_parameter_type: GXF_PARAMETER_TYPE_HANDLE
+    default: N/A
+    handle_type: nvidia::gxf::Transmitter
+    flags: GXF_PARAMETER_FLAGS_NONE
+    rank: 0
+    shape:
+    - 1
+    min_value: null
+    max_value: null
+    step_value: null
+  - key: receiver
+    headline: Receiver
+    description: Channel to receive messages that need to be synchronized
+    gxf_parameter_type: GXF_PARAMETER_TYPE_HANDLE
+    default: N/A
+    handle_type: nvidia::gxf::Receiver
+    flags: GXF_PARAMETER_FLAGS_NONE
+    rank: 0
+    shape:
+    - 1
+    min_value: null
+    max_value: null
+    step_value: null
+  - key: execution_clock
+    headline: Execution Clock
+    description: Clock on which the codelet is executed by the scheduler
+    gxf_parameter_type: GXF_PARAMETER_TYPE_HANDLE
+    default: N/A
+    handle_type: nvidia::gxf::Clock
+    flags: GXF_PARAMETER_FLAGS_NONE
+    rank: 0
+    shape:
+    - 1
+    min_value: null
+    max_value: null
+    step_value: null
+  - key: throttling_clock
+    headline: Throttling Clock
+    description: Clock on which the received entity timestamps are based
+    gxf_parameter_type: GXF_PARAMETER_TYPE_HANDLE
+    default: N/A
+    handle_type: nvidia::gxf::Clock
+    flags: GXF_PARAMETER_FLAGS_NONE
+    rank: 0
+    shape:
+    - 1
+    min_value: null
+    max_value: null
+    step_value: null
+  - key: scheduling_term
+    headline: Scheduling Term
+    description: Scheduling term for executing the codelet
+    gxf_parameter_type: GXF_PARAMETER_TYPE_HANDLE
+    default: N/A
+    handle_type: nvidia::gxf::TargetTimeSchedulingTerm
+    flags: GXF_PARAMETER_FLAGS_NONE
+    rank: 0
+    shape:
+    - 1
+    min_value: null
+    max_value: null
+    step_value: null
+- typename: nvidia::gxf::Vault
+  type_id: 1108cb8d-85e4-4303-ba02-d27406ee9e65
+  base_typename: nvidia::gxf::Codelet
+  description: Safely stores received entities for further processing.
+  is_abstract: false
+  parameters:
+  - key: source
+    headline: Source
+    description: Receiver from which messages are taken and transferred to the vault.
+    gxf_parameter_type: GXF_PARAMETER_TYPE_HANDLE
+    default: N/A
+    handle_type: nvidia::gxf::Receiver
+    flags: GXF_PARAMETER_FLAGS_NONE
+    rank: 0
+    shape:
+    - 1
+    min_value: null
+    max_value: null
+    step_value: null
+  - key: max_waiting_count
+    headline: Maximum waiting count
+    description: The maximum number of waiting messages. If exceeded the codelet will
+      stop pulling messages out of the input queue.
+    gxf_parameter_type: GXF_PARAMETER_TYPE_UINT64
+    default: N/A
+    handle_type: N/A
+    flags: GXF_PARAMETER_FLAGS_NONE
+    rank: 0
+    shape:
+    - 1
+    min_value: null
+    max_value: null
+    step_value: null
+  - key: drop_waiting
+    headline: Drop waiting
+    description: If too many messages are waiting the oldest ones are dropped.
+    gxf_parameter_type: GXF_PARAMETER_TYPE_BOOL
+    default: N/A
+    handle_type: N/A
+    flags: GXF_PARAMETER_FLAGS_NONE
+    rank: 0
+    shape:
+    - 1
+    min_value: null
+    max_value: null
+    step_value: null
+- typename: nvidia::gxf::Subgraph
+  type_id: 576eedd7-7c3f-4d2f-8c38-8baa79a3d231
+  base_typename: nvidia::gxf::Component
+  description: Helper component to import a subgraph
+  is_abstract: false
+  parameters:
+  - key: location
+    headline: Yaml source of the subgraph
+    description: ''
+    gxf_parameter_type: GXF_PARAMETER_TYPE_FILE
+    default: N/A
+    handle_type: N/A
+    flags: GXF_PARAMETER_FLAGS_NONE
+    rank: 0
+    shape:
+    - 1
+    min_value: null
+    max_value: null
+    step_value: null
+- typename: nvidia::gxf::EndOfStream
+  type_id: 8c42f7bf-7041-4626-9792-9eb20ce33cce
+  base_typename: ''
+  description: A component which represents end-of-stream notification
+  is_abstract: false
+  parameters: []
+- typename: nvidia::gxf::Synchronization
+  type_id: f1cb80d6-e5ec-4dba-9f9e-b06b0def4443
+  base_typename: nvidia::gxf::Codelet
+  description: Component to synchronize messages from multiple receivers based on
+    theacq_time
+  is_abstract: false
+  parameters:
+  - key: inputs
+    headline: Inputs
+    description: All the inputs for synchronization, number of inputs must match that
+      of the outputs.
+    gxf_parameter_type: GXF_PARAMETER_TYPE_HANDLE
+    default: N/A
+    handle_type: nvidia::gxf::Receiver
+    flags: GXF_PARAMETER_FLAGS_NONE
+    rank: 1
+    shape:
+    - -1
+    min_value: null
+    max_value: null
+    step_value: null
+  - key: outputs
+    headline: Outputs
+    description: All the outputs for synchronization, number of outpus must match
+      that of the inputs.
+    gxf_parameter_type: GXF_PARAMETER_TYPE_HANDLE
+    default: N/A
+    handle_type: nvidia::gxf::Transmitter
+    flags: GXF_PARAMETER_FLAGS_NONE
+    rank: 1
+    shape:
+    - -1
+    min_value: null
+    max_value: null
+    step_value: null
+- typename: nvidia::gxf::EpochScheduler
+  type_id: 3d175ab4-2e0d-11ec-8d3d-0242ac130003
+  base_typename: nvidia::gxf::Scheduler
+  description: A scheduler for running loads in externally managed threads
+  is_abstract: false
+  parameters:
+  - key: clock
+    headline: Clock
+    description: The clock used by the scheduler to check maximum time budget. Typical
+      choice is a RealtimeClock.
+    gxf_parameter_type: GXF_PARAMETER_TYPE_HANDLE
+    default: N/A
+    handle_type: nvidia::gxf::Clock
+    flags: GXF_PARAMETER_FLAGS_NONE
+    rank: 0
+    shape:
+    - 1
+    min_value: null
+    max_value: null
+    step_value: null
+- typename: signed char
+  type_id: 83905c6a-ca34-4f40-b474-cf2cde8274de
+  base_typename: ''
+  description: ''
+  is_abstract: false
+  parameters: []
+- typename: unsigned char
+  type_id: d4299e15-0006-d0bf-8cbd-9b743575e155
+  base_typename: ''
+  description: ''
+  is_abstract: false
+  parameters: []
+- typename: short int
+  type_id: 9e1dde79-3550-307d-e81a-b864890b3685
+  base_typename: ''
+  description: ''
+  is_abstract: false
+  parameters: []
+- typename: short unsigned int
+  type_id: 958cbdef-b505-bcc7-8a43-dc4b23f8cead
+  base_typename: ''
+  description: ''
+  is_abstract: false
+  parameters: []
+- typename: int
+  type_id: b557ec7f-49a5-08f7-a35e-086e9d1ea767
+  base_typename: ''
+  description: ''
+  is_abstract: false
+  parameters: []
+- typename: unsigned int
+  type_id: d5506b68-5c86-fedb-a2a2-a7bae38ff3ef
+  base_typename: ''
+  description: ''
+  is_abstract: false
+  parameters: []
+- typename: long int
+  type_id: c611627b-6393-365f-d234-1f26bfa8d28f
+  base_typename: ''
+  description: ''
+  is_abstract: false
+  parameters: []
+- typename: long unsigned int
+  type_id: c4385f5b-6e25-01d9-d7b5-6e7cadc704e8
+  base_typename: ''
+  description: ''
+  is_abstract: false
+  parameters: []
+- typename: float
+  type_id: a81bf295-421f-49ef-f24a-f59e9ea0d5d6
+  base_typename: ''
+  description: ''
+  is_abstract: false
+  parameters: []
+- typename: double
+  type_id: d57cee59-686f-e26d-95be-659c126b02ea
+  base_typename: ''
+  description: ''
+  is_abstract: false
+  parameters: []
+- typename: bool
+  type_id: c02f9e93-d01b-1d29-f523-78d2a9195128
+  base_typename: ''
+  description: ''
+  is_abstract: false
+  parameters: []

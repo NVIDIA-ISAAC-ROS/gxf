@@ -1,0 +1,113 @@
+%YAML 1.2
+# SPDX-FileCopyrightText: Copyright (c) 2021-2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+---
+dependencies:
+- extension: TestHelperExtension
+  uuid: 1b99ffeb-c250-4ced-8117-62ac05969a50
+  version: 2.3.0
+---
+interfaces:
+- name: receiver
+  target: block1/input
+- name: transmitter
+  target: block3/output
+- name: buffer_term
+  target: block2/buffer
+---
+prerequisites:
+- monitored_rx
+---
+name: block1
+components:
+- name: input
+  type: nvidia::gxf::test::MockReceiver
+- name: output
+  type: nvidia::gxf::test::MockTransmitter
+- type: nvidia::gxf::Forward
+  parameters:
+    in: input
+    out: output
+- type: nvidia::gxf::MessageAvailableSchedulingTerm
+  parameters:
+    receiver: input
+    min_size: 1
+- type: nvidia::gxf::DownstreamReceptiveSchedulingTerm
+  parameters:
+    transmitter: output
+    min_size: 1
+---
+name: block2
+components:
+- name: input
+  type: nvidia::gxf::test::MockReceiver
+- name: output
+  type: nvidia::gxf::test::MockTransmitter
+- type: nvidia::gxf::Forward
+  parameters:
+    in: input
+    out: output
+- name: buffer
+  type: nvidia::gxf::MessageAvailableSchedulingTerm
+  parameters:
+    receiver: input
+    min_size: 1000
+- type: nvidia::gxf::DownstreamReceptiveSchedulingTerm
+  parameters:
+    transmitter: output
+    min_size: 1
+---
+name: block3
+components:
+- name: input
+  type: nvidia::gxf::test::MockReceiver
+- name: output
+  type: nvidia::gxf::test::MockTransmitter
+- type: nvidia::gxf::Forward
+  parameters:
+    in: input
+    out: output
+- type: nvidia::gxf::MessageAvailableSchedulingTerm
+  parameters:
+    receiver: input
+    min_size: 1
+- type: nvidia::gxf::DownstreamReceptiveSchedulingTerm
+  parameters:
+    transmitter: output
+    min_size: 1
+---
+components:
+- type: nvidia::gxf::Connection
+  parameters:
+    source: block1/output
+    target: block2/input
+---
+components:
+- type: nvidia::gxf::Connection
+  parameters:
+    source: block2/output
+    target: block3/input
+---
+name: counter
+components:
+- name: step_counter
+  type: nvidia::gxf::test::StepCount
+  parameters:
+    expected_count: 100
+- name: test-st
+  type: nvidia::gxf::MessageAvailableSchedulingTerm
+  parameters:
+    receiver: prerequisites/monitored_rx
+    min_size: 1

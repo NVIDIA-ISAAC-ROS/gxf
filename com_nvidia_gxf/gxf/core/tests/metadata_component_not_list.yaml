@@ -1,0 +1,40 @@
+# Copyright (c) 2022, NVIDIA CORPORATION.  All rights reserved.
+#
+# NVIDIA CORPORATION and its licensors retain all intellectual property
+# and proprietary rights in and to this software, related documentation
+# and any modifications thereto.  Any use, reproduction, disclosure or
+# distribution of this software and related documentation without an express
+# license agreement from NVIDIA CORPORATION is strictly prohibited.
+%YAML 1.2
+version: 2.0.0
+extension_library: libgxf_std.so
+name: StandardExtension
+author: NVIDIA
+description: Most commonly used interfaces and components in Gxf Core
+license: LICENSE
+uuid: 8ec2d5d6-b5df-48bf-8dee-0252606fdd7e
+headers:
+- gxf/std/BUILD.public
+- gxf/std/allocator.hpp
+- gxf/std/codelet.hpp
+- gxf/std/eos.hpp
+- gxf/std/queue.hpp
+- gxf/std/receiver.hpp
+- gxf/std/tensor.hpp
+- gxf/std/timestamp.hpp
+- gxf/std/transmitter.hpp
+- gxf/std/scheduling_term.hpp
+- gxf/std/scheduling_condition.hpp
+- gxf/std/system.hpp
+dependencies: []
+gxf_core_version: 2.4.0
+registry_version: 1.0.0
+labels:
+- gxf
+components:
+  typename: nvidia::gxf::test::DummyComponent
+  type_id: 5c6166fa-feed-41e7-bbff-bd48cd6e1014
+  base_typename: nvidia::gxf::Component
+  description: This ia a dummy component for testing.
+  is_abstract: true
+  parameters: []

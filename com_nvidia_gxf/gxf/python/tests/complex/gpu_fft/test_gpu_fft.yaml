@@ -1,0 +1,127 @@
+# SPDX-FileCopyrightText: Copyright (c) 2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+%YAML 1.2
+---
+dependencies:
+- extension: StandardExtension
+  uuid: 8ec2d5d6-b5df-48bf-8dee-0252606fdd7e
+  version: 2.1.0
+- extension: CudaExtension
+  uuid: d63a98fa-7882-11eb-a917-b38f664f399c
+  version: 2.1.0
+- extension: PythonCodeletExtension
+  uuid: 787daddc-1c34-11ec-9621-0242ac130002
+  version: 0.1.0
+- extension: TestHelperExtension
+  uuid: 1b99ffeb-c250-4ced-8117-62ac05969a50
+  version: 2.1.0
+---
+name: global
+components:
+- name: cuda_pool
+  type: nvidia::gxf::BlockMemoryPool
+  parameters:
+    storage_type: 1 # GPU
+    block_size: 5120
+    num_blocks: 5
+---
+name: stream_tensor_generator
+components:
+- name: cuda_out
+  type: nvidia::gxf::DoubleBufferTransmitter
+- name: rx
+  type: nvidia::gxf::DoubleBufferReceiver
+- name: generator
+  type: nvidia::gxf::PyCodeletV0
+  parameters:
+    codelet_name: "CreateTensor"
+    codelet_file: "gxf/python/tests/complex/gpu_fft/CreateTensor.py"
+    codelet_params:
+      transmitter0: cuda_out
+      allocator0: global/cuda_pool
+- type: nvidia::gxf::DownstreamReceptiveSchedulingTerm
+  parameters:
+    transmitter: cuda_out
+    min_size: 1
+- type: nvidia::gxf::CountSchedulingTerm
+  parameters:
+    count: 1
+---
+name: stream_tensor_fft
+components:
+- name: cuda_out
+  type: nvidia::gxf::DoubleBufferTransmitter
+- name: rx
+  type: nvidia::gxf::DoubleBufferReceiver
+- name: generator
+  type: nvidia::gxf::PyCodeletV0
+  parameters:
+    codelet_name: "RunFFT"
+    codelet_file: "gxf/python/tests/complex/gpu_fft/RunFFT.py"
+    codelet_params:
+      transmitter0: cuda_out
+      allocator0: global/cuda_pool
+      receiver0: rx
+- type: nvidia::gxf::DownstreamReceptiveSchedulingTerm
+  parameters:
+    transmitter: cuda_out
+    min_size: 1
+- type: nvidia::gxf::CountSchedulingTerm
+  parameters:
+    count: 1
+---
+name: verify_tensor_description
+components:
+- name: rx
+  type: nvidia::gxf::DoubleBufferReceiver
+- type: nvidia::gxf::PyCodeletV0
+  parameters:
+    codelet_name: "VerifyTensor"
+    codelet_file: "gxf/python/tests/complex/gpu_fft/VerifyTensor.py"
+    codelet_params:
+      allocator0: global/host_pool
+      receiver0: rx
+- type: nvidia::gxf::MessageAvailableSchedulingTerm
+  parameters:
+    receiver: rx
+    min_size: 1
+- name: step_count
+  type: nvidia::gxf::PyCodeletV0
+  parameters:
+    codelet_name: "StepCount"
+    codelet_file: "gxf/python/tests/StepCount.py"
+    codelet_params:
+      expected_count : 1
+---
+components:
+- type: nvidia::gxf::Connection
+  parameters:
+    source: stream_tensor_generator/cuda_out
+    target: stream_tensor_fft/rx
+---
+components:
+- type: nvidia::gxf::Connection
+  parameters:
+    source: stream_tensor_fft/cuda_out
+    target: verify_tensor_description/rx
+---
+name: scheduler
+components:
+- name: clock
+  type: nvidia::gxf::ManualClock
+- type: nvidia::gxf::GreedyScheduler
+  parameters:
+    clock: clock
+    max_duration_ms: 1000

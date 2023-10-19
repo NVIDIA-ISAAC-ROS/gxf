@@ -1,0 +1,171 @@
+# Copyright (c) 2021-2022, NVIDIA CORPORATION.  All rights reserved.
+#
+# NVIDIA CORPORATION and its licensors retain all intellectual property
+# and proprietary rights in and to this software, related documentation
+# and any modifications thereto.  Any use, reproduction, disclosure or
+# distribution of this software and related documentation without an express
+# license agreement from NVIDIA CORPORATION is strictly prohibited.
+
+diff --git a/container_builder/docker_manager/builder_config.py b/container_builder/docker_manager/builder_config.py
+index a43c7df..cac6383 100644
+--- a/container_builder/docker_manager/builder_config.py
++++ b/container_builder/docker_manager/builder_config.py
+@@ -302,8 +302,8 @@ class GraphConfig(IConfig):
+             logger.error('graph field %s is required', MANIFEST_DST)
+             return False
+         if not self._registry_repos:
+-            logger.info('graph field %s is missing, will use public registry',
+-                        REGISTRY_REPOS)
++            # logger.info('graph field %s is missing, will use public registry',
++            #             REGISTRY_REPOS)
+             return True
+
+         if not self._check_registry():
+@@ -429,7 +429,7 @@ class GraphConfig(IConfig):
+             value_node, REGISTRY_DISTRO, default=config.REGISTRY_DEFAULT_DISTRO)
+         assert isinstance(config.registry_distro, str)
+
+-        repos = get_field(value_node, REGISTRY_REPOS, default=[])
++        repos = [] #get_field(value_node, REGISTRY_REPOS, default=[])
+         assert isinstance(repos, list)
+         if repos:
+             config.update_registry_repos(repos)
+diff --git a/container_builder/docker_manager/graph_handler.py b/container_builder/docker_manager/graph_handler.py
+index cd5cc9b..1a3acef 100644
+--- a/container_builder/docker_manager/graph_handler.py
++++ b/container_builder/docker_manager/graph_handler.py
+@@ -78,8 +78,8 @@ class GraphHandler:
+         for repo, cfg in self._added_repo_list.items():
+             if cfg.need_reserve:
+                 continue
+-            logger.debug('removing registry repo %s', repo)
+-            registry.remove_repo(repo)
++            # logger.debug('removing registry repo %s', repo)
++            # registry.remove_repo(repo)
+
+         self._get_exist_repo_list()
+         self._added_repo_list.clear()
+@@ -110,8 +110,8 @@ class GraphHandler:
+             if not reg_conf.force_create:
+                 logger.info('registry repo %s alread existed, skipped', name)
+                 return
+-            logger.info('force removing registry repo %s before re-add', name)
+-            registry.remove_repo(name)
++            # logger.info('force removing registry repo %s before re-add', name)
++            # registry.remove_repo(name)
+
+         if reg_conf.repo_type == GraphConfig.REG_LOCAL_TYPE:
+             self._add_registry_local_repo(reg_conf)
+@@ -147,9 +147,9 @@ class GraphHandler:
+
+         logger.debug('adding registry ngc repo %s, org %s', name, org)
+         team = reg_conf.team if reg_conf.team else 'no-team'
+-        res = registry.add_ngc_repo(name, org, apikey, team)
+-        check_registry_result(res, True, 'registry add ngc repo %s failed',
+-                              name)
++        # res = registry.add_ngc_repo(name, org, apikey, team)
++        # check_registry_result(res, True, 'registry add ngc repo %s failed',
++        #                       name)
+
+     def _download_unpack_extensions(self, graph_files: List[str],
+                                     manifest: str) -> bool:
+diff --git a/registry/cli/cli_argparse_group_maker.py b/registry/cli/cli_argparse_group_maker.py
+index 60226ece..b780c746 100644
+--- a/registry/cli/cli_argparse_group_maker.py
++++ b/registry/cli/cli_argparse_group_maker.py
+@@ -32,7 +32,7 @@ def make_extension_group(subpar):
+                             dest="meta_file",
+                             required=False, nargs=1,
+                             help="Specify a file name to output logs")
+-
++    """
+     parser_remove = subpars_extn \
+         .add_parser("remove", help="Remove extension from repository")
+     parser_remove.set_defaults(subparser_name="remove")
+@@ -124,7 +124,7 @@ def make_extension_group(subpar):
+                               help="Remove all extensions in from a repository")
+     subparsers_remove.add_parser("one", parents=[parser_remove_one],
+                               help="Remove one extensions from a repository")
+-
++    """
+     parser_list = subpars_extn \
+         .add_parser("list", help="List of extensions from all repositories")
+     parser_list.set_defaults(subparser_name="list")
+@@ -138,7 +138,7 @@ def make_extension_group(subpar):
+     parser_list.add_argument("-l", "--labels", dest="labels",
+                              nargs="+", help="Filter the list by specifying "
+                                              "one or several labels")
+-
++    """
+     parser_publish = subpars_extn \
+         .add_parser("publish", help="Publish extension to a NGC repository")
+     parser_publish.set_defaults(subparser_name="publish")
+@@ -231,7 +231,7 @@ def make_extension_group(subpar):
+                               help="Publish all extensions in default repository")
+     subparsers_publish.add_parser("one", parents=[parser_publish_one],
+                               help="Publish an extension in default repository")
+-
++    """
+     parser_info = subpars_extn \
+         .add_parser("info", help="Print extension information including list"
+                                  " of components")
+@@ -458,7 +458,7 @@ def make_repo_group(subpar):
+
+     parser_clean = subpars_repo.add_parser("clean", help="Clean the default repository")
+     parser_clean.set_defaults(subparser_name="clean")
+-
++    """
+     parser_add = subpars_repo.add_parser("add", help="Add a repository")
+     parser_add.set_defaults(subparser_name="add")
+
+@@ -494,7 +494,7 @@ def make_repo_group(subpar):
+                                  required=True, nargs=1,
+                                  help="Specify name of repository to be "
+                                       "removed")
+-
++    """
+     parser_list = subpars_repo.add_parser("list", help="List of repositories")
+     parser_list.set_defaults(subparser_name="list")
+     parser_list.add_argument("-d", "--details", dest="details",
+diff --git a/common/BUILD.release b/common/BUILD.release
+index 8bdf7b31..6983e9ca 100644
+--- a/common/BUILD.release
++++ b/common/BUILD.release
+@@ -22,7 +22,6 @@ cc_library(
+         "assert.hpp",
+         "backtrace.hpp",
+         "byte.hpp",
+-        "endian.hpp",
+         "expected.hpp",
+         "fixed_map.hpp",
+         "fixed_string.hpp",
+@@ -31,7 +30,6 @@ cc_library(
+         "logger.hpp",
+         "memory_utils.hpp",
+         "nvtx_helper.hpp",
+-        "span.hpp",
+         "singleton.hpp",
+         "strong_type.hpp",
+         "type_name.hpp",
+
+diff --git a/release/tarball_content.yaml b/release/tarball_content.yaml
+index 8d145492..abd732cb 100644
+--- a/release/tarball_content.yaml
++++ b/release/tarball_content.yaml
+@@ -211,7 +211,6 @@ files_to_copy_test_as_is: [
+     "common/backtrace.hpp",
+     "common/byte.hpp",
+     "common/expected.hpp",
+-    "common/endian.hpp",
+     "common/fixed_map.hpp",
+     "common/fixed_string.hpp",
+     "common/fixed_vector.hpp",
+@@ -220,7 +219,6 @@ files_to_copy_test_as_is: [
+     "common/memory_utils.hpp",
+     "common/nvtx_helper.hpp",
+     "common/singleton.hpp",
+-    "common/span.hpp",
+     "common/strong_type.hpp",
+     "common/type_name_gnuc.hpp",
+     "common/type_name.hpp",
+

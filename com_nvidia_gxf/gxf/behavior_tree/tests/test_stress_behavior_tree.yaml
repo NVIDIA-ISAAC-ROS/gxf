@@ -1,0 +1,290 @@
+# SPDX-FileCopyrightText: Copyright (c) 2021 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+%YAML 1.2
+---
+name: repeat
+components:
+- name: repeat_controller
+  type: nvidia::gxf::EntityCountFailureRepeatController
+  parameters:
+    max_repeat_count: 0
+- name: repeat_st
+  type: nvidia::gxf::BTSchedulingTerm
+  parameters:
+    is_root: true
+- name: repeat_codelet
+  type: nvidia::gxf::RepeatBehavior
+  parameters:
+    s_term: repeat_st
+    children: [ path_planner/path_planner_st ]
+    repeat_after_failure: false
+---
+name: path_planner
+components:
+- name: path_planner_controller
+  type: nvidia::gxf::EntityCountFailureRepeatController
+  parameters:
+    max_repeat_count: 0
+- name: path_planner_st
+  type: nvidia::gxf::BTSchedulingTerm
+  parameters:
+    is_root: false
+- name: path_planner_codelet
+  type: nvidia::gxf::SequenceBehavior
+  parameters:
+    children: [ path_planner_parallel_task_execution/path_planner_parallel_task_execution_st, publish_path/publish_path_st ]
+    s_term: path_planner_st
+---
+name: path_planner_parallel_task_execution
+components:
+- name: path_planner_parallel_task_execution_controller
+  type: nvidia::gxf::EntityCountFailureRepeatController
+  parameters:
+    max_repeat_count: 0
+- name: path_planner_parallel_task_execution_st
+  type: nvidia::gxf::BTSchedulingTerm
+  parameters:
+    is_root: false
+- name: path_planner_parallel_task_execution_codelet
+  type: nvidia::gxf::ParallelBehavior
+  parameters:
+    children: [ detect_lane/detect_lane_st, detect_objects/detect_objects_st, detect_freespace/detect_freespace_st ]
+    s_term: path_planner_parallel_task_execution_st
+    success_threshold: -1
+    failure_threshold: 1
+---
+name: detect_lane
+components:
+- name: detect_lane_controller
+  type: nvidia::gxf::EntityCountFailureRepeatController
+  parameters:
+    max_repeat_count: 0
+- name: detect_lane_st
+  type: nvidia::gxf::BTSchedulingTerm
+  parameters:
+    is_root: false
+- name: detect_lane_codelet
+  type: nvidia::gxf::SequenceBehavior
+  parameters:
+    children: [ inference_through_cv_pipeline/inference_through_cv_pipeline_st, classify_detected_lane/classify_detected_lane_st ]
+    s_term: detect_lane_st
+---
+name: inference_through_cv_pipeline
+components:
+- name: inference_through_cv_pipeline_controller
+  type: nvidia::gxf::EntityCountFailureRepeatController
+  parameters:
+    max_repeat_count: 0
+- name: inference_through_cv_pipeline_st
+  type: nvidia::gxf::BTSchedulingTerm
+  parameters:
+    is_root: false
+- name: inference_through_cv_pipeline_codelet
+  type: nvidia::gxf::ConstantBehavior
+  parameters:
+    s_term: inference_through_cv_pipeline_st
+    constant_status: 0
+---
+name: classify_detected_lane
+components:
+- name: classify_detected_lane_controller
+  type: nvidia::gxf::EntityCountFailureRepeatController
+  parameters:
+    max_repeat_count: 0
+- name: classify_detected_lane_st
+  type: nvidia::gxf::BTSchedulingTerm
+  parameters:
+    is_root: false
+- name: classify_detected_lane_codelet
+  type: nvidia::gxf::ConstantBehavior
+  parameters:
+    s_term: classify_detected_lane_st
+    constant_status: 0
+---
+name: detect_objects
+components:
+- name: detect_objects_controller
+  type: nvidia::gxf::EntityCountFailureRepeatController
+  parameters:
+    max_repeat_count: 0
+- name: detect_objects_st
+  type: nvidia::gxf::BTSchedulingTerm
+  parameters:
+    is_root: false
+- name: detect_objects_codelet
+  type: nvidia::gxf::SequenceBehavior
+  parameters:
+    children: [ inference_using_obj_detection_model_1/inference_using_obj_detection_model_1_st, inference_using_obj_detection_model_2/inference_using_obj_detection_model_2_st, remap_detection_as_per_model_executed/remap_detection_as_per_model_executed_st ]
+    s_term: detect_objects_st
+---
+name: inference_using_obj_detection_model_1
+components:
+- name: inference_using_obj_detection_model_1_controller
+  type: nvidia::gxf::EntityCountFailureRepeatController
+  parameters:
+    max_repeat_count: 0
+- name: inference_using_obj_detection_model_1_st
+  type: nvidia::gxf::BTSchedulingTerm
+  parameters:
+    is_root: false
+- name: inference_using_obj_detection_model_1_codelet
+  type: nvidia::gxf::ConstantBehavior
+  parameters:
+    s_term: inference_using_obj_detection_model_1_st
+    constant_status: 0
+---
+name: inference_using_obj_detection_model_2
+components:
+- name: inference_using_obj_detection_model_2_controller
+  type: nvidia::gxf::EntityCountFailureRepeatController
+  parameters:
+    max_repeat_count: 0
+- name: inference_using_obj_detection_model_2_st
+  type: nvidia::gxf::BTSchedulingTerm
+  parameters:
+    is_root: false
+- name: inference_using_obj_detection_model_2_codelet
+  type: nvidia::gxf::ConstantBehavior
+  parameters:
+    s_term: inference_using_obj_detection_model_2_st
+    constant_status: 0
+---
+name: remap_detection_as_per_model_executed
+components:
+- name: remap_detection_as_per_model_executed_controller
+  type: nvidia::gxf::EntityCountFailureRepeatController
+  parameters:
+    max_repeat_count: 0
+- name: remap_detection_as_per_model_executed_st
+  type: nvidia::gxf::BTSchedulingTerm
+  parameters:
+    is_root: false
+- name: remap_detection_as_per_model_executed_codelet
+  type: nvidia::gxf::SwitchBehavior
+  parameters:
+    children: [ remap_if_model_1/remap_if_model_1_st, remap_if_model_2/remap_if_model_2_st ]
+    s_term: remap_detection_as_per_model_executed_st
+    desired_behavior: 0
+---
+name: remap_if_model_1
+components:
+- name: remap_if_model_1_controller
+  type: nvidia::gxf::EntityCountFailureRepeatController
+  parameters:
+    max_repeat_count: 0
+- name: remap_if_model_1_st
+  type: nvidia::gxf::BTSchedulingTerm
+  parameters:
+    is_root: false
+- name: remap_if_model_1_codelet
+  type: nvidia::gxf::ConstantBehavior
+  parameters:
+    s_term: remap_if_model_1_st
+    constant_status: 0
+---
+name: remap_if_model_2
+components:
+- name: remap_if_model_2_controller
+  type: nvidia::gxf::EntityCountFailureRepeatController
+  parameters:
+    max_repeat_count: 0
+- name: remap_if_model_2_st
+  type: nvidia::gxf::BTSchedulingTerm
+  parameters:
+    is_root: false
+- name: remap_if_model_2_codelet
+  type: nvidia::gxf::ConstantBehavior
+  parameters:
+    s_term: remap_if_model_2_st
+    constant_status: 0
+---
+name: detect_freespace
+components:
+- name: detect_freespace_controller
+  type: nvidia::gxf::EntityCountFailureRepeatController
+  parameters:
+    max_repeat_count: 0
+- name: detect_freespace_st
+  type: nvidia::gxf::BTSchedulingTerm
+  parameters:
+    is_root: false
+- name: detect_freespace_codelet
+  type: nvidia::gxf::TimerBehavior
+  parameters:
+    s_term: detect_freespace_st
+    clock: sched/clock
+    switch_status: 0
+    delay: 2
+---
+name: publish_path
+components:
+- name: publish_path_controller
+  type: nvidia::gxf::EntityCountFailureRepeatController
+  parameters:
+    max_repeat_count: 0
+- name: publish_path_st
+  type: nvidia::gxf::BTSchedulingTerm
+  parameters:
+    is_root: false
+- name: publish_path_sel_codelet
+  type: nvidia::gxf::SelectorBehavior
+  parameters:
+    children: [ plan_path/plan_path_st, empty_path/empty_path_st ]
+    s_term: publish_path_st
+---
+name: plan_path
+components:
+- name: plan_path_controller
+  type: nvidia::gxf::EntityCountFailureRepeatController
+  parameters:
+    max_repeat_count: 0
+- name: plan_path_st
+  type: nvidia::gxf::BTSchedulingTerm
+  parameters:
+    is_root: false
+- name: plan_path_codelet
+  type: nvidia::gxf::ConstantBehavior
+  parameters:
+    s_term: plan_path_st
+    constant_status: 1
+---
+name: empty_path
+components:
+- name: empty_path_controller
+  type: nvidia::gxf::EntityCountFailureRepeatController
+  parameters:
+    max_repeat_count: 0
+- name: empty_path_st
+  type: nvidia::gxf::BTSchedulingTerm
+  parameters:
+    is_root: false
+- name: empty_path_codelet
+  type: nvidia::gxf::ConstantBehavior
+  parameters:
+    s_term: empty_path_st
+    constant_status: 0
+---
+name: sched
+components:
+- name: clock
+  type: nvidia::gxf::RealtimeClock
+- name: greedy_scheduler
+  type: nvidia::gxf::GreedyScheduler
+  parameters:
+    clock: clock
+- name: job_stats
+  type: nvidia::gxf::JobStatistics
+  parameters:
+    clock: clock

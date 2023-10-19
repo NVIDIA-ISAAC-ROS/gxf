@@ -1,0 +1,109 @@
+%YAML 1.2
+# SPDX-FileCopyrightText: Copyright (c) 2021 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+---
+name: tx
+components:
+- name: signal
+  type: nvidia::gxf::test::MockTransmitter
+- type: nvidia::gxf::DownstreamReceptiveSchedulingTerm
+  parameters:
+    transmitter: signal
+    min_size: 1
+- type: nvidia::gxf::PingTx
+  parameters:
+    signal: signal
+- type: nvidia::gxf::CountSchedulingTerm
+  parameters:
+    count: 20
+- type: nvidia::gxf::test::StepCount
+  parameters:
+    expected_count: 20
+---
+name: roundrobin
+components:
+- name: rx
+  type: nvidia::gxf::test::MockReceiver
+- type: nvidia::gxf::MessageAvailableSchedulingTerm
+  parameters:
+    receiver: rx
+    min_size: 1
+- type: nvidia::gxf::Broadcast
+  parameters:
+    source: rx
+    mode: RoundRobin
+- type: nvidia::gxf::test::StepCount
+  parameters:
+    expected_count: 20
+- name: tx1
+  type: nvidia::gxf::test::MockTransmitter
+- name: tx2
+  type: nvidia::gxf::test::MockTransmitter
+---
+name: rx1
+components:
+- name: signal
+  type: nvidia::gxf::test::MockReceiver
+- type: nvidia::gxf::MessageAvailableSchedulingTerm
+  parameters:
+    receiver: signal
+    min_size: 1
+- type: nvidia::gxf::PingRx
+  parameters:
+    signal: signal
+- type: nvidia::gxf::test::StepCount
+  parameters:
+    expected_count: 10
+---
+name: rx2
+components:
+- name: signal
+  type: nvidia::gxf::test::MockReceiver
+- type: nvidia::gxf::MessageAvailableSchedulingTerm
+  parameters:
+    receiver: signal
+    min_size: 1
+- type: nvidia::gxf::PingRx
+  parameters:
+    signal: signal
+- type: nvidia::gxf::test::StepCount
+  parameters:
+    expected_count: 10
+---
+components:
+- type: nvidia::gxf::Connection
+  parameters:
+    source: tx/signal
+    target: roundrobin/rx
+---
+components:
+- type: nvidia::gxf::Connection
+  parameters:
+    source: roundrobin/tx1
+    target: rx1/signal
+---
+components:
+- type: nvidia::gxf::Connection
+  parameters:
+    source: roundrobin/tx2
+    target: rx2/signal
+---
+components:
+- type: nvidia::gxf::GreedyScheduler
+  parameters:
+    max_duration_ms: 1000000
+    clock: clock
+- name: clock
+  type: nvidia::gxf::ManualClock

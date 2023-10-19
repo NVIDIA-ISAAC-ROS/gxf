@@ -1,0 +1,140 @@
+# SPDX-FileCopyrightText: Copyright (c) 2020-2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+build --nokeep_going --color=yes -c opt --crosstool_top=@toolchain//crosstool:toolchain --jobs 16
+
+build --experimental_scale_timeouts=100  # Let the giantic coverity repo take all the time it wants.
+
+build --action_env=NVGRAPH_REGISTRY_ROOT # Use custom root path if set
+
+# Uncomment to read LD_LIBRARY_PATH into bazel env
+# build --action_env=LD_LIBRARY_PATH
+
+# Read NGC API KEY for registry operations
+build --action_env=NGC_API_KEY
+
+build:debug --compilation_mode=dbg --strip=never --copt="-g"
+
+build:composer --define=dummy_pygxf=true
+build:composer --action_env=dummy_pygxf=true
+
+# Default build configuration
+build --cpu=k8
+build --action_env=cpu="k8"
+build --compiler=gcc-9
+build --action_env=compiler="gcc-9"
+build --define=os=ubuntu_20_04
+build --action_env=os="ubuntu_20_04"
+build --define=target_platform=x86_64_cuda_12_1 --strip=always
+build --action_env=target_platform="x86_64_cuda_12_1"
+
+# Build with c++17 support
+build:cxx17 --define=cpp_standard=gcc_cxx_17
+build:cxx17 --action_env=cpp_standard="gcc_cxx_17"
+
+# Build with c++11 ABI disabled
+build:disable_cxx11_abi --define=disable_cxx11_abi=True
+build:disable_cxx11_abi --action_env=disable_cxx11_abi="True"
+
+# Default x86_64_cuda_12_1 build config
+build:x86_64_cuda_12_1 --cpu=k8
+build:x86_64_cuda_12_1 --action_env=cpu="k8"
+build:x86_64_cuda_12_1 --define=target_platform=x86_64_cuda_12_1
+build:x86_64_cuda_12_1 --action_env=target_platform="x86_64_cuda_12_1"
+
+build:x86_64_cuda_11_8 --cpu=k8
+build:x86_64_cuda_11_8 --action_env=cpu="k8"
+build:x86_64_cuda_11_8 --define=target_platform=x86_64_cuda_11_8
+build:x86_64_cuda_11_8 --action_env=target_platform="x86_64_cuda_11_8"
+
+# Holopack configurations
+build:hp11_sbsa --cpu=aarch64_sbsa
+build:hp11_sbsa --action_env=cpu="aarch64_sbsa"
+build:hp11_sbsa --compiler=gcc-9
+build:hp11_sbsa --action_env=compiler="gcc-9"
+build:hp11_sbsa --define=os=ubuntu_20_04
+build:hp11_sbsa --define=target_platform=hp11_sbsa
+build:hp11_sbsa --action_env=target_platform="hp11_sbsa"
+
+build:hp20_sbsa --cpu=aarch64_sbsa
+build:hp20_sbsa --action_env=cpu="aarch64_sbsa"
+build:hp20_sbsa --compiler=gcc-9
+build:hp20_sbsa --action_env=compiler="gcc-9"
+build:hp20_sbsa --define=os=ubuntu_20_04
+build:hp20_sbsa --define=target_platform=hp20_sbsa
+build:hp20_sbsa --action_env=target_platform="hp20_sbsa"
+
+build:hp21ea_sbsa --cpu=aarch64_sbsa
+build:hp21ea_sbsa --action_env=cpu="aarch64_sbsa"
+build:hp21ea_sbsa --compiler=gcc-9
+build:hp21ea_sbsa --action_env=compiler="gcc-9"
+build:hp21ea_sbsa --define=os=ubuntu_20_04
+build:hp21ea_sbsa --define=target_platform=hp21ea_sbsa
+build:hp21ea_sbsa --action_env=target_platform="hp21ea_sbsa"
+
+# Jetpack configurations
+build:jetpack51 --cpu=aarch64
+build:jetpack51 --action_env=cpu="aarch64"
+build:jetpack51 --compiler=gcc-9
+build:jetpack51 --action_env=compiler="gcc-9"
+build:jetpack51 --define=os=ubuntu_20_04
+build:jetpack51 --define=target_platform=jetpack51
+build:jetpack51 --action_env=target_platform="jetpack51"
+
+# Python
+build:python3_7 --define=python=python3_7
+
+test --test_output=errors --keep_going --color=yes -c opt --features=legacy_whole_archive
+
+test:lint --build_tests_only
+test:lint --test_tag_filters=lint
+
+# Container builder tests
+test:container_builder --action_env=API_KEY
+# depending on cache, building containers from scratch
+# might need extra time
+test:container_builder --test_timeout=3000
+
+# `--config=coverity` for coverity tests
+test:coverity --build_tests_only
+test:coverity --test_tag_filters=coverity
+test:coverity --define=run_coverity="True"
+test:coverity --//coverity:coverity_config=autosar-only
+
+# GCOV configs for generating instrumented builds.
+build:gcov --copt="-O0" --copt="-coverage" --copt="-fprofile-arcs" --copt="-ftest-coverage"
+build:gcov --linkopt="-lgcov"
+build:gcov --collect_code_coverage --java_runtime_version=remotejdk_11
+
+# Enable packaging
+build:package --define=packaging="True"
+
+# Sanitizer Configs
+# --config asan: Address Sanitizer
+build:asan --compilation_mode=dbg --strip=never --copt="-g" --copt="-O0"
+build:asan --copt -fsanitize=address
+build:asan --copt -DADDRESS_SANITIZER
+build:asan --copt -fno-omit-frame-pointer
+build:asan --linkopt -fsanitize=address
+
+# --config tsan: Thread Sanitizer
+build:tsan --compilation_mode=dbg --strip=never --copt="-g" --copt="-O0"
+build:tsan --copt -fsanitize=thread
+build:tsan --copt -fno-omit-frame-pointer
+build:tsan --linkopt -fsanitize=thread
+# This is needed to address false positive problem with abseil.
+# https://github.com/google/sanitizers/issues/953
+build:tsan --test_env=TSAN_OPTIONS=report_atomic_races=0
+build:tsan --action_env=TSAN_OPTIONS=second_deadlock_stack=1

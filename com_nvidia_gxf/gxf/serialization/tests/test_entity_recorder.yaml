@@ -1,0 +1,80 @@
+%YAML 1.2
+# SPDX-FileCopyrightText: Copyright (c) 2021 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+---
+name: generator
+components:
+- name: output
+  type: nvidia::gxf::test::MockTransmitter
+- name: allocator
+  type: nvidia::gxf::test::MockAllocator
+- type: nvidia::gxf::test::TensorGenerator
+  parameters:
+    output: output
+    allocator: allocator
+    shape: [ 2, 2, 2 ]
+- type: nvidia::gxf::DownstreamReceptiveSchedulingTerm
+  parameters:
+    transmitter: output
+    min_size: 1
+- type: nvidia::gxf::CountSchedulingTerm
+  parameters:
+    count: 10
+---
+name: recorder
+components:
+- name: input
+  type: nvidia::gxf::test::MockReceiver
+- name: allocator
+  type: nvidia::gxf::test::MockAllocator
+- name: component_serializer
+  type: nvidia::gxf::StdComponentSerializer
+  parameters:
+    allocator: allocator
+- name: entity_serializer
+  type: nvidia::gxf::StdEntitySerializer
+  parameters:
+    component_serializers: [ component_serializer ]
+- type: nvidia::gxf::EntityRecorder
+  parameters:
+    receiver: input
+    entity_serializer: entity_serializer
+    directory: "/tmp"
+    basename: "channel"
+- type: nvidia::gxf::MessageAvailableSchedulingTerm
+  parameters:
+    receiver: input
+    min_size: 1
+---
+components:
+- type: nvidia::gxf::Connection
+  parameters:
+    source: generator/output
+    target: recorder/input
+---
+components:
+- name: clock
+  type: nvidia::gxf::ManualClock
+- type: nvidia::gxf::GreedyScheduler
+  parameters:
+    clock: clock
+    max_duration_ms: 1000
+- name: realtime_clock
+  type: nvidia::gxf::RealtimeClock
+- type: nvidia::gxf::JobStatistics
+  parameters:
+    clock: realtime_clock
+    codelet_statistics: true
+    json_file_path: '/tmp/test_entity_recorder_statistics.json'
