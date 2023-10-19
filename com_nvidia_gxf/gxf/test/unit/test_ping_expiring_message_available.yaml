@@ -1,0 +1,77 @@
+%YAML 1.2
+# Copyright (c) 2021, NVIDIA CORPORATION.  All rights reserved.
+#
+# NVIDIA CORPORATION and its licensors retain all intellectual property
+# and proprietary rights in and to this software, related documentation
+# and any modifications thereto.  Any use, reproduction, disclosure or
+# distribution of this software and related documentation without an express
+# license agreement from NVIDIA CORPORATION is strictly prohibited.
+---
+name: tx
+components:
+- name: signal
+  type: nvidia::gxf::test::MockTransmitter
+- type: nvidia::gxf::DownstreamReceptiveSchedulingTerm
+  parameters:
+    transmitter: signal
+    min_size: 1
+- type: nvidia::gxf::PingTx
+  parameters:
+    signal: signal
+    clock: misc/clock
+- type: nvidia::gxf::PeriodicSchedulingTerm
+  parameters:
+    recess_period: 1000
+- type: nvidia::gxf::CountSchedulingTerm
+  parameters:
+    count: 99
+---
+name: keeplive
+components:
+- type: nvidia::gxf::PeriodicSchedulingTerm
+  parameters:
+    recess_period: 1000000
+- name: signal
+  type: nvidia::gxf::test::MockTransmitter
+- type: nvidia::gxf::PingTx
+  parameters:
+    signal: signal
+---
+name: rx
+components:
+- name: signal
+  type: nvidia::gxf::test::MockReceiver
+  parameters:
+    max_capacity: 10
+    clock: misc/clock
+- type: nvidia::gxf::ExpiringMessageAvailableSchedulingTerm
+  parameters:
+    receiver: signal
+    max_batch_size: 5
+    max_delay_ns: 100000000
+    clock: misc/clock
+- type: nvidia::gxf::test::PingBatchRx
+  parameters:
+    signal: signal
+    batch_size: 5
+    assert_full_batch: false
+- type: nvidia::gxf::test::StepCount
+  parameters:
+    expected_count: 20
+---
+components:
+- type: nvidia::gxf::Connection
+  parameters:
+    source: tx/signal
+    target: rx/signal
+---
+components:
+- type: nvidia::gxf::GreedyScheduler
+  parameters:
+    max_duration_ms: 100000000
+    clock: misc/clock
+---
+name: misc
+components:
+- name: clock
+  type: nvidia::gxf::RealtimeClock

@@ -1,0 +1,56 @@
+%YAML 1.2
+# Copyright (c) 2021, NVIDIA CORPORATION.  All rights reserved.
+#
+# NVIDIA CORPORATION and its licensors retain all intellectual property
+# and proprietary rights in and to this software, related documentation
+# and any modifications thereto.  Any use, reproduction, disclosure or
+# distribution of this software and related documentation without an express
+# license agreement from NVIDIA CORPORATION is strictly prohibited.
+---
+name: tx0
+components:
+- name: signal
+  type: nvidia::gxf::test::MockTransmitter
+- type: nvidia::gxf::DownstreamReceptiveSchedulingTerm
+  parameters:
+    transmitter: signal
+    min_size: 1
+- type: nvidia::gxf::PingTx
+  parameters:
+    signal: signal
+- type: nvidia::gxf::CountSchedulingTerm
+  parameters:
+    count: 1000
+---
+name: rx0
+components:
+- name: signal
+  type: nvidia::gxf::test::MockReceiver
+- type: nvidia::gxf::MessageAvailableSchedulingTerm
+  parameters:
+    receiver: signal
+    min_size: 1
+- type: nvidia::gxf::PingRx
+  parameters:
+    signal: signal
+---
+name: cxn0
+components:
+- type: nvidia::gxf::Connection
+  parameters:
+    source: tx0/signal
+    target: rx0/signal
+---
+name: scheduler
+components:
+- type: nvidia::gxf::MultiThreadScheduler
+  parameters:
+    max_duration_ms: 1000
+    clock: misc/clock
+    worker_thread_number: 2
+    stop_on_deadlock: false
+---
+name: misc
+components:
+- name: clock
+  type: nvidia::gxf::RealtimeClock

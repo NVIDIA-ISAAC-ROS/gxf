@@ -1,0 +1,1 @@
+../../../../../prepare_minidump_tools.sh

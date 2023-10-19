@@ -1,0 +1,78 @@
+"""
+ SPDX-FileCopyrightText: Copyright (c) 2021-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ SPDX-License-Identifier: Apache-2.0
+
+ Licensed under the Apache License, Version 2.0 (the "License");
+ you may not use this file except in compliance with the License.
+ You may obtain a copy of the License at
+
+ http://www.apache.org/licenses/LICENSE-2.0
+
+ Unless required by applicable law or agreed to in writing, software
+ distributed under the License is distributed on an "AS IS" BASIS,
+ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ See the License for the specific language governing permissions and
+ limitations under the License.
+"""
+
+cc_library(
+    name = "extension_dev",
+    srcs = select({
+        "@com_extension_dev//build:platform_x86_64": [
+            "lib/x86_64/libgxf_core.so",
+            "lib/x86_64/libdefault_extension.lo",
+        ],
+        "@com_extension_dev//build:platform_jetson": [
+            "lib/aarch64/libgxf_core.so",
+            "lib/aarch64/libdefault_extension.lo",
+        ],
+    }),
+    hdrs = [
+        "common/assert.hpp",
+        "common/backtrace.hpp",
+        "common/byte.hpp",
+        "common/expected.hpp",
+        "common/fixed_map.hpp",
+        "common/fixed_string.hpp",
+        "common/fixed_vector.hpp",
+        "common/iterator.hpp",
+        "common/logger.hpp",
+        "common/memory_utils.hpp",
+        "common/singleton.hpp",
+        "common/strong_type.hpp",
+        "common/type_name.hpp",
+        "common/type_name_gnuc.hpp",
+        "common/type_utils.hpp",
+        "gxf/core/component.hpp",
+        "gxf/core/entity.hpp",
+        "gxf/core/expected.hpp",
+        "gxf/core/gxf.h",
+        "gxf/core/gxf_ext.h",
+        "gxf/core/handle.hpp",
+        "gxf/core/parameter.hpp",
+        "gxf/core/registrar.hpp",
+        "gxf/core/resource.hpp",
+        "gxf/std/allocator.hpp",
+        "gxf/std/codelet.hpp",
+        "gxf/std/component_allocator.hpp",
+        "gxf/std/component_factory.hpp",
+        "gxf/std/default_extension.hpp",
+        "gxf/std/extension.hpp",
+        "gxf/std/extension_factory_helper.hpp",
+        "gxf/std/new_component_allocator.hpp",
+        "gxf/std/parameter_parser.hpp",
+        "gxf/std/parameter_registrar.hpp",
+        "gxf/std/parameter_storage.hpp",
+        "gxf/std/parameter_wrapper.hpp",
+        "gxf/std/resource_manager.hpp",
+        "gxf/std/resource_registrar.hpp",
+        "gxf/std/type_registry.hpp",
+    ],
+    includes = ["."],
+    linkopts = ["-lpthread"],
+    strip_include_prefix = ".",
+    visibility = ["//visibility:public"],
+    deps = [
+        "@yaml-cpp",
+    ],
+)

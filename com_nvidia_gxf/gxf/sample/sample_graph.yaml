@@ -1,0 +1,107 @@
+################################################################################
+# Copyright (c) 2021 NVIDIA Corporation.  All rights reserved.
+#
+# Permission is hereby granted, free of charge, to any person obtaining a
+# copy of this software and associated documentation files (the "Software"),
+# to deal in the Software without restriction, including without limitation
+# the rights to use, copy, modify, merge, publish, distribute, sublicense,
+# and/or sell copies of the Software, and to permit persons to whom the
+# Software is furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+# THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+# FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+# DEALINGS IN THE SOFTWARE.
+################################################################################
+%YAML 1.2
+dependencies:
+- extension: SampleExtension
+  uuid: a6ad78b6-1682-11ec-9621-0242ac130002
+  version: 1.0.0
+- extension: StandardExtension
+  uuid: 8ec2d5d6-b5df-48bf-8dee-0252606fdd7e
+  version: 1.0.1
+---
+components:
+- name: ping_tx25..68d0
+  parameters:
+    clock: GreedyScheduler..2550/manual_clock30..bb90
+    signal: double_buffer_transmitter26..b150
+  type: nvidia::gxf::PingTx
+- name: double_buffer_transmitter26..b150
+  parameters:
+    capacity: '1'
+    policy: '2'
+  type: nvidia::gxf::DoubleBufferTransmitter
+- name: periodic_scheduling_term32..cd50
+  parameters:
+    recess_period: '5'
+  type: nvidia::gxf::PeriodicSchedulingTerm
+- name: count_scheduling_term34..6c50
+  parameters:
+    count: 5
+  type: nvidia::gxf::CountSchedulingTerm
+name: PingTx..3e90
+ui_property:
+  position:
+    x: -5.029318809509277
+    y: 107.83745574951172
+  state: 0
+---
+components:
+- name: ping_rx27..fe10
+  parameters:
+    signal: double_buffer_receiver28..2150
+  type: nvidia::gxf::PingRx
+- name: double_buffer_receiver28..2150
+  parameters:
+    capacity: '1'
+    policy: '2'
+  type: nvidia::gxf::DoubleBufferReceiver
+- name: message_available_scheduling_term33..8890
+  parameters:
+    min_size: 1
+    receiver: double_buffer_receiver28..2150
+  type: nvidia::gxf::MessageAvailableSchedulingTerm
+name: PingRx..1150
+ui_property:
+  position:
+    x: 704.756103515625
+    y: 110.70355224609375
+  state: 0
+---
+components:
+- name: greedy_scheduler29..58d0
+  parameters:
+    clock: manual_clock30..bb90
+    stop_on_deadlock: 'True'
+  type: nvidia::gxf::GreedyScheduler
+- name: manual_clock30..bb90
+  parameters:
+    initial_timestamp: '0'
+  type: nvidia::gxf::ManualClock
+name: GreedyScheduler..2550
+ui_property:
+  position:
+    x: 384.1865539550781
+    y: 424.97265625
+  state: 0
+---
+components:
+- name: connection31..ca50
+  parameters:
+    source: PingTx..3e90/double_buffer_transmitter26..b150
+    target: PingRx..1150/double_buffer_receiver28..2150
+  type: nvidia::gxf::Connection
+name: node..c4d0
+ui_property:
+  position:
+    x: 19.027315139770508
+    y: -46.37907409667969
+  state: 0

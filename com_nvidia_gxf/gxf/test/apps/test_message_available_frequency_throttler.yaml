@@ -1,0 +1,106 @@
+%YAML 1.2
+# SPDX-FileCopyrightText: Copyright (c) 2021 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+---
+dependencies:
+- extension: TestHelperExtension
+  uuid: 1b99ffeb-c250-4ced-8117-62ac05969a50
+  version: 2.3.0
+- extension: SampleExtension
+  uuid: a6ad78b6-1682-11ec-9621-0242ac130002
+  version: 1.3.0
+---
+name: tx_left
+components:
+- name: signal
+  type: nvidia::gxf::DoubleBufferTransmitter
+- type: nvidia::gxf::DownstreamReceptiveSchedulingTerm
+  parameters:
+    transmitter: signal
+    min_size: 1
+- type: nvidia::gxf::PingTx
+  parameters:
+    signal: signal
+- type: nvidia::gxf::PeriodicSchedulingTerm
+  parameters:
+    recess_period: 50Hz
+- type: nvidia::gxf::CountSchedulingTerm
+  parameters:
+    count: 100
+- type: nvidia::gxf::test::StepCount
+  parameters:
+    expected_count: 100
+---
+name: tx_right
+components:
+- name: signal
+  type: nvidia::gxf::DoubleBufferTransmitter
+- type: nvidia::gxf::DownstreamReceptiveSchedulingTerm
+  parameters:
+    transmitter: signal
+    min_size: 1
+- type: nvidia::gxf::PingTx
+  parameters:
+    signal: signal
+- type: nvidia::gxf::PeriodicSchedulingTerm
+  parameters:
+    recess_period: 50Hz
+- type: nvidia::gxf::CountSchedulingTerm
+  parameters:
+    count: 100
+- type: nvidia::gxf::test::StepCount
+  parameters:
+    expected_count: 100
+---
+name: rx
+components:
+- name: signal_left
+  type: nvidia::gxf::DoubleBufferReceiver
+- name: signal_right
+  type: nvidia::gxf::DoubleBufferReceiver
+- type: nvidia::gxf::MessageAvailableFrequencyThrottler
+  parameters:
+    receivers: [signal_left, signal_right]
+    execution_frequency: 100Hz
+    min_sum: 1
+    sampling_mode: SumOfAll
+- type: nvidia::gxf::MultiPingRx
+  parameters:
+    receivers: [signal_left, signal_right]
+---
+name: connections
+components:
+- type: nvidia::gxf::Connection
+  parameters:
+    source: tx_left/signal
+    target: rx/signal_left
+- type: nvidia::gxf::Connection
+  parameters:
+    source: tx_right/signal
+    target: rx/signal_right
+---
+name: scheduler
+components:
+- name: clock
+  type: nvidia::gxf::RealtimeClock
+- type: nvidia::gxf::MultiThreadScheduler
+  parameters:
+    max_duration_ms: 5000
+    clock: clock
+    stop_on_deadlock: False
+# - type: nvidia::gxf::test::EntityMonitor
+- type: nvidia::gxf::JobStatistics
+  parameters:
+    clock: clock

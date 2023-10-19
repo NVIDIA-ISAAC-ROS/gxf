@@ -1,0 +1,74 @@
+%YAML 1.2
+# Copyright (c) 2022-2023, NVIDIA CORPORATION.  All rights reserved.
+#
+# NVIDIA CORPORATION and its licensors retain all intellectual property
+# and proprietary rights in and to this software, related documentation
+# and any modifications thereto.  Any use, reproduction, disclosure or
+# distribution of this software and related documentation without an express
+# license agreement from NVIDIA CORPORATION is strictly prohibited.
+---
+name: server
+components:
+- name: channel
+  type: nvidia::gxf::test::MockReceiver
+- name: allocator
+  type: nvidia::gxf::UnboundedAllocator
+- name: component_serializer
+  type: nvidia::gxf::StdComponentSerializer
+  parameters:
+    allocator: allocator
+- name: entity_serializer
+  type: nvidia::gxf::StdEntitySerializer
+  parameters:
+    component_serializers: [ component_serializer ]
+- name: tcp_server
+  type: nvidia::gxf::TcpServer
+  parameters:
+    receivers: [ channel ]
+    entity_serializer: entity_serializer
+    address: 127.0.0.1
+    port: 7000
+    timeout_period: 100ms
+    async_scheduling_term: async_st
+    max_msg_delay_ms: 5000
+- name: async_st
+  type: nvidia::gxf::AsynchronousSchedulingTerm
+---
+name: generator
+components:
+- name: output
+  type: nvidia::gxf::test::MockTransmitter
+- name: allocator
+  type: nvidia::gxf::UnboundedAllocator
+- type: nvidia::gxf::test::TensorGenerator
+  parameters:
+    output: output
+    allocator: allocator
+    shape: [ 1920, 1080, 3 ]
+    storage_type: 2
+    enable_timestamps: false
+- type: nvidia::gxf::DownstreamReceptiveSchedulingTerm
+  parameters:
+    transmitter: output
+    min_size: 1
+- type: nvidia::gxf::CountSchedulingTerm
+  parameters:
+    count: 10
+---
+components:
+- type: nvidia::gxf::Connection
+  parameters:
+    source: generator/output
+    target: server/channel
+---
+components:
+- name: clock
+  type: nvidia::gxf::RealtimeClock
+- type: nvidia::gxf::GreedyScheduler
+  parameters:
+    clock: clock
+    max_duration_ms: 50000
+- type: nvidia::gxf::JobStatistics
+  parameters:
+    clock: clock
+    codelet_statistics: true

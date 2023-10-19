@@ -1,0 +1,116 @@
+%YAML 1.2
+# SPDX-FileCopyrightText: Copyright (c) 2021 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+---
+name: tx
+components:
+- name: signal
+  type: nvidia::gxf::test::MockTransmitter
+- type: nvidia::gxf::DownstreamReceptiveSchedulingTerm
+  parameters:
+    transmitter: signal
+    min_size: 1
+- name: scheduling_term
+  type: nvidia::gxf::TargetTimeSchedulingTerm
+  parameters:
+    clock: clock/execution_clock
+- type: nvidia::gxf::test::ScheduledPingTx
+  parameters:
+    delay: 5000
+    signal: signal
+    scheduling_term: scheduling_term
+    execution_clock: clock/execution_clock
+    offset_clock: clock/generation_clock
+- type: nvidia::gxf::CountSchedulingTerm
+  parameters:
+    count: 10
+- type: nvidia::gxf::test::StepCount
+  parameters:
+    expected_count: 10
+---
+name: throttler
+components:
+- name: throttled_signal
+  type: nvidia::gxf::test::MockTransmitter
+- type: nvidia::gxf::DownstreamReceptiveSchedulingTerm
+  parameters:
+    transmitter: throttled_signal
+    min_size: 1
+- name: rx_signal
+  type: nvidia::gxf::test::MockReceiver
+- name: scheduling_term
+  type: nvidia::gxf::TargetTimeSchedulingTerm
+  parameters:
+    clock: clock/execution_clock
+- type: nvidia::gxf::TimedThrottler
+  parameters:
+    execution_clock: clock/execution_clock
+    throttling_clock: clock/generation_clock
+    receiver: rx_signal
+    transmitter: throttled_signal
+    scheduling_term: scheduling_term
+- type: nvidia::gxf::CountSchedulingTerm
+  parameters:
+    count: 10
+- type: nvidia::gxf::test::StepCount
+  parameters:
+    expected_count: 10
+---
+name: rx
+components:
+- name: signal
+  type: nvidia::gxf::test::MockReceiver
+- type: nvidia::gxf::MessageAvailableSchedulingTerm
+  parameters:
+    receiver: signal
+    min_size: 1
+- type: nvidia::gxf::PingRx
+  parameters:
+    signal: signal
+- type: nvidia::gxf::test::StepCount
+  parameters:
+    expected_count: 9
+---
+components:
+- type: nvidia::gxf::Connection
+  parameters:
+    source: tx/signal
+    target: throttler/rx_signal
+---
+components:
+- type: nvidia::gxf::Connection
+  parameters:
+    source: throttler/throttled_signal
+    target: rx/signal
+---
+name: clock
+components:
+- name: execution_clock
+  type: nvidia::gxf::ManualClock
+- name: generation_clock
+  type: nvidia::gxf::ManualClock
+  parameters:
+    initial_timestamp: 13000
+- type: nvidia::gxf::GreedyScheduler
+  parameters:
+    clock: execution_clock
+    max_duration_ms: 10000
+- name: realtime_clock
+  type: nvidia::gxf::RealtimeClock
+- type: nvidia::gxf::JobStatistics
+  parameters:
+    clock: realtime_clock
+    codelet_statistics: true
+    json_file_path: '/tmp/test_timed_throttler_statistics.json'

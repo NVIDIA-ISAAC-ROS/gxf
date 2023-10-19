@@ -1,0 +1,757 @@
+// GXF tool creation Pipeline
+//
+// Runs every night and push base image to artifactory for development pipeline to use
+//
+// Copyright (c) 2023, NVIDIA CORPORATION. All rights reserved.
+//
+// NVIDIA CORPORATION and its licensors retain all intellectual property
+// and proprietary rights in and to this software, related documentation
+// and any modifications thereto. Any use, reproduction, disclosure or
+// distribution of this software and related documentation without an express
+// license agreement from NVIDIA CORPORATION is strictly prohibited.
+
+@Library('ci-groovkins-lib@25cd83ef576328887aba92e10da1fb851b1a4350')
+
+import com.nvidia.isaac.ci.utils.WorkflowScriptUtil
+import com.nvidia.isaac.ci.utils.dto.BaseCredentialsConfig
+import com.nvidia.isaac.ci.isaac.DockerImageUtil
+
+// environment variables
+env.BRANCH = env.BRANCH_NAME ? env.BRANCH_NAME : "verification"
+env.REPO_NAME = 'gxf'
+env.DOCKER_ARTIFACTORY_URL_BASE = 'https://urm.nvidia.com'
+env.DOCKER_URL = 'urm.nvidia.com'
+env.DOCKER_REPO = 'sw-isaac-public-docker'
+env.IMAGES_TAG_PREFIX = 'gxf-ipc-nightly-builds'
+env.ARTIFACTORY_CRED = 'artifactory-creds'
+env.ARTIFACTORY_REPO = 'sw-isaac-gxf-generic-local'
+env.ARTIFACTORY_URL_BASE = 'https://urm.nvidia.com/artifactory'
+env.ARTIFACTORY_PATH = 'sw-isaac-gxf-generic-local'
+env.ARTIFACTORY_REPOSITORY="sw-isaac-gxf-generic-local"
+
+env.ARTIFACTORY_EXTERNAL = "${env.ARTIFACTORY_URL_BASE}/${env.ARTIFACTORY_REPOSITORY}/external"
+env.ARTIFACTORY_DEBIAN_PKG_EXTERNAL_X86 = "${env.ARTIFACTORY_EXTERNAL}/debian_pkg/x86"
+env.ARTIFACTORY_DEBIAN_PKG_EXTERNAL_JETSON = "${env.ARTIFACTORY_EXTERNAL}/debian_pkg/jetson"
+env.DEFAULT_PLATFORM = 'x86_64_cuda_12_1'
+env.TARGET_ARCH_X86 = "linux_x86_64"
+env.TARGET_ARCH_JETSON = "linux_aarch64"
+env.BAZEL_OUTPUT_ROOT_X86 = "bazel-out/k8-opt/bin"
+env.BAZEL_OUTPUT_ROOT_JETSON = "bazel-out/aarch64-opt/bin"
+
+env.ARTIFACTORY_ENDPOINT = "${env.ARTIFACTORY_URL_BASE}/${env.ARTIFACTORY_REPOSITORY}/nightly/${env.BRANCH}"
+env.ARTIFACTORY_JETSON = "${env.ARTIFACTORY_URL_BASE}/${env.ARTIFACTORY_REPOSITORY}/nightly/${env.BRANCH}/jetson_tests"
+
+// Artifacts
+env.ARTIFACT_PYGXF_X86 = "artifact-pygxf-so-x86"
+env.ARTIFACT_GXE_X86 = "artifact-gxe-x86"
+env.ARTIFACT_LIBGXF_CORE_X86 = "artifact-lib-gxf-core-so-x86"
+env.ARTIFACT_LIBDEFAULT_EXTN_X86 = "artifact-lib-default-extn-lo-x86"
+env.ARTIFACT_PYGXF_JETSON = "artifact-pygxf-so-jetson"
+env.ARTIFACT_GXE_JETSON = "artifact-gxe-jetson"
+env.ARTIFACT_LIBGXF_CORE_JETSON = "artifact-lib-gxf-core-so-jetson"
+env.ARTIFACT_LIBDEFAULT_EXTN_JETSON = "artifact-lib-default-extn-lo-jetson"
+env.ARTIFACT_REGISTRY_X86 = "artifact-registry-x86"
+env.ARTIFACT_GXF_CLI_X86 = "artifact-gxf-cli-x86"
+env.ARTIFACT_GXF_CLI_JETSON = "artifact-gxf-cli-jetson"
+env.ARTIFACT_GRPC_SERVER_X86 = "artifact-grpc-server-x86"
+env.ARTIFACT_GRPC_SERVER_JETSON = "artifact-grpc-server-jetson"
+env.ARTIFACT_REGISTRY_WHEEL_X86 = "artifact-registry-wheel-x86"
+env.ARTIFACT_REGISTRY_JETSON = "artifact-registry-jetson"
+env.ARTIFACT_REGISTRY_WHEEL_JETSON = "artifact-registry-wheel-jetson"
+env.ARTIFACT_COMPOSER_X86 = "artifact-composer-x86"
+env.ARTIFACT_CONTAINER_BUILDER_X86 = "artifact-container-builder-x86"
+env.ARTIFACT_CONTAINER_BUILDER_WHEEL_X86 = "artifact-container-builder-wheel-x86"
+env.ARTIFACT_DEBIAN_PKG_X86 = "artifact-debian-pkg-x86"
+env.ARTIFACT_DEBIAN_TAR_X86 = "artifact-debian-tar-x86"
+env.ARTIFACT_DEBIAN_PKG_JETSON = "artifact-debian-pkg-jetson"
+env.ARTIFACT_DEBIAN_TAR_JETSON = "artifact-debian-tar-jetson"
+env.ARTIFACT_CORE_X86 = "artifact-core-so-x86"
+env.ARTIFACT_CORE_JETSON = "artifact-core-so-jetson"
+
+// Bazel build files
+env.PYGXF_SO = "pygxf.so"
+env.PYGXF_SO_X86 = "${env.BAZEL_OUTPUT_ROOT_X86}/registry/bindings/${env.PYGXF_SO}"
+env.PYGXF_SO_JETSON = "${env.BAZEL_OUTPUT_ROOT_JETSON}/registry/bindings/${env.PYGXF_SO}"
+env.GXE = "gxe"
+env.GXE_X86 = "${env.BAZEL_OUTPUT_ROOT_X86}/gxf/gxe/${env.GXE}"
+env.GXE_JETSON = "${env.BAZEL_OUTPUT_ROOT_JETSON}/gxf/gxe/${env.GXE}"
+env.LIB_GXF_CORE_SO = "libgxf_core.so"
+env.LIB_GXF_CORE_SO_X86 = "${env.BAZEL_OUTPUT_ROOT_X86}/gxf/core/${env.LIB_GXF_CORE_SO}"
+env.LIB_GXF_CORE_SO_JETSON = "${env.BAZEL_OUTPUT_ROOT_JETSON}/gxf/core/${env.LIB_GXF_CORE_SO}"
+env.LIB_DEFAULT_EXTN_LO = "libdefault_extension.lo"
+env.LIB_DEFAULT_EXTN_LO_X86 = "${env.BAZEL_OUTPUT_ROOT_X86}/gxf/std/${env.LIB_DEFAULT_EXTN_LO}"
+env.LIB_DEFAULT_EXTN_LO_JETSON = "${env.BAZEL_OUTPUT_ROOT_JETSON}/gxf/std/${env.LIB_DEFAULT_EXTN_LO}"
+
+// Registry files
+env.REGISTRY_BIN_NAME = "registry"
+env.REGISTRY_BIN_NAME_X86 = "${env.REGISTRY_BIN_NAME}_${env.TARGET_ARCH_X86}"
+env.REGISTRY_BIN_NAME_JETSON = "${env.REGISTRY_BIN_NAME}_${env.TARGET_ARCH_JETSON}"
+env.REGISTRY_VERSION = "1.1.0"
+env.REGISTRY_WHEEL_NAME_X86 = "${env.REGISTRY_BIN_NAME}-${env.REGISTRY_VERSION}-py3-none-${env.TARGET_ARCH_X86}.whl"
+env.REGISTRY_WHEEL_NAME_JETSON = "${env.REGISTRY_BIN_NAME}-${env.REGISTRY_VERSION}-py3-none-${env.TARGET_ARCH_JETSON}.whl"
+env.REGISTRY_ENABLE_PYARMOR = params.BUILD_TYPE == "public" ? "True" : "False"
+// Cli tool files
+env.GXF_CLI_BIN_NAME = "gxf_cli"
+env.GXF_CLI_BIN_NAME_X86 = "${env.GXF_CLI_BIN_NAME}_${env.TARGET_ARCH_X86}"
+env.GXF_CLI_BIN_NAME_JETSON = "${env.GXF_CLI_BIN_NAME}_${env.TARGET_ARCH_JETSON}"
+// GRPC server
+env.GXF_GRPC_BIN_NAME = "gxf_server"
+env.GXF_GRPC_BIN_NAME_X86 = "${env.GXF_GRPC_BIN_NAME}_${env.TARGET_ARCH_X86}"
+env.GXF_GRPC_BIN_NAME_JETSON = "${env.GXF_GRPC_BIN_NAME}_${env.TARGET_ARCH_JETSON}"
+
+// Composer files
+env.COMPOSER_KIT_ZIP = "kit-104.2.zip"
+env.GRAPH_CORE_EXT_ZIP = "omni.exp.graph.core_1.5.2.zip"
+env.GRAPH_CORE_EXT = "omni.exp.graph.core"
+env.INPUT_COMPOSER_KIT_ZIP_URL = "${env.ARTIFACTORY_URL_BASE}/${env.ARTIFACTORY_REPOSITORY}/dependencies/internal/kit/${env.COMPOSER_KIT_ZIP}"
+env.GRAPH_CORE_ZIP_URL = "${env.ARTIFACTORY_URL_BASE}/${env.ARTIFACTORY_REPOSITORY}/dependencies/internal/${env.GRAPH_CORE_EXT_ZIP}"
+env.COMPOSER_OUTPUT_FILE = "composer_x86.run"
+env.COMPOSER_EXPORT_NAME = "composer"
+// Container builder files
+env.CONTAINER_BUILDER_VERISON = "1.1.0"
+env.CONTAINER_BUILDER_OUTPUT_FILE = "container_builder_x86.run"
+env.CONTAINER_BUILDER_EXPORT_NAME = "container_builder"
+env.CONTAINER_BUILDER_WHEEL_NAME_X86 = "${env.CONTAINER_BUILDER_EXPORT_NAME}-${env.CONTAINER_BUILDER_VERISON}-py3-none-linux_x86_64.whl"
+
+// Debian package graph_composer files
+env.DEBIAN_PKG_URL_CHARDET_X86 = "${env.ARTIFACTORY_DEBIAN_PKG_EXTERNAL_X86}/chardet-3.0.4.tar.gz"
+env.DEBIAN_PKG_URL_CHARDET_JETSON = "${env.ARTIFACTORY_DEBIAN_PKG_EXTERNAL_JETSON}/chardet-3.0.4.tar.gz"
+env.DEBIAN_PKG_URL_PY_CERTI_X86 = "${env.ARTIFACTORY_DEBIAN_PKG_EXTERNAL_X86}/python-certifi-2020.12.05.tar.gz"
+env.DEBIAN_PKG_URL_PY_CERTI_JETSON = "${env.ARTIFACTORY_DEBIAN_PKG_EXTERNAL_JETSON}/python-certifi-2020.12.05.tar.gz"
+env.DEBIAN_PKG_NAME = "graph_composer"
+env.DEBIAN_PKG_VERSION = "3.0.0"
+env.DEBIAN_PKG_ARCH_X86 = "x86_64"
+env.DEBIAN_PKG_ARCH_JETSON = "arm64"
+env.DEBIAN_PKG_NAME_X86 = make_debian_pkg_name(env.DEBIAN_PKG_NAME,
+    env.DEBIAN_PKG_VERSION, env.DEBIAN_PKG_ARCH_X86)
+env.DEBIAN_PKG_NAME_JETSON = make_debian_pkg_name(env.DEBIAN_PKG_NAME,
+    env.DEBIAN_PKG_VERSION, env.DEBIAN_PKG_ARCH_JETSON)
+env.DEBIAN_PKG_TAR_NAME_X86 = "archive_x86_64.tar"
+env.DEBIAN_PKG_TAR_NAME_JETSON = "archive_jetson.tar"
+
+// Python bindings
+env.CORE_SO = "core_pybind.so"
+env.CORE_SO_X86 = "${env.BAZEL_OUTPUT_ROOT_X86}/gxf/core/${env.CORE_SO}"
+env.CORE_SO_JETSON = "${env.BAZEL_OUTPUT_ROOT_JETSON}/gxf/core/${env.CORE_SO}"
+
+
+// Global variables
+def utils_credentials = BaseCredentialsConfig.from_default()
+utils_credentials.ngc_credentials_id = ARTIFACTORY_CRED
+utils_credentials.registry_addr = DOCKER_ARTIFACTORY_URL_BASE
+pipeline_utils = new WorkflowScriptUtil(this, utils_credentials)
+image_utils = new DockerImageUtil(this, utils_credentials)
+
+def make_debian_pkg_name(String name, String version, String arch) {
+    return "${name}-${version}_${arch}.deb"
+}
+
+void bazel(String action, String config, String arguments = '') {
+    sh "bazel $action --config=$config $arguments ..."
+}
+
+void safe_stash(String target, String file) {
+    sh "ls"
+    try {
+        stash name:"${target}", includes: "${file}"
+    } catch (e) {
+        unstable(e.getMessage())
+    }
+}
+
+void safe_unstash(String target, String file) {
+    sh "if [ -e ${file} ] ; then  rm -f ${file} ;  fi "
+    try {
+        unstash name: target
+    } catch (error) {
+        echo "error unstashing ${target}: ${error}"
+    }
+    sh "ls"
+}
+
+void copy_and_stash(String src, String dst, String artifact_name) {
+    sh "cp -f ${src} ${dst}"
+    safe_stash(artifact_name, dst)
+}
+
+void unstash_and_move(String src, String dst, String artifact_name) {
+    safe_unstash(artifact_name, src)
+    sh "mv ${src} ${dst}"
+}
+
+void check_apply_release_patch() {
+  if (params.BUILD_TYPE == "public") {
+    sh "git apply release/patch/release_build.patch"
+  }
+}
+
+void make_debian_packages(){
+    def tmp_folder = "/tmp/build_debian"
+    def out_folder_x86 = "${tmp_folder}/x86/opt/nvidia/graph-composer/"
+    def out_folder_jetson = "${tmp_folder}/jetson/opt/nvidia/graph-composer/"
+    def out_folder_x86_core = "${out_folder_x86}/core"
+    def out_folder_jetson_core = "${out_folder_jetson}/core"
+    def out_folder_x86_3rd = "${out_folder_x86}/third-party"
+    def out_folder_jetson_3rd = "${out_folder_jetson}/third-party"
+    def out_folder_x86_extndev_lib = "${out_folder_x86}/extension-dev/lib/x86_64"
+    def out_folder_jetson_extndev_lib = "${out_folder_x86}/extension-dev/lib/aarch64"
+    sh "mkdir -p ${out_folder_x86_3rd} ${out_folder_jetson_3rd}"
+    sh "mkdir -p ${out_folder_x86_core} ${out_folder_jetson_core}"
+    sh "mkdir -p ${out_folder_x86_extndev_lib} ${out_folder_jetson_extndev_lib}"
+    // Registry
+    safe_unstash(env.ARTIFACT_REGISTRY_X86, env.REGISTRY_BIN_NAME_X86)
+    safe_unstash(env.ARTIFACT_REGISTRY_JETSON, env.REGISTRY_BIN_NAME_JETSON)
+
+    sh "cp ${env.REGISTRY_BIN_NAME_X86} ${out_folder_x86}/${env.REGISTRY_BIN_NAME}"
+    sh "cp ${env.REGISTRY_BIN_NAME_JETSON} ${out_folder_jetson}/${env.REGISTRY_BIN_NAME}"
+
+    // stash the files again to be used later
+    safe_stash(env.ARTIFACT_REGISTRY_X86, env.REGISTRY_BIN_NAME_X86)
+    safe_stash(env.ARTIFACT_REGISTRY_JETSON, env.REGISTRY_BIN_NAME_JETSON)
+
+    // gxf cli
+    unstash_and_move(env.GXF_CLI_BIN_NAME_X86,
+                     "${out_folder_x86}/${env.GXF_CLI_BIN_NAME}",
+                     env.ARTIFACT_GXF_CLI_X86)
+    unstash_and_move(env.GXF_CLI_BIN_NAME_JETSON,
+                     "${out_folder_jetson}/${env.GXF_CLI_BIN_NAME}",
+                     env.ARTIFACT_GXF_CLI_JETSON)
+
+    // grpc server
+    unstash_and_move(env.GXF_GRPC_BIN_NAME_X86,
+                     "${out_folder_x86}/${env.GXF_GRPC_BIN_NAME}",
+                     env.ARTIFACT_GRPC_SERVER_X86)
+    unstash_and_move(env.GXF_GRPC_BIN_NAME_JETSON,
+                     "${out_folder_jetson}/${env.GXF_GRPC_BIN_NAME}",
+                     env.ARTIFACT_GRPC_SERVER_JETSON)
+
+    // Composer
+    unstash_and_move(env.COMPOSER_OUTPUT_FILE,
+                     "${out_folder_x86}/${env.COMPOSER_EXPORT_NAME}",
+                     env.ARTIFACT_COMPOSER_X86)
+    // Container builder
+    unstash_and_move(env.CONTAINER_BUILDER_OUTPUT_FILE,
+                     "${out_folder_x86}/${env.CONTAINER_BUILDER_EXPORT_NAME}",
+                     env.ARTIFACT_CONTAINER_BUILDER_X86)
+    // GXE
+    unstash_and_move(env.GXE, out_folder_x86, env.ARTIFACT_GXE_X86)
+    unstash_and_move(env.GXE, out_folder_jetson, env.ARTIFACT_GXE_JETSON)
+    // Lib gxf core
+    unstash_and_move(env.LIB_GXF_CORE_SO, out_folder_x86,
+                     env.ARTIFACT_LIBGXF_CORE_X86)
+    unstash_and_move(env.LIB_GXF_CORE_SO, out_folder_jetson,
+                     env.ARTIFACT_LIBGXF_CORE_JETSON)
+    unstash_and_move(env.LIB_DEFAULT_EXTN_LO, out_folder_x86_extndev_lib,
+                     env.ARTIFACT_LIBDEFAULT_EXTN_X86)
+    unstash_and_move(env.LIB_DEFAULT_EXTN_LO, out_folder_jetson_extndev_lib,
+                     env.ARTIFACT_LIBDEFAULT_EXTN_JETSON)
+    sh "cp ${out_folder_x86}/${env.LIB_GXF_CORE_SO} ${out_folder_x86_extndev_lib}"
+    sh "cp ${out_folder_jetson}/${env.LIB_GXF_CORE_SO} ${out_folder_jetson_extndev_lib}"
+
+    // Python bindings
+    unstash_and_move(env.CORE_SO, out_folder_x86_core,
+                     env.ARTIFACT_CORE_X86)
+    unstash_and_move(env.CORE_SO, out_folder_jetson_core,
+                     env.ARTIFACT_CORE_JETSON)
+    sh "cp ${out_folder_x86_core}/${env.CORE_SO} ${out_folder_x86_extndev_lib}"
+    sh "cp ${out_folder_jetson_core}/${env.CORE_SO} ${out_folder_jetson_extndev_lib}"
+
+    // 3rd party files
+    sh "cd ${out_folder_x86_3rd} && wget ${env.DEBIAN_PKG_URL_CHARDET_X86} ${env.DEBIAN_PKG_URL_PY_CERTI_X86}"
+    sh "cd ${out_folder_jetson_3rd} && wget ${env.DEBIAN_PKG_URL_CHARDET_JETSON} ${env.DEBIAN_PKG_URL_PY_CERTI_JETSON}"
+
+    def pkg_define_yaml = "package_define.yaml"
+
+    sh """
+    echo 'name: "${env.DEBIAN_PKG_NAME}"' >  ${pkg_define_yaml} &&
+    echo 'version: "${env.DEBIAN_PKG_VERSION}"' >> ${pkg_define_yaml} &&
+    echo 'arch_x86: "${env.DEBIAN_PKG_ARCH_X86}"' >> ${pkg_define_yaml} &&
+    echo 'arch_aarch64: "${env.DEBIAN_PKG_ARCH_JETSON}"' >> ${pkg_define_yaml}
+    """
+
+    sh """python3 release/scripts/make_package.py \
+                  release/scripts/package_content.yaml \
+                  ${pkg_define_yaml} \
+                  . ${tmp_folder}
+    """
+    safe_stash(env.ARTIFACT_DEBIAN_PKG_X86, env.DEBIAN_PKG_NAME_X86)
+    safe_stash(env.ARTIFACT_DEBIAN_PKG_JETSON, env.DEBIAN_PKG_NAME_JETSON)
+
+
+    sh """
+    cd ${tmp_folder} &&
+    tar czvf ${env.DEBIAN_PKG_TAR_NAME_X86}  x86 &&
+    tar czvf ${env.DEBIAN_PKG_TAR_NAME_JETSON} jetson
+    """
+    sh "mv ${tmp_folder}/${env.DEBIAN_PKG_TAR_NAME_X86} ${env.DEBIAN_PKG_TAR_NAME_X86}"
+    sh "mv ${tmp_folder}/${env.DEBIAN_PKG_TAR_NAME_JETSON} ${env.DEBIAN_PKG_TAR_NAME_JETSON}"
+    safe_stash(env.ARTIFACT_DEBIAN_TAR_X86, env.DEBIAN_PKG_TAR_NAME_X86)
+    safe_stash(env.ARTIFACT_DEBIAN_TAR_JETSON, env.DEBIAN_PKG_TAR_NAME_JETSON)
+}
+
+void make_grpc_server(String artifact_name, String target_arch) {
+    def tmp_folder = "/tmp/build"
+    def server_stash_name = "${env.GXF_GRPC_BIN_NAME}_${target_arch}"
+
+    sh "mkdir -p ${tmp_folder}"
+    sh """
+    cd ${tmp_folder} &&
+    python3 ${WORKSPACE}/service_stub/packaging/create_binary.py ${WORKSPACE}
+    """
+
+    sh "cp ${tmp_folder}/dist/${env.GXF_GRPC_BIN_NAME} ./${server_stash_name}"
+    safe_stash(artifact_name, server_stash_name)
+    sh "rm -rf ${WORKSPACE}/service_stub/server/__pycache__/"
+}
+
+void make_gxf_cli(String artifact_name, String target_arch) {
+    def tmp_folder = "/tmp/build"
+    def cli_stash_name = "${env.GXF_CLI_BIN_NAME}_${target_arch}"
+
+    sh "mkdir -p ${tmp_folder}"
+    sh """
+    cd ${tmp_folder} &&
+    python3 ${WORKSPACE}/gxf/cli/packaging/create_binary.py ${WORKSPACE}/gxf/cli
+    """
+
+    sh "cp ${tmp_folder}/dist/${env.GXF_CLI_BIN_NAME} ./${cli_stash_name}"
+    safe_stash(artifact_name, cli_stash_name)
+    sh "rm -rf ${WORKSPACE}/gxf/cli/__pycache__/"
+}
+
+String get_git_commit() {
+    return sh(
+        script: "git config --global --add safe.directory ${WORKSPACE} && git rev-parse --short HEAD",
+        returnStdout: true
+    ).trim()
+}
+
+void make_package_name(String name, String os, String arch) {
+    def utcdate = new Date().format("yyyyMMdd", TimeZone.getTimeZone("UTC"))
+    String GIT_COMMIT_ID = get_git_commit()
+    def final_name = "${name}-${os}-${arch}-${env.BRANCH}_${utcdate}_${GIT_COMMIT_ID}_${params.BUILD_TYPE}.tar"
+    return final_name
+}
+
+void register_pyarmor() {
+    sh "curl https://api.dashingsoft.com/product/key/activate/yZyTJLdIlg_lBrDlU1CCcB0pNRVpxSM0Nc3qoy1jmNyijEOi7m4yV9b9kWjTIvZBPP6FuGKltc8_NhP0CWHOHI3brgkxYERYYSptr9bk2qg-v3x3aYkNZAtSs1Ed190K-Pg7DpdbKD2C7tWXPmIhEK3xysStbHYI8BS2dDRZp0VKqu-GE3p74H7DPH5yRog6/ --output pyarmor-regfile-1222.zip"
+    sh "pyarmor register pyarmor-regfile-1222.zip"
+    sh "pyarmor register"
+}
+
+void make_registry(String registry_wheel_name, String target_arch, String artifact_pygxf,
+    String artifact_bin, String artifact_wheel) {
+    safe_unstash(artifact_pygxf, env.PYGXF_SO)
+    def tmp_folder = "/tmp/build"
+    def build_setting_yaml = "build_setting.yaml"
+    def registry_stash_name = "${env.REGISTRY_BIN_NAME}_${target_arch}"
+
+    if (env.REGISTRY_ENABLE_PYARMOR == "True") {
+      // Register pyarmor license
+      register_pyarmor()
+    }
+
+    sh "mkdir -p ${tmp_folder}"
+    sh """
+    cd ${tmp_folder} &&
+    echo 'pip_platform: "${target_arch}"' > ${build_setting_yaml} &&
+    echo 'enable_pyarmor: ${env.REGISTRY_ENABLE_PYARMOR}' >> ${build_setting_yaml} &&
+    echo 'registry: "${env.REGISTRY_BIN_NAME}"' >> ${build_setting_yaml} &&
+    echo 'registry_version: "${env.REGISTRY_VERSION}"' >> ${build_setting_yaml}
+    """
+    sh """
+    cd ${tmp_folder} &&
+    python3 ${WORKSPACE}/registry/build/packaging/make_bin_and_pip_pkg.py ${WORKSPACE} \
+    ${WORKSPACE}/${env.PYGXF_SO} ${build_setting_yaml}
+    """
+
+    sh "ls ${tmp_folder}"
+    sh "mv ${tmp_folder}/${env.REGISTRY_BIN_NAME} ${registry_stash_name}"
+    sh "mv ${tmp_folder}/${registry_wheel_name} ."
+
+    safe_stash(artifact_bin, registry_stash_name)
+    safe_stash(artifact_wheel, registry_wheel_name)
+}
+
+void make_composer() {
+    if (env.REGISTRY_ENABLE_PYARMOR == "True") {
+      // Register pyarmor license
+      register_pyarmor()
+    }
+
+    def zip_folder_path = "kit"
+    def zip_bin_path = "${zip_folder_path}/kit"
+    def encryption_var = env.REGISTRY_ENABLE_PYARMOR == "True" ? "" : "--no-encryption"
+    def tmp_folder = "/tmp/build"
+    sh "mkdir -p ${tmp_folder}"
+    sh """
+        cd ${tmp_folder} &&
+        wget ${env.INPUT_COMPOSER_KIT_ZIP_URL} &&
+        unzip ${env.COMPOSER_KIT_ZIP} &&
+        rm -f ${env.COMPOSER_KIT_ZIP}
+    """
+    sh """
+        cd ${tmp_folder} &&
+        wget ${env.GRAPH_CORE_ZIP_URL} &&
+        unzip ${env.GRAPH_CORE_EXT_ZIP} &&
+        rm -f ${env.GRAPH_CORE_EXT_ZIP}
+    """
+    sh "ls "
+    sh "ls ${tmp_folder}"
+    def cmd = """ python3 ${WORKSPACE}/composer/utils/prepare.py ${zip_folder_path} \
+        ${WORKSPACE} ${env.GRAPH_CORE_EXT} ${encryption_var}
+    """
+    sh "echo ${cmd}"
+    sh "cd ${tmp_folder} && ${cmd}"
+    sh "ls ${tmp_folder}/${env.COMPOSER_OUTPUT_FILE}"
+    sh "cp ${tmp_folder}/${env.COMPOSER_OUTPUT_FILE} ."
+    safe_stash(env.ARTIFACT_COMPOSER_X86, env.COMPOSER_OUTPUT_FILE)
+}
+
+void make_container_builder() {
+    safe_unstash(env.ARTIFACT_REGISTRY_WHEEL_X86, env.REGISTRY_WHEEL_NAME_X86)
+    def encryption_var = env.REGISTRY_ENABLE_PYARMOR == "True" ? "" : "--no-encryption"
+    def folder_cb_pkg = "container_builder/packaging/"
+    sh "ls ${folder_cb_pkg}"
+    def cmd_bin = """python3 build_bundle.py ${WORKSPACE}/${env.REGISTRY_WHEEL_NAME_X86} \
+                  ${encryption_var}"""
+    sh "cd ${folder_cb_pkg} && ${cmd_bin}"
+    sh "ls ${folder_cb_pkg}/dist"
+    sh "cp ${folder_cb_pkg}/dist/container_builder ${env.CONTAINER_BUILDER_OUTPUT_FILE}"
+    safe_stash(env.ARTIFACT_CONTAINER_BUILDER_X86, env.CONTAINER_BUILDER_OUTPUT_FILE)
+
+    sh "pip3 install ${env.REGISTRY_WHEEL_NAME_X86}"
+    def folder_cb = "container_builder"
+    def cmd_whl = """python3 container_builder/packaging/setup.py -v bdist_wheel --plat-name ${env.TARGET_ARCH_X86}"""
+    sh "${cmd_whl}"
+    sh "ls dist"
+    sh "cp dist/${env.CONTAINER_BUILDER_WHEEL_NAME_X86} ./"
+    safe_stash(env.ARTIFACT_CONTAINER_BUILDER_WHEEL_X86, env.CONTAINER_BUILDER_WHEEL_NAME_X86)
+}
+
+void skip_extn_registration() {
+    sh "echo build --define=register_extensions=False >> ~/.bazelrc"
+}
+
+void send_file(String src, String dst) {
+  def vault_secret = [
+      [path: '/secrets/artifactory', engineVersion: 1, secretValues: [
+          [envVar: 'ISAAC_ARTIFACTORY_KEY', vaultKey: 'key']]]
+      ]
+  String GIT_COMMIT_ID = get_git_commit()
+  withVault([vaultSecrets: vault_secret]) {
+      def build_metadata=[
+          "commit_id=${GIT_COMMIT_ID}",
+          "build_number=${BUILD_NUMBER}",
+          "branch=${env.BRANCH}",
+          "build_url=${env.RUN_DISPLAY_URL}"].join(';')
+      def headers = "'X-JFrog-Art-Api:${ISAAC_ARTIFACTORY_KEY}'"
+      sh "curl -H ${headers} -T ${src} \"${env.ARTIFACTORY_ENDPOINT}/${dst};${build_metadata}\""
+    }
+}
+
+void deploy_graph_composer() {
+    safe_unstash(env.ARTIFACT_DEBIAN_PKG_X86, env.DEBIAN_PKG_NAME_X86)
+    safe_unstash(env.ARTIFACT_DEBIAN_PKG_JETSON, env.DEBIAN_PKG_NAME_JETSON)
+    safe_unstash(env.ARTIFACT_DEBIAN_TAR_X86, env.DEBIAN_PKG_TAR_NAME_X86)
+    safe_unstash(env.ARTIFACT_DEBIAN_TAR_JETSON, env.DEBIAN_PKG_TAR_NAME_JETSON)
+
+    def dst_graph_composer = make_package_name("graph_composer", "any", "any")
+    sh """
+    tar czvf ${dst_graph_composer} ${env.DEBIAN_PKG_NAME_X86} ${env.DEBIAN_PKG_NAME_JETSON} \
+     ${env.DEBIAN_PKG_TAR_NAME_X86} ${env.DEBIAN_PKG_TAR_NAME_JETSON}
+    """
+
+    send_file(dst_graph_composer, dst_graph_composer)
+
+    // Registry wheel file
+    safe_unstash(env.ARTIFACT_REGISTRY_WHEEL_X86, env.REGISTRY_WHEEL_NAME_X86)
+    safe_unstash(env.ARTIFACT_REGISTRY_WHEEL_JETSON, env.REGISTRY_WHEEL_NAME_JETSON)
+
+    def dst_registry_wheel = make_package_name("registry_wheel", "any", "any")
+    sh "tar czvf ${dst_registry_wheel} ${env.REGISTRY_WHEEL_NAME_X86} ${env.REGISTRY_WHEEL_NAME_JETSON}"
+
+    send_file(dst_registry_wheel, dst_registry_wheel)
+
+    // Registry binary file
+    safe_unstash(env.ARTIFACT_REGISTRY_X86, env.REGISTRY_BIN_NAME_X86)
+    safe_unstash(env.ARTIFACT_REGISTRY_JETSON, env.REGISTRY_BIN_NAME_JETSON)
+
+    def dst_registry_binary = make_package_name("registry_binary", "any", "any")
+    sh "tar czvf ${dst_registry_binary} ${env.REGISTRY_BIN_NAME_X86} ${env.REGISTRY_BIN_NAME_JETSON}"
+
+    send_file(dst_registry_binary, dst_registry_binary)
+
+    // Container builder wheel file
+    safe_unstash(env.ARTIFACT_CONTAINER_BUILDER_WHEEL_X86, env.CONTAINER_BUILDER_WHEEL_NAME_X86)
+
+    def dst_container_builder_wheel = make_package_name("container_wheel", "any", "any")
+    sh "tar czvf ${dst_container_builder_wheel} ${env.CONTAINER_BUILDER_WHEEL_NAME_X86}"
+
+    send_file(dst_container_builder_wheel, dst_container_builder_wheel)
+}
+
+properties([
+    parameters([
+        string(
+          name: 'GERRIT_REFSPEC',
+          description: "Branch to build. Use a branch name or full REF",
+          defaultValue: 'refs/heads/master'
+        ),
+        choice(
+          choices: ['internal', 'public'],
+          name: "BUILD_TYPE",
+          description: "Select build type - internal / public"
+        ),
+    ])
+])
+
+pipeline {
+    agent none
+    stages {
+        stage('Build Base Image'){
+            steps {
+                script {
+podTemplate(cloud:'sc-ipp-blossom-prod', yaml : '''
+apiVersion: v1
+kind: Pod
+spec:
+  containers:
+  - name: base-image-builder
+    image: docker:19.03.1
+    env:
+      - name: DOCKER_HOST
+        value: tcp://localhost:2375
+    securityContext:
+      privileged: true
+    tty: true
+  - name: docker-daemon
+    image: docker:19.03.1-dind
+    securityContext:
+      privileged: true
+    env:
+      - name: DOCKER_TLS_CERTDIR
+        value: ""
+    restartPolicy: Never
+    tty: true
+  nodeSelector:
+    kubernetes.io/os: linux
+''') {
+    node(POD_LABEL) {
+        container('base-image-builder') {
+            checkout scm
+            String image_name = "$DOCKER_URL/$DOCKER_REPO/$IMAGES_TAG_PREFIX-$DEFAULT_PLATFORM"
+            String tag = "$env.BUILD_NUMBER"
+            image_utils.build_base_image(image_name, tag,
+                                "engine/build/docker/Dockerfile",
+                                'engine/build','--network host')
+            base_image = "$image_name:$tag"
+        }
+    }
+}
+                }
+            }
+        }
+        stage('Parallel Build Stages') {
+            parallel {
+                stage('Build X86') {
+                    steps {
+                        script {
+podTemplate(cloud:'sc-ipp-blossom-prod', yaml : """
+apiVersion: v1
+kind: Pod
+spec:
+  containers:
+  - name: tools-base-image
+    image: $base_image
+    tty: true
+    imagePullSecrets:
+      - name: regcred
+    resources:
+        requests:
+            cpu: 10000m
+            nvidia.com/gpu: 1
+        limits:
+            nvidia.com/gpu: 1
+  nodeSelector:
+    kubernetes.io/os: linux
+    nvidia.com/driver_version: "530.30.02"
+"""){
+        node(POD_LABEL) {
+            container('tools-base-image') {
+                checkout scm
+                pipeline_utils.enable_ssh() {
+                    stage('Build Binaries') {
+                        check_apply_release_patch()
+                        skip_extn_registration()
+                        bazel('build', 'x86_64_cuda_12_1')
+                        copy_and_stash(env.PYGXF_SO_X86, env.PYGXF_SO, env.ARTIFACT_PYGXF_X86)
+                        copy_and_stash(env.GXE_X86, env.GXE, env.ARTIFACT_GXE_X86)
+                        copy_and_stash(env.LIB_GXF_CORE_SO_X86, env.LIB_GXF_CORE_SO, env.ARTIFACT_LIBGXF_CORE_X86)
+                        copy_and_stash(env.CORE_SO_X86, env.CORE_SO, env.ARTIFACT_CORE_X86)
+                        copy_and_stash(env.LIB_DEFAULT_EXTN_LO_X86, env.LIB_DEFAULT_EXTN_LO, env.ARTIFACT_LIBDEFAULT_EXTN_X86)
+                    }
+                    stage('Build Registry') {
+                        make_registry(env.REGISTRY_WHEEL_NAME_X86,
+                        env.TARGET_ARCH_X86, env.ARTIFACT_PYGXF_X86,
+                        env.ARTIFACT_REGISTRY_X86, env.ARTIFACT_REGISTRY_WHEEL_X86)
+                    }
+                    stage('Build GXF CLI') {
+                        make_gxf_cli(env.ARTIFACT_GXF_CLI_X86, env.TARGET_ARCH_X86)
+                    }
+                    stage('Build GRPC Server') {
+                        make_grpc_server(env.ARTIFACT_GRPC_SERVER_X86, env.TARGET_ARCH_X86)
+                    }
+                    stage('Build Container builder') {
+                        make_container_builder()
+                    }
+                }
+            }
+        }
+    }
+                        }
+                    }
+                }
+                stage('Build Jetson') {
+                    steps {
+                        script {
+podTemplate(cloud:'sc-ipp-blossom-prod', yaml : """
+apiVersion: v1
+kind: Pod
+spec:
+  containers:
+  - name: tools-base-image
+    image: $base_image
+    tty: true
+    imagePullSecrets:
+      - name: regcred
+    resources:
+        requests:
+            cpu: 10000m
+            nvidia.com/gpu: 1
+        limits:
+            nvidia.com/gpu: 1
+  nodeSelector:
+    kubernetes.io/os: linux
+    nvidia.com/driver_version: "530.30.02"
+"""){
+        node(POD_LABEL) {
+            container('tools-base-image') {
+                checkout scm
+                pipeline_utils.enable_ssh() {
+                    stage('Build Binaries') {
+                        check_apply_release_patch()
+                        skip_extn_registration()
+                        bazel('build', 'jetpack51')
+                        copy_and_stash(env.PYGXF_SO_JETSON, env.PYGXF_SO, env.ARTIFACT_PYGXF_JETSON)
+                        copy_and_stash(env.GXE_JETSON, env.GXE, env.ARTIFACT_GXE_JETSON)
+                        copy_and_stash(env.LIB_GXF_CORE_SO_JETSON, env.LIB_GXF_CORE_SO, env.ARTIFACT_LIBGXF_CORE_JETSON)
+                        copy_and_stash(env.CORE_SO_JETSON, env.CORE_SO, env.ARTIFACT_CORE_JETSON)
+                        copy_and_stash(env.LIB_DEFAULT_EXTN_LO_JETSON, env.LIB_DEFAULT_EXTN_LO, env.ARTIFACT_LIBDEFAULT_EXTN_JETSON)
+                    }
+                }
+            }
+        }
+    }
+                        }
+                    }
+                }
+            }
+        }
+    stage('Parallel Stages') {
+        parallel {
+            stage('Build Composer') {
+                steps {
+                    script {
+podTemplate(cloud:'sc-ipp-blossom-prod', yaml : """
+apiVersion: v1
+kind: Pod
+spec:
+  containers:
+  - name: tools-base-image
+    image: $base_image
+    tty: true
+    imagePullSecrets:
+      - name: regcred
+  nodeSelector:
+    kubernetes.io/os: linux
+""") {
+                        node(POD_LABEL) {
+                            checkout scm
+                            container('tools-base-image') {
+                                make_composer()
+                            }
+                        }
+                    }
+                }
+            }
+        }
+            stage("Build on Tegra") {
+                agent {
+                    dockerfile {
+                        label 'gxf && orin'
+                        reuseNode true
+                        filename 'docker/arm64/jp51.Dockerfile'
+                        dir 'engine/build'
+                        args '--user root --runtime nvidia -e HOME=/tmp -v /etc/passwd:/etc/passwd:ro'
+                    }
+                }
+                steps {
+                    script {
+                        checkout scm
+                        pipeline_utils.enable_ssh() {
+                            stage('Build GRPC server') {
+                                check_apply_release_patch()
+                                make_grpc_server(env.ARTIFACT_GRPC_SERVER_JETSON, env.TARGET_ARCH_JETSON)
+                            }
+                            stage('Build GXF CLI') {
+                                check_apply_release_patch()
+                                make_gxf_cli(env.ARTIFACT_GXF_CLI_JETSON, env.TARGET_ARCH_JETSON)
+                            }
+                            stage('Build Registry') {
+                                check_apply_release_patch()
+                                make_registry(env.REGISTRY_WHEEL_NAME_JETSON,
+                                env.TARGET_ARCH_JETSON, env.ARTIFACT_PYGXF_JETSON,
+                                env.ARTIFACT_REGISTRY_JETSON, env.ARTIFACT_REGISTRY_WHEEL_JETSON)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+        stage('Debian packages') {
+            steps {
+                script {
+podTemplate(cloud:'sc-ipp-blossom-prod', yaml : """
+apiVersion: v1
+kind: Pod
+spec:
+  containers:
+  - name: tools-base-image
+    image: $base_image
+    tty: true
+    imagePullSecrets:
+      - name: regcred
+  nodeSelector:
+    kubernetes.io/os: linux
+""") {
+                        node(POD_LABEL) {
+                            container('tools-base-image') {
+                                checkout scm
+                                pipeline_utils.enable_ssh() {
+                                    stage('Make Debian packages') {
+                                        make_debian_packages()
+                                    }
+                                    stage('Deploy Graph composer') {
+                                        deploy_graph_composer()
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

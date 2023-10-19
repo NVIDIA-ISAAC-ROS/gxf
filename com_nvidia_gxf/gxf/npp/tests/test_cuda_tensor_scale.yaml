@@ -1,0 +1,111 @@
+# SPDX-FileCopyrightText: Copyright (c) 2020-2021 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+%YAML 1.2
+---
+name: gen
+components:
+- name: tensor
+  type: nvidia::gxf::DoubleBufferTransmitter
+- type: nvidia::gxf::DownstreamReceptiveSchedulingTerm
+  parameters:
+    transmitter: tensor
+    min_size: 1
+- name: pool
+  type: nvidia::gxf::BlockMemoryPool
+  parameters:
+    storage_type: 1
+    block_size: 1843200
+    num_blocks: 2
+- type: nvidia::gxf::NppiSet
+  parameters:
+    rows: 320
+    columns: 480
+    channels: 3
+    pool: pool
+    value: [-0.54, 0.21, 0.73]
+    out: tensor
+- type: nvidia::gxf::CountSchedulingTerm
+  parameters:
+    count: 500
+---
+name: scale
+components:
+- name: tensor
+  type: nvidia::gxf::DoubleBufferReceiver
+- type: nvidia::gxf::MessageAvailableSchedulingTerm
+  parameters:
+    receiver: tensor
+    min_size: 1
+- name: scaled_tensor
+  type: nvidia::gxf::DoubleBufferTransmitter
+- type: nvidia::gxf::DownstreamReceptiveSchedulingTerm
+  parameters:
+    transmitter: scaled_tensor
+    min_size: 1
+- name: pool
+  type: nvidia::gxf::BlockMemoryPool
+  parameters:
+    storage_type: 1
+    block_size: 1843200
+    num_blocks: 2
+- type: nvidia::gxf::NppiMulC
+  parameters:
+    factor: [0.5, 0.5, 0.5]
+    in: tensor
+    out: scaled_tensor
+    pool: pool
+---
+name: print
+components:
+- name: tensor
+  type: nvidia::gxf::DoubleBufferReceiver
+- type: nvidia::gxf::MessageAvailableSchedulingTerm
+  parameters:
+    receiver: tensor
+    min_size: 1
+- type: nvidia::gxf::test::PrintTensor
+  parameters:
+    tensors: tensor
+    silent: False
+- type: nvidia::gxf::test::StepCount
+  parameters:
+    expected_count: 500
+---
+components:
+- type: nvidia::gxf::Connection
+  parameters:
+    source: gen/tensor
+    target: scale/tensor
+---
+components:
+- type: nvidia::gxf::Connection
+  parameters:
+    source: scale/scaled_tensor
+    target: print/tensor
+---
+components:
+- type: nvidia::gxf::GreedyScheduler
+  parameters:
+    max_duration_ms: 100000
+    clock: clock
+- name: clock
+  type: nvidia::gxf::ManualClock
+- name: realtime_clock
+  type: nvidia::gxf::RealtimeClock
+- type: nvidia::gxf::JobStatistics
+  parameters:
+    clock: realtime_clock
+    codelet_statistics: true
+    json_file_path: '/tmp/test_cuda_tensor_scale_statistics.json'

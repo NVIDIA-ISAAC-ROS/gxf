@@ -1,0 +1,688 @@
+// GXF Nightly Pipeline
+//
+// Nightly automated builds for GXF
+// Runs every night and archives the resulting artifacts on the
+// binary storage
+//
+// Copyright (c) 2021-2023, NVIDIA CORPORATION. All rights reserved.
+//
+// NVIDIA CORPORATION and its licensors retain all intellectual property
+// and proprietary rights in and to this software, related documentation
+// and any modifications thereto. Any use, reproduction, disclosure or
+// distribution of this software and related documentation without an express
+// license agreement from NVIDIA CORPORATION is strictly prohibited.
+
+@Library('ci-groovkins-lib@da4841fe4dff36ceb989c15ffa9eae1348d4cbd8')
+
+import com.nvidia.isaac.ci.utils.WorkflowScriptUtil
+import com.nvidia.isaac.ci.utils.dto.BaseCredentialsConfig
+import com.nvidia.isaac.ci.utils.Nodes
+
+// Global variables
+def DOCKER_IMAGE
+def DOCKER_IMAGE_ARM
+
+utils = new WorkflowScriptUtil(this,
+    BaseCredentialsConfig.from_default())
+
+// Stage execution configuration class
+class StageConfig {
+   String env_type
+   def image
+   String docker_args = ''
+   Boolean ignore_failures = false
+   Boolean use_cache = false
+}
+
+//  Get current git hash
+void set_git_hash(){
+    def scmInfo = checkout scm
+    env.GIT_HASH = scmInfo.GIT_COMMIT
+}
+
+// get groups the host user belongs to as argument list for Docker
+String get_docker_groups() {
+    return sh(
+        script: '''
+python3 -c 'import os; print (" ".join(["--group-add " + str(g) for g in os.getgroups()]))'
+''',
+        returnStdout: true
+    ).trim()
+}
+
+// Execute steps from the list of methods
+def execute_methods(def methods, StageConfig stage_config) {
+
+    def vault_secret = [
+        [path: '/secrets/artifactory', engineVersion: 1, secretValues: [
+            [envVar: 'ARTIFACTORY_USER', vaultKey: 'user'],
+            [envVar: 'ARTIFACTORY_PASS', vaultKey: 'password']]]
+        ]
+    withVault([vaultSecrets: vault_secret]) {
+        if (stage_config.image) {
+            String local_docker_args = stage_config.docker_args
+            def docker_groups = get_docker_groups()
+            if (stage_config.env_type == 'x86') {
+                def (cpus, first_cpu, last_cpu, mem) = Nodes.getResourceLimitations(this)
+                local_docker_args = "$local_docker_args --cpus ${cpus} --cpuset-cpus ${first_cpu}-${last_cpu} -m=\"${mem}k\""
+            } else {
+                local_docker_args = "$local_docker_args --user root"
+            }
+            docker.withRegistry('https://nvcr.io',  NGC_REGISTRY_CREDENTIALS) {
+              utils.run_with_ssh_key("secrets/account/ssh-key",
+                "${WORKSPACE}/secret/ssh_key") {
+                    stage_config.image.inside("-v ${WORKSPACE}/secret/ssh_key:/home/${ARTIFACTORY_USER}/.ssh/id_rsa:ro \
+                     ${local_docker_args} ${docker_groups}") {
+                        dir(WORKSPACE) {
+                            if (stage_config.use_cache) {enable_cache(ARTIFACTORY_USER)}
+                            if (!execute_steps(methods, stage_config.ignore_failures)) {
+                                error ("${env.PACKAGE_STATE}")
+                            }
+                        }
+                    }
+                }
+            }
+        } else {
+            if (!execute_steps(methods, stage_config.ignore_failures)) {
+                error("${env.PACKAGE_STATE}")
+            }
+        }
+    }
+}
+
+// Enable bazel remote cache if required
+def enable_cache() {
+    sh "echo build --remote_cache=http://${NODE_NAME}:8080 >> ~/.bazelrc"
+}
+
+// Execute steps from the list of steps (methods)
+Boolean execute_steps(def steps, Boolean ignore_failures=false) {
+    Boolean result = true
+    try {
+        steps()
+    } catch (Exception e) {
+        env.PACKAGE_STATE = "Package builds with errors: ${e}"
+        if (ignore_failures) {
+            unstable("${env.PACKAGE_STATE}")
+        } else {
+            currentBuild.result = "FAIL"
+            result = false
+        }
+    }
+    return result
+}
+
+boolean started_by_timer() {
+    return currentBuild.getBuildCauses()[0]['shortDescription'].matches(
+        'Started by timer'
+    )
+}
+
+String get_started_by_username() {
+    if (started_by_timer()) {
+        return 'svc-robotics-admin'
+    }
+    def specific_cause = currentBuild.getBuildCauses('hudson.model.Cause$UserIdCause')
+    return specific_cause.userId[0]?.trim()
+}
+
+def update_recipients() {
+    String user_email = get_started_by_username()
+    print user_email
+    if (user_email != null && !user_email.isEmpty()) {
+        FAILURE_EMAIL_RECIPIENT="${user_email};${FAILURE_EMAIL_RECIPIENT}"
+        SUCCESS_EMAIL_RECIPIENT="${user_email};${SUCCESS_EMAIL_RECIPIENT}"
+    }
+}
+
+def send_file(String src, String dst) {
+  def vault_secret = [
+      [path: '/secrets/artifactory', engineVersion: 1, secretValues: [
+          [envVar: 'ISAAC_ARTIFACTORY_KEY', vaultKey: 'key']]]
+      ]
+  withVault([vaultSecrets: vault_secret]) {
+      def build_metadata=[
+          "commit_id=${env.GIT_COMMIT_ID}",
+          "build_number=${BUILD_NUMBER}",
+          "branch=${env.BRANCH_NAME}",
+          "build_url=${env.RUN_DISPLAY_URL}"].join(';')
+      def headers = "'X-JFrog-Art-Api:${ISAAC_ARTIFACTORY_KEY}'"
+      sh "curl -H ${headers} -T ${src} \"${env.ARTIFACTORY_ENDPOINT}/${dst};${build_metadata}\""
+    }
+}
+
+def check_apply_release_patch() {
+  if (params.BUILD_TYPE == "public") {
+    sh "git apply release/patch/release_build.patch"
+  }
+}
+
+def make_package_name(String name, String os, String arch) {
+    def utcdate = new Date().format("yyyyMMdd", TimeZone.getTimeZone("UTC"))
+    def final_name = "${name}-${os}-${arch}-${env.BRANCH_NAME}_${utcdate}_${env.GIT_COMMIT_ID}_${params.BUILD_TYPE}.tar"
+    return final_name
+}
+
+def safe_stash(String target, String file)
+{
+    sh "ls"
+    try {
+        stash name:"${target}", includes: "${file}"
+    } catch (e) {
+        unstable(e.getMessage())
+    }
+}
+
+def safe_unstash(String target, String file)
+{
+    sh "if [ -e ${file} ] ; then  rm -f ${file} ;  fi "
+    try {
+        unstash name: target
+    } catch (error) {
+        echo "error unstashing ${target}: ${error}"
+    }
+    sh "ls"
+}
+
+def skip_extn_registration() {
+    sh "echo build --define=register_extensions=False >> ~/.bazelrc"
+}
+
+def copy_and_stash(String src, String dst, String artifact_name)
+{
+    sh "cp -f ${src} ${dst}"
+    safe_stash(artifact_name, dst)
+}
+
+def build_documentation() {
+     sh "bazel build //doc:doc --define skip_doc=false"
+     copy_and_stash(env.GXF_DOC_TAR, env.GXF_DOC_TARBALL_NAME, env.ARTIFACT_GXF_DOC)
+}
+
+// Build and push to artifactory jetson tests
+def build_jetson_tests(String jp_version) {
+    sh """
+    chmod +x engine/build/scripts/build_upload_tests.sh
+    ./engine/build/scripts/build_upload_tests.sh -d ${jp_version} \
+        -a ${env.ARTIFACTORY_JETSON}/${BUILD_NUMBER}-${jp_version} \
+        -u u$ARTIFACTORY_USER -p $ARTIFACTORY_PASS
+    """
+}
+
+// Download and run jetson tests
+def run_jetson_tests(String jp_version) {
+    sh "rm -rf jetson_testlog"
+    sh "chmod +x engine/build/scripts/download_run_tests.sh"
+    sh "./engine/build/scripts/download_run_tests.sh \
+        u$ARTIFACTORY_USER $ARTIFACTORY_PASS ${env.ARTIFACTORY_JETSON}/${BUILD_NUMBER}-${jp_version} \
+        ${BUILD_NUMBER}-${jp_version}"
+}
+
+// Save and publish test results for jetson
+def report_test_results_jetson() {
+    String tag = UUID.randomUUID().toString()
+    sh "cp -r jetson_artifactory/jetson_testlog $WORKSPACE/jetson_testlog-${tag}"
+    archiveArtifacts artifacts: "jetson_testlog-${tag}/**/*.xml"
+    junit testResults: "jetson_testlog-${tag}/**/*.xml",
+        allowEmptyResults: true
+    sh "rm -r *"
+    sh "rm -rf /tmp/isaac"
+}
+
+def build_gxf_release_package(String config, String output_file, String output_folder){
+
+    sh "python3 release/make_tarball.py ${config} ${output_file} ${output_folder}"
+}
+
+def deploy_release_builds() {
+    // Deploy gxf core release package builds which can be used to debug build failures
+    if (params.DEBUG_GXF_CORE == true) {
+        def src_gxf_core = env.OUTPUT_TARBALL_NAME
+        def dst_gxf_core = make_package_name("testing-gxf_core", "any", "any")
+        send_file(src_gxf_core, dst_gxf_core)
+    }
+    safe_stash(env.ARTIFACT_GXF_PACKAGE, env.OUTPUT_TARBALL_NAME)
+}
+
+def test_gxf_release_package(){
+    safe_unstash(env.ARTIFACT_GXF_PACKAGE, env.OUTPUT_TARBALL_NAME)
+    sh "mkdir -p /tmp/testing_tarball"
+    sh "cp ${env.OUTPUT_TARBALL_NAME} /tmp/testing_tarball"
+    sh "cd /tmp/testing_tarball && tar xf ${env.OUTPUT_TARBALL_NAME}"
+    sh """cd /tmp/testing_tarball/${env.OUTPUT_DIR_NAME} &&
+          bazel build ... &&
+          bazel test ... &&
+          bazel build ... --config=jetpack51
+       """
+}
+
+// Run artifactory cleanup script
+def artifactory_cleanup() {
+    withEnv(["HOME=${env.WORKSPACE}"]) {
+        sh """
+         pip install lavatory --user
+         export ARTIFACTORY_USERNAME=$ARTIFACTORY_USER
+         export ARTIFACTORY_URL=${env.ARTIFACTORY_URL_BASE}
+         export ARTIFACTORY_PASSWORD=$ARTIFACTORY_PASS
+         export PATH="/tmp/.local/bin:$PATH"
+         export LC_ALL=C.UTF-8
+         export LANG=C.UTF-8
+         python3 -m lavatory -vvvvv purge --nodryrun --policies-path=./engine/build/jenkins/artifactory_cleanup_policy --repo ${env.ARTIFACTORY_REPOSITORY} --no-default
+         """
+     }
+}
+
+pipeline {
+    agent none
+    triggers {
+        //  Please update env.CRON_STRING too
+        pollSCM('@midnight')
+    }
+    parameters {
+        string(
+            name: 'REF',
+            description: "Branch to build. Use a branch name or full REF",
+            defaultValue: 'refs/heads/master'
+        )
+        choice(
+          choices: ['internal', 'public'],
+          name: "BUILD_TYPE",
+          description: "Select build type - internal / public"
+        )
+        booleanParam(
+          name: 'DEBUG_GXF_CORE',
+          defaultValue: false,
+          description: 'Deploy GXF core release package for debugging'
+        )
+        booleanParam(
+          name: 'ENABLE_jetpack51',
+          defaultValue: true,
+          description: 'Enable Jetpack 5.1 build and test stages')
+        booleanParam(
+          name: 'Generate_Coverity_Report',
+          defaultValue: true,
+          description: 'Generate Coverity Report on X86')
+        booleanParam(
+          name: 'ENABLE_CODE_COVERAGE',
+          defaultValue: false,
+          description: 'Generate Code coverage report on X86')
+    }
+    environment {
+        GERRIT_SERVER="git-master.nvidia.com"
+        DOCKER_ARGUMENTS='-e HOME=/tmp -v /etc/passwd:/etc/passwd:ro'
+        FAILURE_EMAIL_RECIPIENT='isacc-sdk-ci@exchange.nvidia.com;\
+        deepstream-next-sqa@exchange.nvidia.com;gxf-qa-extended@exchange.nvidia.com;pgaikwad@nvidia.com'
+        SUCCESS_EMAIL_RECIPIENT='isaac-sdk-ci-notifications@exchange.nvidia.com;\
+        deepstream-next-sqa@exchange.nvidia.com;gxf-qa-extended@exchange.nvidia.com;pgaikwad@nvidia.com'
+        ARTIFACTORY_URL_BASE="https://urm.nvidia.com/artifactory"
+        ARTIFACTORY_REPOSITORY="sw-isaac-gxf-generic-local"
+        RUNTIME='--runtime=nvidia'
+        NGC_REGISTRY_CREDENTIALS = 'vault-ngc'
+        REPO_NAME='gxf'
+    }
+    options {
+        ansiColor('xterm')
+        timestamps()
+        timeout(time: 10, unit: 'HOURS')
+        buildDiscarder(logRotator(numToKeepStr: '200', daysToKeepStr: '120'))
+        parallelsAlwaysFailFast()
+    }
+    stages {
+        stage('Environment setup') {
+            agent { node { label 'gxf && agent' } }
+            steps {
+                script {
+                    // When running outside of a multibranch job, this value
+                    // is not set. Setting a default value allows for testing
+                    // as a single branch pipeline with the same code as in
+                    // multibranch builds (production).
+                    if(env.BRANCH_NAME == null ) {
+                        env.BRANCH_NAME = 'pipeline-testing'
+                        FAILURE_EMAIL_RECIPIENT = sh(
+                            script: 'git show -s --format=%ae',
+                            returnStdout: true
+                        ).trim()
+                        SUCCESS_EMAIL_RECIPIENT = FAILURE_EMAIL_RECIPIENT
+                    }
+
+                    env.CRON_STRING = '@midnight'
+                    check_apply_release_patch()
+
+                    env.ARTIFACTORY_ENDPOINT = "${env.ARTIFACTORY_URL_BASE}/${env.ARTIFACTORY_REPOSITORY}/nightly/${env.BRANCH_NAME}"
+                    env.ARTIFACTORY_JETSON = "${env.ARTIFACTORY_URL_BASE}/${env.ARTIFACTORY_REPOSITORY}/nightly/${env.BRANCH_NAME}/jetson_tests"
+
+                    env.GIT_COMMIT_ID = sh(
+                        script: "git rev-parse --short HEAD",
+                        returnStdout: true
+                    ).trim()
+                    env.OUTPUT_DIR_NAME = "/tmp/gxf-${env.BRANCH_NAME}-release"
+                    env.OUTPUT_DIR_DOC_NAME = "gxf-doc-${env.BRANCH_NAME}-release"
+                    env.OUTPUT_TARBALL_NAME = "gxf-${env.BRANCH_NAME}-release.tar"
+                    env.BAZEL_OUTPUT_ROOT_DOC = "bazel-bin/doc/"
+                    env.GXF_DOC_TARBALL_NAME= "${env.OUTPUT_DIR_DOC_NAME}.tar"
+
+
+                    // Artifacts
+                    env.ARTIFACT_GXF_DOC = "artifact-gxf-doc"
+                    env.ARTIFACT_GXF_PACKAGE = "gxf-release-pkg-tarball"
+
+                    // Bazel build files
+                    env.GXF_DOC_TAR = "${env.BAZEL_OUTPUT_ROOT_DOC}/gxf.tar.gz"
+
+                    //  Get next build time and git changelog
+                    env.NEXT_BUILD_TIME = ''
+                    env.GIT_CHANGELOG = ''
+                    try {
+                        //  Get current git hash
+                        set_git_hash()
+                        //  Next build time
+                        env.NEXT_BUILD_TIME = utils.get_next_run_time(CRON_STRING)
+                        //  Git changelog
+                        env.GIT_CHANGELOG = utils.get_changelog().replaceAll('\n', '<br>')
+                    }
+                    catch(error) {
+                        echo "Couldn't get Git changelog and next run time"
+                    }
+                    update_recipients()
+                }
+            }
+        }
+        stage("Get builder images"){
+            parallel {
+                stage("x86 Branch") {
+                    agent { node { label 'gxf && builder' } }
+                    steps {
+                        script {
+                            checkout scm
+                            docker.withRegistry('https://nvcr.io',  NGC_REGISTRY_CREDENTIALS) {
+                                // Build base image
+                                DOCKER_IMAGE = docker.build("nvcr.io/nvidian/isaac-sdk/gxf:nightly-${BUILD_NUMBER}",
+                                "-f engine/build/docker/Dockerfile engine/build")
+                                DOCKER_IMAGE.push()
+                            }
+                        }
+                    }
+                }
+                stage("Jetson Branch") {
+                    agent { node { label 'jp-5.1' } }
+                    steps {
+                        script {
+                            checkout scm
+                            docker.withRegistry('https://nvcr.io',  NGC_REGISTRY_CREDENTIALS) {
+                                DOCKER_IMAGE_ARM = docker.build("nvcr.io/nvidian/isaac-sdk/gxf-arm:nightly-${BUILD_NUMBER}",
+                                "-f engine/build/docker/arm64/jp51.Dockerfile engine/build")
+                                DOCKER_IMAGE_ARM.push()
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        stage("Parallel"){
+            parallel {
+                stage("GXF on device verification") {
+                    stages {
+                        stage("Build Jetson 5.1 tests") {
+                            when { environment name: 'ENABLE_jetpack51', value: "true" }
+                            agent {  node { label 'gxf && cuda-11.7' } }
+                            steps {
+                                cleanWs disableDeferredWipeout: true, deleteDirs: true
+                                checkout scm
+                                script {
+                                    execute_methods(
+                                        {
+                                            build_jetson_tests("jetpack51")
+                                        },
+                                        new StageConfig(
+                                            env_type: 'x86',
+                                            image: DOCKER_IMAGE,
+                                            docker_args: "${DOCKER_ARGUMENTS}"))
+                                }
+                                cleanWs disableDeferredWipeout: true, deleteDirs: true
+                            }
+                        }
+                        stage("Run Jetpack 5.1 tests") {
+                            when { environment name: 'ENABLE_jetpack51', value: "true" }
+                            agent {  node { label 'gxf && jp-5.1' } }
+                            steps {
+                                cleanWs disableDeferredWipeout: true, deleteDirs: true
+                                checkout scm
+                                script {
+                                    config = new StageConfig(
+                                        env_type: 'jetson',
+                                        image: DOCKER_IMAGE_ARM,
+                                        docker_args: "${DOCKER_ARGUMENTS} ${RUNTIME}")
+
+                                    execute_methods(
+                                        {
+                                            run_jetson_tests("jetpack51")
+                                        }, config)
+
+                                    config.ignore_failures = true
+                                    execute_methods(
+                                        {
+                                            report_test_results_jetson()
+                                        }, config)
+                                }
+                                cleanWs disableDeferredWipeout: true, deleteDirs: true
+                            }
+                        }
+                    }
+                }
+                stage("GXF release package") {
+                    stages {
+                        stage("Build release") {
+                            agent {  node { label 'gxf && cuda-11.8' } }
+                            steps {
+                                cleanWs disableDeferredWipeout: true, deleteDirs: true
+                                checkout scm
+                                script {
+                                    execute_methods(
+                                        {
+                                            check_apply_release_patch()
+                                            build_documentation()
+                                            build_gxf_release_package(
+                                              'release/tarball_content.yaml',
+                                              env.OUTPUT_TARBALL_NAME,
+                                              env.OUTPUT_DIR_NAME)
+                                            deploy_release_builds()
+                                        },
+                                        new StageConfig(env_type: 'x86',
+                                            image: DOCKER_IMAGE,
+                                            docker_args: "${DOCKER_ARGUMENTS} ${RUNTIME}"))
+                                }
+                                cleanWs disableDeferredWipeout: true, deleteDirs: true
+                            }
+                        }
+                        stage("Verify release") {
+                            agent {  node { label 'gxf && cuda-11.7' } }
+                            steps {
+                                cleanWs disableDeferredWipeout: true, deleteDirs: true
+                                script {
+                                    execute_methods(
+                                        {
+                                            test_gxf_release_package()
+                                        },
+                                        new StageConfig(
+                                            env_type: 'x86',
+                                            image: DOCKER_IMAGE,
+                                            docker_args: "${DOCKER_ARGUMENTS} ${RUNTIME}"
+                                            ))
+                                }
+                                cleanWs disableDeferredWipeout: true, deleteDirs: true
+                            }
+                        }
+                    }
+                }
+                stage("GXF Coverity run") {
+                    stages {
+                        stage("Run Coverity") {
+                            when { environment name: 'Generate_Coverity_Report', value: "true" }
+                            agent {  node { label 'gxf && cuda-11.8' } }
+                            steps {
+                                cleanWs disableDeferredWipeout: true, deleteDirs: true
+                                checkout scm
+                                script {
+                                    execute_methods(
+                                        {
+                                            utils.generate_coverity_report('--jobs=6 --test_timeout=2000')
+                                            currentBuild.rawBuild.@result = hudson.model.Result.SUCCESS
+                                            utils.upload_coverity_report('https://urm.nvidia.com/artifactory/sw-isaac-gxf-generic-local/dependencies/internal/',
+                                                                        'coverity.tar.gz', 'coverity-certificate', 'Linux64/bin',
+                                                                        'execroot/com_nvidia_gxf/coverity/config/coverity_config.xml',
+                                                                        'execroot/com_nvidia_gxf/coverity/ruleset/autosarcpp14-required-only.config',
+                                                                        'GXF_master', 'reporter', 'coverity',
+                                                                        "${env.REPO_NAME}-${env.BRANCH_NAME}-Nightly-Build-${env.BUILD_NUMBER}")
+                                        },
+                                        new StageConfig(
+                                            env_type: 'x86',
+                                            image: DOCKER_IMAGE,
+                                            docker_args: "${DOCKER_ARGUMENTS}",
+                                            ignore_failures: 'true'))
+                                }
+                                cleanWs disableDeferredWipeout: true, deleteDirs: true
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        stage("Deploy") {
+            agent { node { label 'gxf && agent' } }
+            options {
+                skipDefaultCheckout(true)
+            }
+            steps {
+                script {
+                    execute_methods(
+                        {
+                            safe_unstash(env.ARTIFACT_GXF_PACKAGE, env.OUTPUT_TARBALL_NAME)
+                            def src_gxf_core = env.OUTPUT_TARBALL_NAME
+                            def dst_gxf_core = make_package_name("gxf_core", "any", "any")
+                            send_file(src_gxf_core, dst_gxf_core)
+
+                            safe_unstash(env.ARTIFACT_GXF_DOC, env.GXF_DOC_TARBALL_NAME)
+                            def src_gxf_core_doc = env.GXF_DOC_TARBALL_NAME
+                            def dst_gxf_core_doc = make_package_name("gxf_core-docs", "any", "any")
+                            send_file(src_gxf_core_doc, dst_gxf_core_doc)
+                        },
+                        new StageConfig(
+                            env_type: 'x86',
+                            image: DOCKER_IMAGE))
+                }
+                cleanWs disableDeferredWipeout: true, deleteDirs: true
+            }
+        }
+        stage("Artifactory cleanup") {
+            agent { node { label 'gxf && agent' } }
+            steps {
+                checkout scm
+                script {
+                    execute_methods(
+                        {
+                            artifactory_cleanup()
+                        },
+                        new StageConfig(
+                            env_type: 'x86',
+                            image: DOCKER_IMAGE))
+                }
+                cleanWs disableDeferredWipeout: true, deleteDirs: true
+            }
+        }
+        stage("Update last successful build") {
+            agent { node { label 'isaac-sdk && compute' } }
+            steps {
+                script {
+                    try{
+                        //  Get current git hash
+                        set_git_hash()
+                        //  Update the git hash code of the last successful build in the artifactory
+                        utils.update_last_successful_git_hash()
+                    }
+                    catch(error) {
+                        echo "Couldn't update last successful build"
+                    }
+                }
+                cleanWs disableDeferredWipeout: true, deleteDirs: true
+            }
+        }
+    }
+    post {
+        unstable {
+            node ('gxf && agent'){
+                emailext (
+                    subject: "[CI-CD][GXF]: Nightly build is unstable '${env.JOB_NAME} [${env.BUILD_NUMBER}]'",
+                    mimeType: 'text/html',
+                    body: """
+                    <html>
+                        <body>
+                            <p>Unstable '${env.JOB_NAME} [${env.BUILD_NUMBER}]':</p>
+                            <p>Check console output at &QUOT;<a href='${env.BUILD_URL}'>${env.JOB_NAME} [${env.BUILD_NUMBER}]</a>&QUOT;</p>
+                            <p>${env.NEXT_BUILD_TIME}</p>
+                            <p>Changelog:</p>
+                            <p>${env.GIT_CHANGELOG}</p>
+                        </body>
+                    </html>
+                    """,
+                    recipientProviders: [[$class: 'DevelopersRecipientProvider']],
+                    to: FAILURE_EMAIL_RECIPIENT,
+                    attachLog: true
+                )
+            }
+        }
+        failure {
+            node ('gxf && agent'){
+                emailext (
+                    subject: "[CI-CD][GXF]: Failed nightly build '${env.JOB_NAME} [${env.BUILD_NUMBER}]'",
+                    mimeType: 'text/html',
+                    body: """
+                    <html>
+                        <body>
+                            <p>Failed '${env.JOB_NAME} [${env.BUILD_NUMBER}]':</p>
+                            <p>Check console output at &QUOT;<a href='${env.BUILD_URL}'>${env.JOB_NAME} [${env.BUILD_NUMBER}]</a>&QUOT;</p>
+                            <p>${env.NEXT_BUILD_TIME}</p>
+                            <p>Changelog:</p>
+                            <p>${env.GIT_CHANGELOG}</p>
+                        </body>
+                    </html>
+                    """,
+                    recipientProviders: [[$class: 'DevelopersRecipientProvider']],
+                    to: FAILURE_EMAIL_RECIPIENT,
+                    attachLog: true
+                )
+            }
+        }
+        success {
+            node ('gxf && agent'){
+                emailext (
+                    subject: "[CI-CD][GXF]: Nightly build available '${env.JOB_NAME} [${env.BUILD_NUMBER}]'",
+                    mimeType: 'text/html',
+                    body: """
+                    <html>
+                        <body>
+                            <p>Successfully built '${env.JOB_NAME} [${env.BUILD_NUMBER}]':</p>
+                            <p>Check console output at &QUOT;<a href='${env.BUILD_URL}'>${env.JOB_NAME} [${env.BUILD_NUMBER}]</a>&QUOT;</p>
+                            <p>
+                                You can <a href="${env.ARTIFACTORY_ENDPOINT}">download the package from Artifactory</a> here
+                                <pre>${env.ARTIFACTORY_ENDPOINT}</pre>
+                            </p>
+                            <p>
+                                For more information, please review the
+                                <a href="https://confluence.nvidia.com/display/ISDK/Nightly+builds">
+                                    Nightly Builds documentation.
+                                </a>
+                            </p>
+                            <p>${env.NEXT_BUILD_TIME}</p>
+                            <p>Changelog:</p>
+                            <p>${env.GIT_CHANGELOG}</p>
+                        </body>
+                    </html>
+                    """,
+                    recipientProviders: [[$class: 'DevelopersRecipientProvider']],
+                    to: SUCCESS_EMAIL_RECIPIENT,
+                    attachLog: true
+                )
+            }
+        }
+    }
+}

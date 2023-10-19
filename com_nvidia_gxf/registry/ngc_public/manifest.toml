@@ -1,0 +1,174 @@
+################################################################################
+# Copyright (c) 2021-2023, NVIDIA CORPORATION. All rights reserved.
+#
+# NVIDIA Corporation and its licensors retain all intellectual property
+# and proprietary rights in and to this software, related documentation
+# and any modifications thereto.  Any use, reproduction, disclosure or
+# distribution of this software and related documentation without an express
+# license agreement from NVIDIA Corporation is strictly prohibited.
+#
+################################################################################
+
+[[extension]]
+eid = "56d7e3ec-62c6-4652-bcc8-4f1c3b00df03"
+name = "NvDsBaseExt"
+
+[[extension]]
+eid = "0aee1c83-fad2-4bba-a25a-b253a8289f13"
+name = "NvDsAnalyticsExt"
+
+[[extension]]
+eid = "d16b1366-dba2-47f6-95fc-b09b39f885de"
+name = "NvDsCloudMsgExt"
+
+[[extension]]
+eid = "7fe1ae48-7bb3-49a8-98fb-142ba07eb273"
+name = "NvDsConverterExt"
+
+[[extension]]
+eid = "1c7c145e-a631-4748-953a-bf3e7f92305d"
+name = "NvDsDewarperExt"
+
+[[extension]]
+eid = "0b02963e-c24e-4c13-ace0-c4cdf36c7c71"
+name = "NvDsInferenceExt"
+
+[[extension]]
+eid = "27856a43-5ad4-4d8e-be36-0ec2cf9bbb58"
+name = "NvDsInferenceUtilsExt"
+
+[[extension]]
+eid = "f787f50d-9004-4e85-88b9-1ed1894257f2"
+name = "NvDsInterfaceExt"
+
+[[extension]]
+eid = "89b8398c-5820-4051-835c-a91f2d49766b"
+name = "NvDsMuxDemuxExt"
+
+[[extension]]
+eid = "814ef803-7b37-4a3d-8b95-5fc483824712"
+name = "NvDsOpticalFlowExt"
+
+[[extension]]
+eid = "3fc9ad87-03e7-47a8-bbfc-8501c3f7ff2f"
+name = "NvDsOutputSinkExt"
+
+[[extension]]
+eid = "44a711e4-8519-4a68-81e8-be7ee4af3ff0"
+name = "NvDsSampleExt"
+
+[[extension]]
+eid = "909dc1ea-c654-44c1-97a3-0b8fec12141a"
+name = "NvDsSampleModelsExt"
+
+[[extension]]
+eid = "a632d022-3425-4848-9074-e6483ef74366"
+name = "NvDsSourceExt"
+
+[[extension]]
+eid = "845a7fd3-51e8-4076-b3d9-e2974880925e"
+name = "NvDsTemplateExt"
+
+[[extension]]
+eid = "f5aaeb53-e9b8-4317-87d1-9549d67c1638"
+name = "NvDsTrackerExt"
+
+[[extension]]
+eid = "e5590555-9031-4187-a217-4518c149c2d0"
+name = "NvDsTranscodeExt"
+
+[[extension]]
+eid = "68de050b-138f-4f60-af99-e74125ab929e"
+name = "NvDsTritonExt"
+
+[[extension]]
+eid = "25903cd4-fc5c-4139-987b-47bb27e8b424"
+name = "NvDsVisualizationExt"
+
+[[extension]]
+eid = "8ec2d5d6-b5df-48bf-8dee-0252606fdd7e"
+name = "StandardExtension"
+
+[[extension]]
+eid = "b72585ad-d225-4834-b9f9-3d5e5cbe33c2"
+name = "NvDsBodyPose2D"
+
+[[extension]]
+eid = "78969c67-6287-44b0-83bf-afe920eb4874"
+name = "NvDsFacialLandmarks"
+
+[[extension]]
+eid = "790289c2-915d-4cb4-b3dd-ae0c2052d5ac"
+name = "NvDsEmotionExt"
+
+[[extension]]
+eid = "e7eaff36-de8b-329c-aad0-0952ddfc96b8"
+name = "NvDsGazeExt"
+
+[[extension]]
+eid = "47df7993-48ff-37cb-ab0e-48a9f67f7627"
+name = "NvDsHeartRateExt"
+
+[[extension]]
+eid = "6f2d1afc-1057-481a-9da6-a5f61fed178e"
+name = "MultimediaExtension"
+
+[[extension]]
+eid = "699a5ccf-c812-4216-a56a-a3184dc9b7b1"
+name = "NvDsGesture"
+
+[[extension]]
+eid = "b7259b47-6df1-4774-b55f-ccd71e692c44"
+name = "NvDsActionRecognitionExt"
+
+[[extension]]
+eid = "d63a98fa-7882-11eb-a917-b38f664f399c"
+name = "CudaExtension"
+
+[[extension]]
+eid = "6fa7c385-a3b6-4f7c-925f-fa44393e17ce"
+name = "DeepStreamExtensionTest"
+
+[[extension]]
+eid = "ecded987-983c-4fcd-af14-7f961b059c8e"
+name = "NvDs3dProcessingExt"
+
+[[extension]]
+eid = "4ee6215d-cb14-41e8-a266-5c45f4f9ffd4"
+name = "NvDsUcxExt"
+
+[[extension]]
+eid = "a3c95d1c-c06c-4a4e-a2f9-8d9078ab645c"
+name = "NvTritonExt"
+
+[[extension]]
+eid = "787daddc-1c34-11ec-9621-0242ac130002"
+name = "PythonCodeletExtension"
+
+[[extension]]
+eid = "a6ad78b6-1682-11ec-9621-0242ac130002"
+name = "SampleExtension"
+
+[[extension]]
+eid = "bc573c2f-89b3-d4b0-8061-2da8b11fe79a"
+name = "SerializationExtension"
+
+[[extension]]
+eid = "d43f23e4-b9bf-11eb-9d18-2b7be630552b"
+name = "TensorRTExtension"
+
+[[extension]]
+eid = "798c0dca-34b3-4f73-b794-ad5995186601"
+name = "NvDsUdpExt"
+
+[[extension]]
+eid = "f50665e5-ade2-f71b-de2a-2380614b1725"
+name = "NetworkExtension"
+
+[[extension]]
+eid = "22a21c97-f20b-4c03-b277-6e6f52303328"
+name = "HttpExtension"
+
+[[extension]]
+eid = "62e7335c-c555-47c9-a2d2-21991b7fd250"
+name = "GrpcExtension"

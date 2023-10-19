@@ -1,0 +1,110 @@
+%YAML 1.2
+# Copyright (c) 2021-2023, NVIDIA CORPORATION.  All rights reserved.
+#
+# NVIDIA CORPORATION and its licensors retain all intellectual property
+# and proprietary rights in and to this software, related documentation
+# and any modifications thereto.  Any use, reproduction, disclosure or
+# distribution of this software and related documentation without an express
+# license agreement from NVIDIA CORPORATION is strictly prohibited.
+---
+name: server
+components:
+- name: channel_1
+  type: nvidia::gxf::test::MockReceiver
+- name: channel_2
+  type: nvidia::gxf::test::MockReceiver
+- name: allocator
+  type: nvidia::gxf::test::MockAllocator
+- name: component_serializer
+  type: nvidia::gxf::StdComponentSerializer
+  parameters:
+    allocator: allocator
+- name: entity_serializer
+  type: nvidia::gxf::StdEntitySerializer
+  parameters:
+    component_serializers: [ component_serializer ]
+- name: tcp_server
+  type: nvidia::gxf::TcpServer
+  parameters:
+    receivers: [ channel_1, channel_2 ]
+    entity_serializer: entity_serializer
+    address: 127.0.0.1
+    port: 7000
+    timeout_period: 100ms
+    async_scheduling_term: async_st
+    max_msg_delay_ms: 100
+- name: async_st
+  type: nvidia::gxf::AsynchronousSchedulingTerm
+---
+name: generator_1
+components:
+- name: output
+  type: nvidia::gxf::test::MockTransmitter
+- name: allocator
+  type: nvidia::gxf::test::MockAllocator
+- type: nvidia::gxf::test::TensorGenerator
+  parameters:
+    output: output
+    allocator: allocator
+    shape: [ 2, 2, 2 ]
+    storage_type: 0
+    enable_timestamps: false
+- type: nvidia::gxf::DownstreamReceptiveSchedulingTerm
+  parameters:
+    transmitter: output
+    min_size: 1
+- type: nvidia::gxf::PeriodicSchedulingTerm
+  parameters:
+    recess_period: 5ms
+- type: nvidia::gxf::CountSchedulingTerm
+  parameters:
+    count: 1000
+---
+name: generator_2
+components:
+- name: output
+  type: nvidia::gxf::test::MockTransmitter
+- name: allocator
+  type: nvidia::gxf::test::MockAllocator
+- type: nvidia::gxf::test::TensorGenerator
+  parameters:
+    output: output
+    allocator: allocator
+    shape: [ 3, 3 ]
+    storage_type: 1
+    enable_timestamps: false
+- type: nvidia::gxf::DownstreamReceptiveSchedulingTerm
+  parameters:
+    transmitter: output
+    min_size: 1
+- type: nvidia::gxf::PeriodicSchedulingTerm
+  parameters:
+    recess_period: 5ms
+- type: nvidia::gxf::CountSchedulingTerm
+  parameters:
+    count: 1000
+---
+components:
+- type: nvidia::gxf::Connection
+  parameters:
+    source: generator_1/output
+    target: server/channel_1
+---
+components:
+- type: nvidia::gxf::Connection
+  parameters:
+    source: generator_2/output
+    target: server/channel_2
+---
+components:
+- name: clock
+  type: nvidia::gxf::RealtimeClock
+- type: nvidia::gxf::GreedyScheduler
+  parameters:
+    clock: clock
+    max_duration_ms: 6000
+- type: nvidia::gxf::JobStatistics
+  parameters:
+    clock: clock
+    codelet_statistics: true
+    json_file_path: '/tmp/test_tcp_server_source_statistics.json'

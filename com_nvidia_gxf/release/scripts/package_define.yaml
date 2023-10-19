@@ -1,0 +1,18 @@
+################################################################################
+# Copyright (c) 2021, NVIDIA CORPORATION. All rights reserved.
+#
+# NVIDIA Corporation and its licensors retain all intellectual property
+# and proprietary rights in and to this software, related documentation
+# and any modifications thereto.  Any use, reproduction, disclosure or
+# distribution of this software and related documentation without an express
+# license agreement from NVIDIA Corporation is strictly prohibited.
+#
+################################################################################
+
+# This file is separated from package content yaml in order to be filled
+# in a custom manner inside of jenkins pipeline
+
+name: "graph_composer"
+version: "3.0.0"
+arch_x86: "x86_64"
+arch_aarch64: "arm64"

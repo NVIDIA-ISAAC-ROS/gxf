@@ -1,0 +1,155 @@
+%YAML 1.2
+# SPDX-FileCopyrightText: Copyright (c) 2021 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+---
+name: generator
+components:
+- name: output
+  type: nvidia::gxf::test::MockTransmitter
+- name: allocator
+  type: nvidia::gxf::test::MockAllocator
+- type: nvidia::gxf::test::TensorGenerator
+  parameters:
+    output: output
+    allocator: allocator
+    shape: [ 2, 2, 2 ]
+    storage_type: 2
+- type: nvidia::gxf::DownstreamReceptiveSchedulingTerm
+  parameters:
+    transmitter: output
+    min_size: 1
+- type: nvidia::gxf::CountSchedulingTerm
+  parameters:
+    count: 10
+---
+name: broadcast
+components:
+- name: input
+  type: nvidia::gxf::test::MockReceiver
+- name: output_1
+  type: nvidia::gxf::test::MockTransmitter
+- name: output_2
+  type: nvidia::gxf::test::MockTransmitter
+- type: nvidia::gxf::Broadcast
+  parameters:
+    source: input
+- type: nvidia::gxf::MessageAvailableSchedulingTerm
+  parameters:
+    receiver: input
+    min_size: 1
+- type: nvidia::gxf::DownstreamReceptiveSchedulingTerm
+  parameters:
+    transmitter: output_1
+    min_size: 1
+- type: nvidia::gxf::DownstreamReceptiveSchedulingTerm
+  parameters:
+    transmitter: output_2
+    min_size: 1
+---
+name: tester
+components:
+- name: input
+  type: nvidia::gxf::test::MockReceiver
+- name: output
+  type: nvidia::gxf::test::MockTransmitter
+- name: allocator
+  type: nvidia::gxf::test::MockAllocator
+- name: component_serializer
+  type: nvidia::gxf::StdComponentSerializer
+  parameters:
+    allocator: allocator
+- name: entity_serializer
+  type: nvidia::gxf::StdEntitySerializer
+  parameters:
+    component_serializers: [ component_serializer ]
+- name: serialization_buffer
+  type: nvidia::gxf::SerializationBuffer
+  parameters:
+    allocator: allocator
+- type: nvidia::gxf::test::SerializationTester
+  parameters:
+    input: input
+    output: output
+    entity_serializer: entity_serializer
+    serialization_buffer: serialization_buffer
+- type: nvidia::gxf::MessageAvailableSchedulingTerm
+  parameters:
+    receiver: input
+    min_size: 1
+- type: nvidia::gxf::DownstreamReceptiveSchedulingTerm
+  parameters:
+    transmitter: output
+    min_size: 1
+---
+name: comparator
+components:
+- name: expected
+  type: nvidia::gxf::test::MockReceiver
+- name: actual
+  type: nvidia::gxf::test::MockReceiver
+- type: nvidia::gxf::test::TensorComparator
+  parameters:
+    expected: expected
+    actual: actual
+- type: nvidia::gxf::MessageAvailableSchedulingTerm
+  parameters:
+    receiver: expected
+    min_size: 1
+- type: nvidia::gxf::MessageAvailableSchedulingTerm
+  parameters:
+    receiver: actual
+    min_size: 1
+- type: nvidia::gxf::test::StepCount
+  parameters:
+    expected_count: 10
+---
+components:
+- type: nvidia::gxf::Connection
+  parameters:
+    source: generator/output
+    target: broadcast/input
+---
+components:
+- type: nvidia::gxf::Connection
+  parameters:
+    source: broadcast/output_1
+    target: tester/input
+---
+components:
+- type: nvidia::gxf::Connection
+  parameters:
+    source: broadcast/output_2
+    target: comparator/expected
+---
+components:
+- type: nvidia::gxf::Connection
+  parameters:
+    source: tester/output
+    target: comparator/actual
+---
+components:
+- name: clock
+  type: nvidia::gxf::ManualClock
+- type: nvidia::gxf::GreedyScheduler
+  parameters:
+    clock: clock
+    max_duration_ms: 1000
+- name: realtime_clock
+  type: nvidia::gxf::RealtimeClock
+- type: nvidia::gxf::JobStatistics
+  parameters:
+    clock: realtime_clock
+    codelet_statistics: true
+    json_file_path: '/tmp/test_std_component_serializer_system.json'

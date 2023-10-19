@@ -1,0 +1,44 @@
+#####################################################################################
+# SPDX-FileCopyrightText: Copyright (c) 2021 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+#####################################################################################
+launchpadlib
+pyparsing
+numpy==1.23.5 # we have to use an older version otherwise the `cupy` doesn't work Bug: 3963975
+# Sphinx for document generation
+sphinx
+sphinx-rtd-theme
+result==0.5.0
+requests==2.18.4
+toml==0.10.2
+construct  # for python/gxf/serialization/cask.py
+pyarmor==6.7.0
+pyinstaller==4.10
+
+# Container builder requirements
+requests==2.18.4
+docker==4.4.1
+Jinja2==2.11.2
+MarkupSafe==1.1.1
+urllib3==1.21.1
+PyYAML==5.3.1
+pylint==2.6.0
+pytest==6.2.2
+
+# GXF Cli requirements
+grpcio==1.47.0
+urwid==2.1.2
+protobuf==4.21.5

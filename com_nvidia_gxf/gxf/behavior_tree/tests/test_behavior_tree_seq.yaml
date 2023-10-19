@@ -1,0 +1,126 @@
+# SPDX-FileCopyrightText: Copyright (c) 2021 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+%YAML 1.2
+---
+name: root
+components:
+- name: root_controller
+  type: nvidia::gxf::EntityCountFailureRepeatController
+  parameters:
+    max_repeat_count: 0
+- name: root_st
+  type: nvidia::gxf::BTSchedulingTerm
+  parameters:
+    is_root: true
+- name: root_seq_codelet
+  type: nvidia::gxf::SequenceBehavior
+  parameters:
+    children: [ scene/scene_st, ref/ref_st ]
+    s_term: root_st
+---
+name: scene
+components:
+- name: scene_controller
+  type: nvidia::gxf::EntityCountFailureRepeatController
+  parameters:
+    max_repeat_count: 0
+- name: scene_st
+  type: nvidia::gxf::BTSchedulingTerm
+  parameters:
+    is_root: false
+- name: scene_seq
+  type: nvidia::gxf::SequenceBehavior
+  parameters:
+    children: [ pose/pose_st, det/det_st, seg/seg_st ]
+    s_term: scene_st
+---
+name: pose
+components:
+- name: pose_controller
+  type: nvidia::gxf::EntityCountFailureRepeatController
+  parameters:
+    max_repeat_count: 0
+- name: pose_st
+  type: nvidia::gxf::BTSchedulingTerm
+  parameters:
+    is_root: false
+- name: pos
+  type: nvidia::gxf::SequenceBehavior
+  parameters:
+    children: []
+    s_term: pose_st
+---
+name: det
+components:
+- name: det_controller
+  type: nvidia::gxf::EntityCountFailureRepeatController
+  parameters:
+    max_repeat_count: 0
+- name: det_st
+  type: nvidia::gxf::BTSchedulingTerm
+  parameters:
+    is_root: false
+- name: detection
+  type: nvidia::gxf::SequenceBehavior
+  parameters:
+    children: []
+    s_term: det_st
+---
+name: seg
+components:
+- name: seg_controller
+  type: nvidia::gxf::EntityCountFailureRepeatController
+  parameters:
+    max_repeat_count: 0
+- name: seg_st
+  type: nvidia::gxf::BTSchedulingTerm
+  parameters:
+    is_root: false
+- name: segm
+  type: nvidia::gxf::SequenceBehavior
+  parameters:
+    children: []
+    s_term: seg_st
+---
+name: ref
+components:
+- name: ref_controller
+  type: nvidia::gxf::EntityCountFailureRepeatController
+  parameters:
+    max_repeat_count: 0
+- name: ref_st
+  type: nvidia::gxf::BTSchedulingTerm
+  parameters:
+    is_root: false
+- name: refine
+  type: nvidia::gxf::SequenceBehavior
+  parameters:
+    children: []
+    s_term: ref_st
+---
+name: sched
+components:
+- name: clock
+  type: nvidia::gxf::RealtimeClock
+- name: greedy_scheduler
+  type: nvidia::gxf::GreedyScheduler
+  parameters:
+    max_duration_ms: 10000
+    clock: clock
+- name: job_stats
+  type: nvidia::gxf::JobStatistics
+  parameters:
+    clock: clock
+    json_file_path: '/tmp/test_behavior_tree_seq.json'

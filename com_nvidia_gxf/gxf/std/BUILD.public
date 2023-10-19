@@ -1,0 +1,61 @@
+"""
+ SPDX-FileCopyrightText: Copyright (c) 2021 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ SPDX-License-Identifier: Apache-2.0
+
+ Licensed under the Apache License, Version 2.0 (the "License");
+ you may not use this file except in compliance with the License.
+ You may obtain a copy of the License at
+
+ http://www.apache.org/licenses/LICENSE-2.0
+
+ Unless required by applicable law or agreed to in writing, software
+ distributed under the License is distributed on an "AS IS" BASIS,
+ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ See the License for the specific language governing permissions and
+ limitations under the License.
+
+"""
+
+load("@rules_cc//cc:defs.bzl", "cc_library")
+
+cc_library(
+    name = "StandardExtension",
+    hdrs = [
+        "allocator.hpp",
+        "clock.hpp",
+        "codelet.hpp",
+        "complex.hpp",
+        "component_allocator.hpp",
+        "component_factory.hpp",
+        "default_extension.hpp",
+        "double_buffer_receiver.hpp",
+        "eos.hpp",
+        "extension.hpp",
+        "extension_factory_helper.hpp",
+        "memory_buffer.hpp",
+        "metric.hpp",
+        "monitor.hpp",
+        "new_component_allocator.hpp",
+        "parameter_parser.hpp",
+        "parameter_parser_std.hpp",
+        "parameter_registrar.hpp",
+        "parameter_storage.hpp",
+        "parameter_wrapper.hpp",
+        "queue.hpp",
+        "resources.hpp",
+        "receiver.hpp",
+        "scheduling_condition.hpp",
+        "scheduling_term.hpp",
+        "scheduling_terms.hpp",
+        "system.hpp",
+        "tensor.hpp",
+        "timestamp.hpp",
+        "transmitter.hpp",
+        "type_registry.hpp",
+        "typed_message_view.hpp",
+        "unbounded_allocator.hpp",
+        "vault.hpp",
+    ],
+    include_prefix = "gxf/std",
+    visibility = ["//visibility:public"],
+)

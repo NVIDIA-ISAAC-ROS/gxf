@@ -1,0 +1,73 @@
+# SPDX-FileCopyrightText: Copyright (c) 2021 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+%YAML 1.2
+---
+name: cuda_stream_pool
+components:
+- name: stream_pool
+  type: nvidia::gxf::CudaStreamPool
+  parameters:
+    stream_flags: 0
+    stream_priority: 0
+    reserved_size: 1
+    max_size: 5
+---
+name: tx
+components:
+- name: tx0
+  type: nvidia::gxf::DoubleBufferTransmitter
+---
+name: sync
+components:
+- name: rx1
+  type: nvidia::gxf::DoubleBufferReceiver
+  parameters:
+    capacity: 10
+- type: nvidia::gxf::MessageAvailableSchedulingTerm
+  parameters:
+    receiver: rx1
+    min_size: 1
+- type: nvidia::gxf::CudaStreamSync
+  parameters:
+    rx: rx1
+---
+components:
+- type: nvidia::gxf::Connection
+  parameters:
+    source: tx/tx0
+    target: sync/rx1
+---
+components:
+- type: nvidia::gxf::MultiThreadScheduler
+  parameters:
+    max_duration_ms: 1000
+    clock: misc/clock
+    worker_thread_number: 3
+    stop_on_deadlock: false
+---
+name: misc
+components:
+- name: clock
+  type: nvidia::gxf::RealtimeClock
+# Resources
+# GPU
+---
+# only the first will be used by default EntityGroup
+name: GPU_0
+components:
+- type: nvidia::gxf::GPUDevice
+  name: GPU_0
+  parameters:
+    dev_id: 0
