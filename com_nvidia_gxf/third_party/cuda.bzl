@@ -21,6 +21,8 @@ load(
     "nv_gxf_new_local_repository",
 )
 
+load("//third_party:deps.bzl", "local_archive")
+
 CUDA_SO = [
     "cudart",
     "cufft",
@@ -484,14 +486,11 @@ def cuda_workspace():
     # CUDNN 8.6.0 from cudnn-local-tegra-repo-ubuntu2004-8.6.0.166_1.0-1_arm64.deb
     # Debian's are obtained from https://urm.nvidia.com/ui/native/sw-sdkm-jetson-generic-local/5.1/Linux/72/Jetson_51_b72/
     # repackaged by cuda_cudnn_package_generation.sh
-    nv_gxf_http_archive(
+    local_archive(
         name = "cuda_aarch64_jetpack51",
         build_file = clean_dep("//third_party:cuda_aarch64_jetpack51.BUILD"),
-        sha256 = "bdd2ee3f6e29320b6a927d973acaf11e0735ffe207e4ba0ad452a93d9e052878",
         patches = [clean_dep("//third_party:libcudacxx_aarch64_cuda_11_4.diff")],
-        url = "https://urm.nvidia.com/artifactory/sw-isaac-gxf-generic-local/dependencies/internal/cuda/cuda11.4-cudnn8.6.0.166-arm64-tar-xz",
-        type = "tar.xz",
-        licenses = ["http://docs.nvidia.com/cuda/eula/index.html"],
+        src = "//third_party:cuda11.4-cudnn8.6.0.166-arm64.tar.xz",
     )
 
     # CUDA 11.6.2 from https://developer.download.nvidia.com/compute/cuda/11.6.1/local_installers/cuda-repo-ubuntu2004-11-6-local_11.6.1-510.47.03-1_amd64.deb
@@ -523,13 +522,10 @@ def cuda_workspace():
     # CUDA 11.8.0 from http://cuda-internal.nvidia.com/release-candidates/kitpicks/cuda-r11-8/11.8.0/065/local_installers/cuda-repo-ubuntu2004-11-8-local_11.8.0-520.61.05-1_amd64.deb
     # CUDNN 8.6.0 from http://cuda-internal.nvidia.com/release-candidates/kitpicks/cudnn-v8-6-cuda-11-8/8.6.0.163/001/repos/ubuntu2004/x86_64/libcudnn8-dev_8.6.0.163-1+cuda11.8_amd64.deb
     # repackaged by cuda_cudnn_package_generation.sh
-    nv_gxf_http_archive(
+    local_archive(
         name = "cuda_x86_64_11080",
         build_file = clean_dep("//third_party:cuda_x86_64_11080.BUILD"),
-        sha256 = "5606613de318176578f90d1a6936134ee910a6048a105ca496aa138819be0f8c",
-        url = "https://urm.nvidia.com/artifactory/sw-isaac-gxf-generic-local/dependencies/internal/cuda/cuda11.8-cudnn8.6.0.163-amd64-tar-xz",
-        type = "tar.xz",
-        licenses = ["http://docs.nvidia.com/cuda/eula/index.html"],
+        src = "//third_party:cuda11.8-cudnn8.6.0.163-amd64.tar.xz",
     )
 
     # CUDA 12.1.0 from https://developer.download.nvidia.com/compute/cuda/12.1.1/local_installers/cuda-repo-ubuntu2004-12-1-local_12.1.1-530.30.02-1_amd64.deb
