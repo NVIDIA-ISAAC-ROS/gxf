@@ -22,6 +22,8 @@ load(
     "nv_gxf_new_local_repository",
 )
 
+load("//third_party:deps.bzl", "local_archive")
+
 # Uncomment the imports below to download extensions from NGC
 # load(
 #     "//registry/test/ngc/import:gxf_extension_test.bzl",
@@ -45,13 +47,10 @@ def gxf_workspace():
     # JSON for Modern C++
     # version 3.10.5
     # The following library is obtained from : https://github.com/nlohmann/json
-    nv_gxf_http_archive(
+    local_archive(
         name = "nlohmann-json",
         build_file = clean_dep("//third_party:nlohmann_json.BUILD"),
-        sha256 = "b94997df68856753b72f0d7a3703b7d484d4745c567f3584ef97c96c25a5798e",
-        url = "https://urm.nvidia.com/artifactory/sw-isaac-gxf-generic-local/dependencies/internal/nlohmann-json-3-10-5.zip",
-        type = "zip",
-        licenses = ["@nlohmann-json//:LICENSE"],
+        src = "//third_party:nlohmann-json-3-10-5.zip",
     )
 
     nv_gxf_http_archive(
@@ -67,13 +66,10 @@ def gxf_workspace():
     # breakpad doesn't have version information.
     # following package has the commit id: 13c1568702e8804bc3ebcfbb43 and is present in
     # the master branch here: https://github.com/google/breakpad
-    nv_gxf_http_archive(
+    local_archive(
         name = "breakpad",
         build_file = clean_dep("//third_party:breakpad.BUILD"),
-        url = "https://urm.nvidia.com/artifactory/sw-isaac-gxf-generic-local/external/breakpad-13c1568702e8804bc3ebcfbb435a2786a3e335cf.tar.gz",
-        type = "tar.gz",
-        sha256 = "9420c263a0db0a0e07a789589f46f0d69b72e921e7eeabb4af3b0018043e5225",
-        licenses = ["@breakpad//:LICENSE"],
+        src = "//third_party:breakpad-13c1568702e8804bc3ebcfbb435a2786a3e335cf.tar.gz",
     )
 
     # linux-syscall-support doesn't have version information.
@@ -83,14 +79,11 @@ def gxf_workspace():
     #
     # Patch for gcc 9.3.0 builds
     # https://chromium.googlesource.com/linux-syscall-support/+/8048ece6c16c91acfe0d36d1d3cc0890ab6e945c%5E%21/#F0
-    nv_gxf_http_archive(
+    local_archive(
         name = "lss",
         build_file = clean_dep("//third_party:lss.BUILD"),
         patches = [clean_dep("//third_party:lss_gcc_9_3.patch")],
-        sha256 = "6d2e98e9d360797db6348ae725be901c1947e5736d87f07917c2bd835b03eeef",
-        url = "https://urm.nvidia.com/artifactory/sw-isaac-gxf-generic-local/external/linux-syscall-support-93426bda6535943ff1525d0460aab5cc0870ccaf.tar.gz",
-        type = "tar.gz",
-        licenses = ["@lss//:linux_syscall_support.h"],
+        src = "//third_party:linux-syscall-support-93426bda6535943ff1525d0460aab5cc0870ccaf.tar.gz",
     )
 
     native.bind(
@@ -133,25 +126,19 @@ def gxf_workspace():
     # nvcc-11.8
     # NVCC from http://cuda-internal.nvidia.com/release-candidates/kitpicks/cuda-r11-8/11.8.0/065/local_installers/cuda-repo-ubuntu2004-11-8-local_11.8.0-520.61.05-1_amd64.deb
     # Repackaged by nvcc_package_generation.sh
-    nv_gxf_http_archive(
+    local_archive(
         name = "nvcc_11_08",
         build_file = clean_dep("//third_party:nvcc_11_08.BUILD"),
-        sha256 = "d9ed365b7ce220256a6c784568b51fcb310dc63e874f2180f027a3abdda226ac",
-        url = "https://urm.nvidia.com/artifactory/sw-isaac-gxf-generic/dependencies/internal/nvcc/nvcc-11.8-ubuntu2004-520.61.05-amd64-tar-xz",
-        type = "tar.xz",
-        licenses = ["http://docs.nvidia.com/cuda/eula/index.html"],
+        src = "//third_party:nvcc-11.8-ubuntu2004-520.61.05-amd64.tar.xz",
     )
 
     # nvcc-11.4
     # NVCC from https://developer.download.nvidia.com/compute/cuda/11.4.1/local_installers/cuda-repo-ubuntu2004-11-4-local_11.4.1-470.57.02-1_amd64.deb
     # Repackaged by nvcc_package_generation.sh
-    nv_gxf_http_archive(
+    local_archive(
         name = "nvcc_11_04",
         build_file = clean_dep("//third_party:nvcc_11_04.BUILD"),
-        sha256 = "8c11a17ff4aba433f6f480ef9ab7535e589afaadd42c87544c174378ffba53d0",
-        url = "https://urm.nvidia.com/artifactory/sw-isaac-gxf-generic-local/dependencies/internal/nvcc/nvcc-11.4.1-ubuntu2004-470.57.02-amd64-tar-xz",
-        type = "tar.xz",
-        licenses = ["http://docs.nvidia.com/cuda/eula/index.html"],
+        src = "//third_party:nvcc-11.4.1-ubuntu2004-470.57.02-amd64.tar.xz",
     )
 
     # nvcc-12.1
@@ -207,13 +194,10 @@ def gxf_workspace():
     )
 
     # Coverity static analysis
-    nv_gxf_http_archive(
+    local_archive(
         name = "coverity",
         build_file = "@com_nvidia_gxf//coverity/bazel:coverity.BUILD",
-        url = "https://urm.nvidia.com/artifactory/sw-isaac-gxf-generic-local/dependencies/internal/coverity.tar.gz",
-        sha256 = "55d7343358289ad89b8d1fe6af80255fb01e1504b09b702f0afe1a914b279b4d",
-        type = "tar.gz",
-        licenses = ["TBD-Propertietary"],
+        src = "//third_party:coverity.tar.gz",
     )
 
 def gxf_python_workspace():
@@ -229,13 +213,10 @@ def gxf_python_workspace():
         licenses = ["TBD"],
     )
 
-    nv_gxf_http_archive(
+    local_archive(
         name = "python_x86_64",
         build_file = clean_dep("//third_party:python_x86_64.BUILD"),
-        sha256 = "54e75648c385f761a774c902cd6d31f016b6eaf27053f51afcad281f6b6fe81a",
-        type = "tar.xz",
-        url = "https://urm.nvidia.com/artifactory/sw-isaac-gxf-generic-local/dependencies/internal/python_x86_64_3_8.tar.xz",
-        licenses = ["TBD"],
+        src = "//third_party:python_x86_64_3_8.tar.xz",
     )
 
     nv_gxf_http_archive(
@@ -247,13 +228,10 @@ def gxf_python_workspace():
         licenses = ["TBD"],
     )
 
-    nv_gxf_http_archive(
+    local_archive(
         name = "python_aarch64_3_8",
         build_file = clean_dep("//third_party:python_aarch64_3_8.BUILD"),
-        sha256 = "e597a529fb5e38817163782e8fdacf61a478e93d045c78ff12dff49d31affe69",
-        type = "tar.xz",
-        url = "https://urm.nvidia.com/artifactory/sw-isaac-gxf-generic-local/dependencies/internal/python_3_8_aarch64_jp50.tar.xz",
-        licenses = ["TBD"],
+        src = "//third_party:python_3_8_aarch64_jp50.tar.xz",
     )
 
     nv_gxf_http_archive(
