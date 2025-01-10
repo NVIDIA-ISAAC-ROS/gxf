@@ -1,5 +1,5 @@
 '''
- SPDX-FileCopyrightText: Copyright (c) 2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  SPDX-License-Identifier: Apache-2.0
 
  Licensed under the Apache License, Version 2.0 (the "License");
@@ -30,7 +30,7 @@ class CudaStreamPool(Component, CudaStreamPool_pybind):
     gxf_native_type: str = "nvidia::gxf::CudaStreamPool"
 
     _validation_info_parameters = {'dev_id': {'key': 'dev_id', 'headline': 'Device Id', 'description': 'Create CUDA Stream on which device.', 'gxf_parameter_type': 'GXF_PARAMETER_TYPE_INT32', 'rank': 0, 'shape': [1], 'flags': 'GXF_PARAMETER_FLAGS_NONE', 'handle_type': 'N/A', 'default': 0}, 'stream_flags': {'key': 'stream_flags', 'headline': 'Stream Flags', 'description': 'Create CUDA streams with flags.', 'gxf_parameter_type': 'GXF_PARAMETER_TYPE_UINT32', 'rank': 0, 'shape': [1], 'flags': 'GXF_PARAMETER_FLAGS_NONE', 'handle_type': 'N/A', 'default': 0}, 'stream_priority': {'key': 'stream_priority', 'headline': 'Stream Priority', 'description': 'Create CUDA streams with priority.', 'gxf_parameter_type': 'GXF_PARAMETER_TYPE_INT32', 'rank': 0, 'shape': [
-        1], 'flags': 'GXF_PARAMETER_FLAGS_NONE', 'handle_type': 'N/A', 'default': 0}, 'reserved_size': {'key': 'reserved_size', 'headline': 'Reserved Stream Size', 'description': 'Reserve serveral CUDA streams before 1st request coming', 'gxf_parameter_type': 'GXF_PARAMETER_TYPE_UINT32', 'rank': 0, 'shape': [1], 'flags': 'GXF_PARAMETER_FLAGS_NONE', 'handle_type': 'N/A', 'default': 1}, 'max_size': {'key': 'max_size', 'headline': 'Maximum Stream Size', 'description': 'The maximum stream size for the pool to allocate, unlimited by default', 'gxf_parameter_type': 'GXF_PARAMETER_TYPE_UINT32', 'rank': 0, 'shape': [1], 'flags': 'GXF_PARAMETER_FLAGS_NONE', 'handle_type': 'N/A', 'default': 0}}
+        1], 'flags': 'GXF_PARAMETER_FLAGS_NONE', 'handle_type': 'N/A', 'default': 0}, 'reserved_size': {'key': 'reserved_size', 'headline': 'Reserved Stream Size', 'description': 'Reserve several CUDA streams before 1st request coming', 'gxf_parameter_type': 'GXF_PARAMETER_TYPE_UINT32', 'rank': 0, 'shape': [1], 'flags': 'GXF_PARAMETER_FLAGS_NONE', 'handle_type': 'N/A', 'default': 1}, 'max_size': {'key': 'max_size', 'headline': 'Maximum Stream Size', 'description': 'The maximum stream size for the pool to allocate, unlimited by default', 'gxf_parameter_type': 'GXF_PARAMETER_TYPE_UINT32', 'rank': 0, 'shape': [1], 'flags': 'GXF_PARAMETER_FLAGS_NONE', 'handle_type': 'N/A', 'default': 0}}
 
     def __init__(self, name: str = "", **params):
         Component.__init__(self, type=self.get_gxf_type(), name=name, **params)
@@ -43,6 +43,41 @@ class CudaStreamSync(Component):
 
     _validation_info_parameters = {'rx': {'key': 'rx', 'headline': 'Receiver', 'description': 'N/A', 'gxf_parameter_type': 'GXF_PARAMETER_TYPE_HANDLE', 'rank': 0, 'shape': [1], 'flags': 'GXF_PARAMETER_FLAGS_NONE', 'handle_type': 'nvidia::gxf::Receiver', 'default': 'N/A'}, 'tx': {
         'key': 'tx', 'headline': 'Transmitter', 'description': '', 'gxf_parameter_type': 'GXF_PARAMETER_TYPE_HANDLE', 'rank': 0, 'shape': [1], 'flags': 'GXF_PARAMETER_FLAGS_OPTIONAL', 'handle_type': 'nvidia::gxf::Transmitter', 'default': 'N/A'}}
+
+    def __init__(self, name: str = "", **params):
+        Component.__init__(self, type=self.get_gxf_type(), name=name, **params)
+
+
+class CudaEventSchedulingTerm(Component):
+    '''A component which specifies that data is ready to be consumed on a cuda stream based on event polling
+    '''
+    gxf_native_type: str = "nvidia::gxf::CudaEventSchedulingTerm"
+
+    _validation_info_parameters = {'receiver': {'key': 'receiver', 'headline': 'Receiver queue', 'description': 'The receiver queue on which the scheduling term checks for the datareadiness on cuda stream based on the cuda event', 'gxf_parameter_type': 'GXF_PARAMETER_TYPE_HANDLE', 'rank': 0, 'shape': [
+        1], 'flags': 'GXF_PARAMETER_FLAGS_NONE', 'handle_type': 'nvidia::gxf::Receiver', 'default': 'N/A'}, 'event_name': {'key': 'event_name', 'headline': 'Event name', 'description': 'The event name on which the cudaEventQuery API is called to get the status', 'gxf_parameter_type': 'GXF_PARAMETER_TYPE_STRING', 'rank': 0, 'shape': [1], 'flags': 'GXF_PARAMETER_FLAGS_NONE', 'handle_type': 'N/A', 'default': ''}}
+
+    def __init__(self, name: str = "", **params):
+        Component.__init__(self, type=self.get_gxf_type(), name=name, **params)
+
+
+class CudaStreamSchedulingTerm(Component):
+    '''A component which specifies that data is ready to be consumed on a cuda stream based on callback function
+    '''
+    gxf_native_type: str = "nvidia::gxf::CudaStreamSchedulingTerm"
+
+    _validation_info_parameters = {'receiver': {'key': 'receiver', 'headline': 'Receiver queue', 'description': 'The receiver queue on which the scheduling term checks for the datareadiness on cuda stream',
+                                                'gxf_parameter_type': 'GXF_PARAMETER_TYPE_HANDLE', 'rank': 0, 'shape': [1], 'flags': 'GXF_PARAMETER_FLAGS_NONE', 'handle_type': 'nvidia::gxf::Receiver', 'default': 'N/A'}}
+
+    def __init__(self, name: str = "", **params):
+        Component.__init__(self, type=self.get_gxf_type(), name=name, **params)
+
+
+class StreamOrderedAllocator(Component):
+    '''Allocator based on Cuda Memory Pools
+    '''
+    gxf_native_type: str = "nvidia::gxf::StreamOrderedAllocator"
+
+    _validation_info_parameters = {}
 
     def __init__(self, name: str = "", **params):
         Component.__init__(self, type=self.get_gxf_type(), name=name, **params)

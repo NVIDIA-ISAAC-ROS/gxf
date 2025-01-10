@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2021-2023, NVIDIA CORPORATION. All rights reserved.
+Copyright (c) 2021-2024, NVIDIA CORPORATION. All rights reserved.
 
 NVIDIA CORPORATION and its licensors retain all intellectual property
 and proprietary rights in and to this software, related documentation
@@ -19,7 +19,7 @@ license agreement from NVIDIA CORPORATION is strictly prohibited.
 
 #include "common/assert.hpp"
 #include "gxf/std/gems/utils/time.hpp"
-#include "nlohmann-json/json.hpp"
+#include "nlohmann/json.hpp"
 
 namespace nvidia {
 namespace gxf {
@@ -268,16 +268,19 @@ gxf_result_t JobStatistics::deinitialize() {
       auto c_logs = c_data.term_change_logs;
       auto c_stats = c_data.term_change_stats;
 
-      GXF_LOG_INFO("    Component name %s", findParameterName(c_pair.first).value().c_str());
+      GXF_LOG_INFO("    Component name %s  Type %s",
+                   findParameterName(c_pair.first).value().c_str(),
+                   findComponentTypeName(c_pair.first).value().c_str());
+
       for (auto rec : c_stats) {
-        GXF_LOG_INFO("         type: [%s] median: [%f] max: [%f] count: [%d] ", rec.first.c_str(),
+        GXF_LOG_INFO("         type: [%s] median: [%f] max: [%f] count: [%ld] ", rec.first.c_str(),
                      rec.second.median() * 1000, rec.second.percentile(0.9)*1000.0,
                      rec.second.count());
       }
-      // GXF_LOG_INFO("   Logs ----------------------------------------------");
-      // for (auto log : c_logs) {
-      //   GXF_LOG_INFO("         State: [%s] Ts: [%ld]", log.state.c_str(), log.timestamp);
-      // }
+      GXF_LOG_INFO("   Logs ----------------------------------------------");
+      for (auto log : c_logs) {
+        GXF_LOG_INFO("         State: [%s] Ts: [%ld]", log.state.c_str(), log.timestamp);
+      }
     }
   }
   #endif
@@ -349,6 +352,7 @@ gxf_result_t JobStatistics::preTick(gxf_uid_t eid, gxf_uid_t cid) {
 gxf_result_t JobStatistics::postTick(gxf_uid_t eid, gxf_uid_t cid) {
   std::shared_lock<std::shared_timed_mutex> lock(mutex_);
   const int64_t now = clock_->timestamp();
+  std::lock_guard<std::mutex> lock_codelet_data(mutex_codelet_data_);
   if (codelet_data_.find(eid) == codelet_data_.end()) {
     GXF_LOG_ERROR("No previous record for eid %lu ", eid);
     return GXF_INVALID_EXECUTION_SEQUENCE;
@@ -421,7 +425,9 @@ gxf_result_t JobStatistics::onLifecycleChange(gxf_uid_t eid, std::string next_st
 }
 
 gxf_result_t JobStatistics::postTermCheck(gxf_uid_t eid, gxf_uid_t cid, std::string next_type) {
-  std::shared_lock<std::shared_timed_mutex> lock(mutex_);
+  // std::shared_lock is not safe for writing, std::unique_lock does.
+  // std::unique_lock<std::shared_timed_mutex> allow read, but sync on write
+  std::unique_lock<std::shared_timed_mutex> lock(mutex_);
   auto it = entity_term_data_.find(eid);
   if (it == entity_term_data_.end()) {
     return GXF_ENTITY_NOT_FOUND;
@@ -489,22 +495,16 @@ Expected<std::string> JobStatistics::findParameterName(gxf_uid_t id) {
   const char* this_name = nullptr;
   std::string backup_name = std::to_string(id);
   const gxf_result_t result =
-      GxfParameterGetStr(context_, id, kInternalNameParameterKey, &this_name);
+      GxfEntityGetName(context_, id, &this_name);
   if (result != GXF_SUCCESS || this_name[0] == '\0') {
     this_name = backup_name.c_str();
   }
   return this_name;
 }
 
-Expected<std::string> JobStatistics::findCodeletTypeName(gxf_uid_t id) {
-  gxf_tid_t tid = GxfTidNull();
-  auto code = GxfComponentType(context_, id, &tid);
-  if (code != GXF_SUCCESS) {
-    GXF_LOG_ERROR("Could not find component type");
-    return Unexpected{GXF_FAILURE};
-  }
+Expected<std::string> JobStatistics::findComponentTypeName(gxf_uid_t id) {
   const char* component_type_name = nullptr;
-  code = GxfComponentTypeName(context_, tid, &component_type_name);
+  auto code = GxfComponentTypeNameFromUID(context_, id, &component_type_name);
   if (code != GXF_SUCCESS) {
     GXF_LOG_ERROR("Could not find component type name");
     return Unexpected{GXF_FAILURE};
@@ -697,7 +697,7 @@ Expected<std::string> JobStatistics::getCodeletStatistics(gxf_uid_t uid) {
   if (uid != kUnspecifiedUid && codelet_data.find(uid) != codelet_data.end()) {
     filter_eid = true;
   }
-  for (const auto entity_iterator : codelet_data) {
+  for (const auto& entity_iterator : codelet_data) {
     if (filter_eid && entity_iterator.first != uid) {
       continue;
     }
@@ -715,7 +715,7 @@ Expected<std::string> JobStatistics::getCodeletStatistics(gxf_uid_t uid) {
           GXF_LOG_ERROR("Error retrieving codelet name for cid %lu", codelet_iterator.first);
           return Unexpected{GXF_FAILURE};
         }
-        auto codelet_type_name = findCodeletTypeName(codelet_iterator.first);
+        auto codelet_type_name = findComponentTypeName(codelet_iterator.first);
         if (!codelet_type_name) {
           GXF_LOG_ERROR("Error retrieving codelet typename for cid %lu", codelet_iterator.first);
           return Unexpected{GXF_FAILURE};
@@ -750,7 +750,7 @@ Expected<std::string> JobStatistics::getSchedulingEventStatistics(gxf_uid_t uid)
   GXF_LOG_INFO("JobStatistics::getSchedulingEventStatistics Enters");
   nlohmann::json json_array  = nlohmann::json::array();
   auto all_term_data = getallSchedulingTermData();
-  for (const auto entity_iterator : all_term_data) {
+  for (const auto& entity_iterator : all_term_data) {
     if (uid != kUnspecifiedUid && uid != entity_iterator.first) {
       continue;
     }
@@ -761,19 +761,19 @@ Expected<std::string> JobStatistics::getSchedulingEventStatistics(gxf_uid_t uid)
     }
     auto term_data = entity_iterator.second;
     nlohmann::json term_array = nlohmann::json::array();
-    for (const auto term_iterator : term_data) {
+    for (const auto& term_iterator : term_data) {
       auto term_name = findParameterName(term_iterator.first);
       if (!term_name) {
         GXF_LOG_ERROR("Error retrieving scheduling term name for cid %lu", term_iterator.first);
         return Unexpected{GXF_FAILURE};
       }
-      auto term_type_name = findCodeletTypeName(term_iterator.first);
+      auto term_type_name = findComponentTypeName(term_iterator.first);
       if (!term_type_name) {
         GXF_LOG_ERROR("Error retrieving scheduling term typename for cid %lu", term_iterator.first);
         return Unexpected{GXF_FAILURE};
       }
       nlohmann::json log_array = nlohmann::json::array();
-      for (const auto log_iterator : term_iterator.second.term_change_logs) {
+      for (const auto& log_iterator : term_iterator.second.term_change_logs) {
         log_array.push_back({
           {"timestamp", log_iterator.timestamp},
           {"state", log_iterator.state}
@@ -801,7 +801,7 @@ Expected<std::string> JobStatistics::getSchedulingTermStatistics(gxf_uid_t uid) 
   GXF_LOG_INFO("JobStatistics::getSchedulingTermStatistics Enters");
   nlohmann::json json_array  = nlohmann::json::array();
   auto all_term_data = getallSchedulingTermData();
-  for (const auto entity_iterator : all_term_data) {
+  for (const auto& entity_iterator : all_term_data) {
     if (uid != kUnspecifiedUid && uid != entity_iterator.first) {
       continue;
     }
@@ -812,19 +812,19 @@ Expected<std::string> JobStatistics::getSchedulingTermStatistics(gxf_uid_t uid) 
     }
     auto term_data = entity_iterator.second;
     nlohmann::json term_array = nlohmann::json::array();
-    for (const auto term_iterator : term_data) {
+    for (const auto& term_iterator : term_data) {
       auto term_name = findParameterName(term_iterator.first);
       if (!term_name) {
         GXF_LOG_ERROR("Error retrieving scheduling term name for cid %lu", term_iterator.first);
         return Unexpected{GXF_FAILURE};
       }
-      auto term_type_name = findCodeletTypeName(term_iterator.first);
+      auto term_type_name = findComponentTypeName(term_iterator.first);
       if (!term_type_name) {
         GXF_LOG_ERROR("Error retrieving scheduling term typename for cid %lu", term_iterator.first);
         return Unexpected{GXF_FAILURE};
       }
       nlohmann::json stats_array = nlohmann::json::array();
-      for (const auto stat_iterator : term_iterator.second.term_change_stats) {
+      for (const auto& stat_iterator : term_iterator.second.term_change_stats) {
         stats_array.push_back({
           {"state", stat_iterator.first.c_str()},
           {"count", stat_iterator.second.count()},

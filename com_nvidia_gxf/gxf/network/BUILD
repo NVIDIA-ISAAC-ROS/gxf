@@ -1,5 +1,5 @@
 """
-Copyright (c) 2021-2023, NVIDIA CORPORATION. All rights reserved.
+Copyright (c) 2021-2024, NVIDIA CORPORATION. All rights reserved.
 
 NVIDIA CORPORATION and its licensors retain all intellectual property
 and proprietary rights in and to this software, related documentation
@@ -36,6 +36,8 @@ nv_gxf_cc_extension(
         "tcp_codelet",
         "tcp_client",
         "tcp_server",
+        "//gxf/core:gxf",
+        "//gxf/std:extension_factory_helper",
     ],
     ext_deps = [
         "//gxf/std",
@@ -75,9 +77,9 @@ nv_gxf_cc_library(
     deps = [
         "tcp_client_socket",
         "tcp_server_socket",
+        "//gxf/core:parameter_parser_std",
         "//gxf/serialization:entity_serializer",
         "//gxf/std:codelet",
-        "//gxf/std:parameter_parser_std",
         "//gxf/std:scheduling_terms",
     ],
 )
@@ -147,6 +149,6 @@ register_extension(
     priority = "1",
     url = "www.nvidia.com",
     uuid = "f50665e5-ade2-f71b-de2a-2380614b1725",
-    version = "1.3.0",
+    version = "1.6.0",
     visibility = ["//visibility:public"],
 )

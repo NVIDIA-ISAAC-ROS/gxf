@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2020-2023, NVIDIA CORPORATION. All rights reserved.
+Copyright (c) 2020-2024, NVIDIA CORPORATION. All rights reserved.
 
 NVIDIA CORPORATION and its licensors retain all intellectual property
 and proprietary rights in and to this software, related documentation
@@ -176,6 +176,9 @@ gxf_result_t BlockMemoryPool::free_abi(void* void_pointer) {
 }
 
 gxf_result_t BlockMemoryPool::deinitialize() {
+  if (stack_->size() != num_blocks_.get()) {
+    GXF_LOG_WARNING("BlockMemoryPool pool %s still has unreleased memory", name());
+  }
   stack_.release();
 
   switch (MemoryStorageType(storage_type_.get())) {

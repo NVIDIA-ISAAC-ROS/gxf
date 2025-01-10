@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
+Copyright (c) 2022-2024, NVIDIA CORPORATION. All rights reserved.
 
 NVIDIA CORPORATION and its licensors retain all intellectual property
 and proprietary rights in and to this software, related documentation
@@ -83,4 +83,14 @@ TEST(GxfParameterTypeStr, Uint32) {
 TEST(GxfParameterTypeStr, Float32) {
   gxf_parameter_type_t type = gxf_parameter_type_t::GXF_PARAMETER_TYPE_FLOAT32;
   GXF_ASSERT_EQ(strcmp(GxfParameterTypeStr(type), "GXF_PARAMETER_TYPE_FLOAT32"), 0);
+}
+
+TEST(GxfParameterTypeStr, Complex64) {
+  gxf_parameter_type_t type = gxf_parameter_type_t::GXF_PARAMETER_TYPE_COMPLEX64;
+  GXF_ASSERT_EQ(strcmp(GxfParameterTypeStr(type), "GXF_PARAMETER_TYPE_COMPLEX64"), 0);
+}
+
+TEST(GxfParameterTypeStr, Complex128) {
+  gxf_parameter_type_t type = gxf_parameter_type_t::GXF_PARAMETER_TYPE_COMPLEX128;
+  GXF_ASSERT_EQ(strcmp(GxfParameterTypeStr(type), "GXF_PARAMETER_TYPE_COMPLEX128"), 0);
 }

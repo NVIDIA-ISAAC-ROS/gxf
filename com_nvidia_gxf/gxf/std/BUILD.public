@@ -1,5 +1,5 @@
 """
- SPDX-FileCopyrightText: Copyright (c) 2021 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ SPDX-FileCopyrightText: Copyright (c) 2021-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  SPDX-License-Identifier: Apache-2.0
 
  Licensed under the Apache License, Version 2.0 (the "License");
@@ -22,6 +22,10 @@ cc_library(
     name = "StandardExtension",
     hdrs = [
         "allocator.hpp",
+        "async_buffer_receiver.hpp",
+        "async_buffer_transmitter.hpp",
+        "block_memory_pool.hpp",
+        "broadcast.hpp",
         "clock.hpp",
         "codelet.hpp",
         "complex.hpp",
@@ -29,33 +33,45 @@ cc_library(
         "component_factory.hpp",
         "default_extension.hpp",
         "double_buffer_receiver.hpp",
+        "double_buffer_transmitter.hpp",
         "eos.hpp",
         "extension.hpp",
         "extension_factory_helper.hpp",
+        "forward.hpp",
+        "gather.hpp",
+        "graph_driver.hpp",
+        "graph_driver_worker_common.hpp",
+        "graph_worker.hpp",
+        "ipc_client.hpp",
+        "ipc_server.hpp",
         "memory_buffer.hpp",
         "metric.hpp",
         "monitor.hpp",
+        "network_context.hpp",
+        "network_router.hpp",
         "new_component_allocator.hpp",
-        "parameter_parser.hpp",
-        "parameter_parser_std.hpp",
-        "parameter_registrar.hpp",
-        "parameter_storage.hpp",
-        "parameter_wrapper.hpp",
         "queue.hpp",
-        "resources.hpp",
         "receiver.hpp",
+        "resources.hpp",
+        "scheduler.hpp",
         "scheduling_condition.hpp",
+        "scheduling_term_combiner.hpp",
         "scheduling_term.hpp",
         "scheduling_terms.hpp",
         "system.hpp",
         "tensor.hpp",
+        "tensor_copier.hpp",
         "timestamp.hpp",
         "transmitter.hpp",
-        "type_registry.hpp",
         "typed_message_view.hpp",
         "unbounded_allocator.hpp",
         "vault.hpp",
     ],
     include_prefix = "gxf/std",
+    visibility = ["//visibility:public"],
+)
+
+exports_files(
+    glob(include = ["*"]),
     visibility = ["//visibility:public"],
 )

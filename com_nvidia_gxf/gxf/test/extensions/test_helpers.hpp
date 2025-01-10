@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2020-2021 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-FileCopyrightText: Copyright (c) 2020-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * SPDX-License-Identifier: Apache-2.0
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -163,6 +163,104 @@ class StepCount : public Codelet {
   uint64_t count_stop_;
 };
 
+/**
+ * @brief A codelet to check whether the number of steps fall within a certain range.
+ *
+ */
+class StepRangeCount : public Codelet {
+ public:
+  gxf_result_t initialize() override {
+    is_initialized_ = true;
+    count_start_ = 0;
+    count_tick_ = 0;
+    count_stop_ = 0;
+    return GXF_SUCCESS;
+  }
+
+  gxf_result_t start() override {
+    if (use_assert_) {
+      GXF_ASSERT(is_initialized_, "not initialized");
+    } else {
+      if (!is_initialized_) return GXF_CONTRACT_INVALID_SEQUENCE;
+    }
+    count_start_++;
+    return GXF_SUCCESS;
+  }
+
+  gxf_result_t tick() override {
+    if (use_assert_) {
+      GXF_ASSERT_GT(count_start_, 0);
+    } else {
+      if (count_start_ == 0) return GXF_CONTRACT_INVALID_SEQUENCE;
+    }
+    count_tick_++;
+    return GXF_SUCCESS;
+  }
+
+  gxf_result_t stop() override {
+    if (use_assert_) {
+      GXF_ASSERT_EQ(count_start_, count_stop_ + 1);
+    } else {
+      if (count_start_ != count_stop_ + 1) return GXF_CONTRACT_INVALID_SEQUENCE;
+    }
+    count_stop_++;
+    return GXF_SUCCESS;
+  }
+
+  gxf_result_t deinitialize() override {
+    if (use_assert_) {
+      GXF_ASSERT(is_initialized_, "not initialized");
+      GXF_ASSERT_EQ(count_start_, expected_start_count_.get());
+      GXF_ASSERT_GE(count_tick_, expected_count_range_start_.get());
+      GXF_ASSERT_LE(count_tick_, expected_count_range_end_.get());
+      GXF_ASSERT_EQ(count_start_, count_stop_);
+    } else {
+      if (!is_initialized_) return GXF_CONTRACT_INVALID_SEQUENCE;
+      if (count_start_ != expected_start_count_.get()) {
+        GXF_LOG_ERROR("Start count [%zu] does not match expected start count [%zu]", count_start_,
+                      expected_start_count_.get());
+        return GXF_FAILURE;
+      }
+      if (count_tick_ < expected_count_range_start_.get()) {
+        GXF_LOG_ERROR("Tick count [%zu] is lower than expected tick count range start [%zu]",
+                      count_tick_, expected_count_range_start_.get());
+        return GXF_FAILURE;
+      } else if (count_tick_ > expected_count_range_end_.get()) {
+        GXF_LOG_ERROR("Tick count [%zu] is higher than expected tick count range end [%zu]",
+                      count_tick_, expected_count_range_end_.get());
+        return GXF_FAILURE;
+      }
+      if (count_start_ != count_stop_) return GXF_CONTRACT_INVALID_SEQUENCE;
+    }
+    return GXF_SUCCESS;
+  }
+
+  gxf_result_t registerInterface(Registrar* registrar) override {
+    Expected<void> result;
+    result &= registrar->parameter(use_assert_, "use_assert", "Use ASSERT",
+                                   "If enabled the codelet "
+                                   "will assert when test conditions are not true",
+                                   false);
+    result &= registrar->parameter(expected_start_count_, "expected_start_count", "", "", 1UL);
+    result &= registrar->parameter(expected_count_range_start_, "expected_count_range_start",
+                                   "the start of the expected count range", "", 0UL);
+    result &= registrar->parameter(expected_count_range_end_, "expected_count_range_end",
+                                   "the end of the expected count range", "", 0UL);
+    return ToResultCode(result);
+  }
+
+ private:
+  Parameter<bool> use_assert_;
+  Parameter<uint64_t> expected_start_count_;
+  Parameter<uint64_t> expected_count_range_start_;
+  Parameter<uint64_t> expected_count_range_end_;
+
+  bool is_initialized_ = false;
+  uint64_t count_start_;
+  uint64_t count_tick_;
+  uint64_t count_stop_;
+};
+
 // Sends a ping after a user-defined delay. If the offset clock parameter is set, an offset is
 // added to the acqtime and pubtime before publishing.
 class ScheduledPingTx : public Codelet {
@@ -196,11 +294,11 @@ class ScheduledPingTx : public Codelet {
       timestamp.value()->acqtime = maybe_offset_clock.value()->timestamp() + target_timestamp;
       timestamp.value()->pubtime = maybe_offset_clock.value()->timestamp() + target_timestamp;
     }
+
     const auto result = signal_->publish(std::move(message.value()));
+    GXF_LOG_DEBUG("ScheduledPingTx(%ld:%s) message sent", eid(), entity().name());
     return ToResultCode(message);
   }
-
-  gxf_result_t stop() override { return GXF_SUCCESS; }
 
   gxf_result_t registerInterface(Registrar* registrar) override {
     Expected<void> result;
@@ -388,8 +486,6 @@ class PingPollRx : public Codelet {
 // Receives an entity in specified batch size
 class PingBatchRx : public Codelet {
  public:
-  gxf_result_t start() override { return GXF_SUCCESS; }
-
   gxf_result_t tick() override {
     for (int64_t i = 0; i < batch_size_; i++) {
       auto message = signal_->receive();
@@ -399,8 +495,6 @@ class PingBatchRx : public Codelet {
     }
     return GXF_SUCCESS;
   }
-
-  gxf_result_t stop() override { return GXF_SUCCESS; }
 
   gxf_result_t registerInterface(Registrar* registrar) override {
     Expected<void> result;
@@ -416,24 +510,24 @@ class PingBatchRx : public Codelet {
   Parameter<bool> assert_full_batch_;
 };
 
-// Generates interger and fibonacci messages
+// Generates integer and fibonacci messages
 class Generator : public Codelet {
  public:
-  gxf_result_t start() override { return GXF_SUCCESS; }
-
   gxf_result_t tick() override {
     const Expected<Entity> msg1 = createIntegerMessage();
-    if (!msg1) return msg1.error();
+    if (!msg1) {
+      return msg1.error();
+    }
     integers_->publish(msg1.value());
 
     const Expected<Entity> msg2 = createFibonacciMessage();
-    if (!msg1) return msg1.error();
+    if (!msg2) {
+      return msg2.error();
+    }
     fibonacci_->publish(msg2.value());
 
     return GXF_SUCCESS;
   }
-
-  gxf_result_t stop() override { return GXF_SUCCESS; }
 
   gxf_result_t registerInterface(Registrar* registrar) override {
     Expected<void> result;
@@ -498,17 +592,13 @@ class Generator : public Codelet {
 
 
 
-// Pops an incoming message at the reciever
+// Pops an incoming message at the receiver
 class Pop : public Codelet {
  public:
-  gxf_result_t start() override { return GXF_SUCCESS; }
-
   gxf_result_t tick() override {
     message_->receive();
     return GXF_SUCCESS;
   }
-
-  gxf_result_t stop() override { return GXF_SUCCESS; }
 
   gxf_result_t registerInterface(Registrar* registrar) override {
     Expected<void> result;
@@ -522,8 +612,6 @@ class Pop : public Codelet {
 // Receives a message with tensors and prints the element count to debug log
 class Print : public Codelet {
  public:
-  gxf_result_t start() override { return GXF_SUCCESS; }
-
   gxf_result_t tick() override {
     auto message = message_->receive();
     if (!message) return message.error();
@@ -540,8 +628,6 @@ class Print : public Codelet {
 
     return GXF_SUCCESS;
   }
-
-  gxf_result_t stop() override { return GXF_SUCCESS; }
 
   gxf_result_t registerInterface(Registrar* registrar) override {
     Expected<void> result;
@@ -575,7 +661,7 @@ gxf_result_t PrintSingleTensorGivenType(const Tensor& tensor, const char* format
 }
 
 // Prints the elements of a tensor for various types
-gxf_result_t PrintSingleTensorAllTypes(const Tensor& tensor) {
+inline gxf_result_t PrintSingleTensorAllTypes(const Tensor& tensor) {
   switch (tensor.element_type()) {
     case PrimitiveType::kUnsigned8:
       return PrintSingleTensorGivenType<uint8_t, uint32_t>(tensor, "%u, ");
@@ -616,8 +702,6 @@ gxf_result_t PrintSingleTensorAllTypes(const Tensor& tensor) {
 // Receives a message with tensors and prints them to the console.
 class PrintTensor : public Codelet {
  public:
-  gxf_result_t start() override { return GXF_SUCCESS; }
-
   gxf_result_t tick() override {
     auto message = tensors_->receive();
     if (!message) return message.error();
@@ -646,8 +730,6 @@ class PrintTensor : public Codelet {
     return GXF_SUCCESS;
   }
 
-  gxf_result_t stop() override { return GXF_SUCCESS; }
-
   gxf_result_t registerInterface(Registrar* registrar) override {
     Expected<void> result;
     result &= registrar->parameter(tensors_, "tensors", "Input Tensor", "");
@@ -665,8 +747,6 @@ class PrintTensor : public Codelet {
 // Generates an arbitrary precision factorial tensor message
 class ArbitraryPrecisionFactorial : public Codelet {
  public:
-  gxf_result_t start() override { return GXF_SUCCESS; }
-
   gxf_result_t tick() override {
     const int32_t digits = digits_;
     const uint32_t factorial = factorial_;
@@ -709,8 +789,6 @@ class ArbitraryPrecisionFactorial : public Codelet {
     return GXF_SUCCESS;
   }
 
-  gxf_result_t stop() override { return GXF_SUCCESS; }
-
   gxf_result_t registerInterface(Registrar* registrar) override {
     Expected<void> result;
     result &= registrar->parameter(digits_, "digits");
@@ -729,8 +807,6 @@ class ArbitraryPrecisionFactorial : public Codelet {
 // Creates a tensor message with a cumulative sum of sines
 class IntegerSinSum : public Codelet {
  public:
-  gxf_result_t start() override { return GXF_SUCCESS; }
-
   gxf_result_t tick() override {
     const size_t count = count_;
 
@@ -754,8 +830,6 @@ class IntegerSinSum : public Codelet {
     return GXF_SUCCESS;
   }
 
-  gxf_result_t stop() override { return GXF_SUCCESS; }
-
   gxf_result_t registerInterface(Registrar* registrar) override {
     Expected<void> result;
     result &= registrar->parameter(count_, "count");
@@ -771,8 +845,6 @@ class IntegerSinSum : public Codelet {
 
 class TestTensorStrides : public Codelet {
  public:
-  gxf_result_t start() override { return GXF_SUCCESS; }
-  gxf_result_t stop() override { return GXF_SUCCESS; }
   gxf_result_t tick() override {
     Shape shape{2, 3, 4};
     auto foo_strides = ComputeRowStrides(shape, 256, PrimitiveTypeTraits<float>::size);
@@ -861,8 +933,6 @@ class TestTimestampTx : public Codelet {
     return ToResultCode(message);
   }
 
-  gxf_result_t stop() override { return GXF_SUCCESS; }
-
   gxf_result_t registerInterface(Registrar* registrar) override {
     Expected<void> result;
     result &= registrar->parameter(delay_, "delay");
@@ -882,8 +952,6 @@ class TestTimestampTx : public Codelet {
 
 class TestTimestampRx : public Codelet {
  public:
-  gxf_result_t start() override { return GXF_SUCCESS; }
-
   gxf_result_t tick() override {
     auto message = signal_->receive();
     if (!message || message.value().is_null()) { return GXF_CONTRACT_MESSAGE_NOT_AVAILABLE; }
@@ -904,8 +972,6 @@ class TestTimestampRx : public Codelet {
     return GXF_SUCCESS;
   }
 
-  gxf_result_t stop() override { return GXF_SUCCESS; }
-
   gxf_result_t registerInterface(Registrar* registrar) override {
     Expected<void> result;
     result &= registrar->parameter(signal_, "signal");
@@ -924,8 +990,6 @@ class TestTimestampRx : public Codelet {
 // Prints test logs for various severity levels defined in `gxf_severity_t`
 class TestLogger : public Codelet {
  public:
-  gxf_result_t start() override { return GXF_SUCCESS; }
-
   gxf_result_t tick() override {
     GXF_LOG_ERROR("This is test error message");
     GXF_LOG_WARNING("This is a test warning message");
@@ -933,8 +997,6 @@ class TestLogger : public Codelet {
     GXF_LOG_DEBUG("This is a test debug message");
     return GXF_SUCCESS;
   }
-
-  gxf_result_t stop() override { return GXF_SUCCESS; }
 };
 
 class PeriodicSchedulingTermWithDelay : public PeriodicSchedulingTerm {
@@ -1021,4 +1083,4 @@ class WaitSchedulingTerm : public SchedulingTerm {
 }  // namespace gxf
 }  // namespace nvidia
 
-#endif
+#endif /* NVIDIA_GXF_TEST_EXTENSIONS_TEST_HELPERS_HPP */

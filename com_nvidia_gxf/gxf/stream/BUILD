@@ -1,5 +1,5 @@
 """
-Copyright (c) 2022-2023, NVIDIA CORPORATION. All rights reserved.
+Copyright (c) 2022-2024, NVIDIA CORPORATION. All rights reserved.
 NVIDIA CORPORATION and its licensors retain all intellectual property
 and proprietary rights in and to this software, related documentation
 and any modifications thereto. Any use, reproduction, disclosure or
@@ -59,7 +59,6 @@ nv_gxf_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         "//gxf/core:gxf_cpp_api",
-        "//gxf/std:parameter_parser",
         "//third_party:cudart",
         "//third_party:nvscievent",
         "//third_party:nvscisync",
@@ -84,6 +83,6 @@ register_extension(
     priority = "1",
     url = "www.nvidia.com",
     uuid = "918e6ad7-8e1a-43aa-9b49-251d4b6072b0",
-    version = "0.2.0",
+    version = "0.5.0",
     visibility = ["//visibility:public"],
 )

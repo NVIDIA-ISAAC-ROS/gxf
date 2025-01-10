@@ -14,12 +14,10 @@
  See the License for the specific language governing permissions and
  limitations under the License.
 """
-from gxf.core import MessageEntity
 from gxf.python_codelet import CodeletAdapter
 from gxf.std import Clock
 from gxf.std import Receiver
 from gxf.std import Tensor
-from gxf.std import Shape
 from gxf.std import MemoryStorageType
 import numpy as np
 
@@ -57,7 +55,7 @@ class VerifyEqual(CodeletAdapter):
         assert(tensor0.shape() == tensor1.shape())
         assert(tensor0.element_type() == tensor1.element_type())
 
-        # if tensor0 is on device copy it to host memory for comparision
+        # if tensor0 is on device copy it to host memory for comparison
         if tensor0.storage_type() == MemoryStorageType.kHost:
             tensor0 = np.array(tensor0)
         elif tensor0.storage_type() == MemoryStorageType.kDevice:
@@ -65,7 +63,7 @@ class VerifyEqual(CodeletAdapter):
         else:
             raise RuntimeError("data neither on host or device?!")
 
-        # if tensor1 is on device copy it to host memory for comparision
+        # if tensor1 is on device copy it to host memory for comparison
         if tensor1.storage_type() == MemoryStorageType.kHost:
             tensor1 = np.array(tensor1)
         elif tensor1.storage_type() == MemoryStorageType.kDevice:

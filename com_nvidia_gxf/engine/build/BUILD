@@ -1,5 +1,5 @@
 """
-Copyright (c) 2020-2023, NVIDIA CORPORATION. All rights reserved.
+Copyright (c) 2020-2024, NVIDIA CORPORATION. All rights reserved.
 
  SPDX-FileCopyrightText: Copyright (c) 2020-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  SPDX-License-Identifier: Apache-2.0
@@ -22,31 +22,31 @@ Copyright (c) 2020-2023, NVIDIA CORPORATION. All rights reserved.
 # For more detail refer to
 # https://docs.bazel.build/versions/master/configurable-attributes.html
 
+load("@bazel_skylib//lib:selects.bzl", "selects")
+
 ####  Target platform configs
 config_setting(
-    name = "platform_x86_64_cuda_11_8",
-    define_values = {"target_platform": "x86_64_cuda_11_8"},
+    name = "platform_x86_64_cuda_12_6",
+    define_values = {"target_platform": "x86_64_cuda_12_6"},
     visibility = ["//visibility:public"],
 )
 
 config_setting(
-    name = "platform_x86_64_cuda_12_1",
-    define_values = {"target_platform": "x86_64_cuda_12_1"},
+    name = "platform_x86_64_cuda_12_2",
+    define_values = {"target_platform": "x86_64_cuda_12_2"},
     visibility = ["//visibility:public"],
 )
 
 config_setting(
-    name = "platform_hp11_sbsa",
+    name = "platform_x86_64_rhel9_cuda_12_2",
+    define_values = {"target_platform": "x86_64_rhel9_cuda_12_2"},
+    visibility = ["//visibility:public"],
+)
+
+config_setting(
+    name = "platform_hp21ga_sbsa",
     define_values = {
-        "target_platform": "hp11_sbsa",
-    },
-    visibility = ["//visibility:public"],
-)
-
-config_setting(
-    name = "platform_hp20_sbsa",
-    define_values = {
-        "target_platform": "hp20_sbsa",
+        "target_platform": "hp21ga_sbsa",
     },
     visibility = ["//visibility:public"],
 )
@@ -60,8 +60,27 @@ config_setting(
 )
 
 config_setting(
-    name = "platform_jetpack51",
-    define_values = {"target_platform": "jetpack51"},
+    name = "platform_jetpack61",
+    define_values = {"target_platform": "jetpack61"},
+    visibility = ["//visibility:public"],
+)
+
+config_setting(
+    name = "platform_jetpack60",
+    define_values = {"target_platform": "jetpack60"},
+    visibility = ["//visibility:public"],
+)
+
+#### Host OS Configs
+config_setting(
+    name = "host_ubuntu_22_04",
+    define_values = {"os": "ubuntu_22_04"},
+    visibility = ["//visibility:public"],
+)
+
+config_setting(
+    name = "host_rhel9",
+    define_values = {"os": "rhel9"},
     visibility = ["//visibility:public"],
 )
 
@@ -86,8 +105,21 @@ config_setting(
 
 #### Compiler Configs
 config_setting(
-    name = "compiler_gcc_9",
-    values = {"compiler": "gcc-9"},
+    name = "compiler_gcc_11",
+    values = {"compiler": "gcc-11"},
+    visibility = ["//visibility:public"],
+)
+
+# Distro config
+config_setting(
+    name = "rhel",
+    define_values = {"os": "rhel9"},
+    visibility = ["//visibility:public"],
+)
+
+config_setting(
+    name = "ubuntu",
+    define_values = {"os": "ubuntu_22_04"},
     visibility = ["//visibility:public"],
 )
 
@@ -95,19 +127,20 @@ config_setting(
 filegroup(
     name = "nvcc",
     srcs = select({
-        "//engine/build:platform_x86_64_cuda_11_8": ["@nvcc_11_08"],
-        "//engine/build:platform_x86_64_cuda_12_1": ["@nvcc_12_01"],
-        "//engine/build:platform_hp11_sbsa": ["@nvcc_11_06"],
-        "//engine/build:platform_hp20_sbsa": ["@nvcc_11_08"],
-        "//engine/build:platform_hp21ea_sbsa": ["@nvcc_12_01"],
-        "//engine/build:platform_jetpack51": ["@nvcc_11_04"],
+        "//engine/build:platform_x86_64_cuda_12_2": ["@nvcc_12_02"],
+        "//engine/build:platform_x86_64_cuda_12_6": ["@nvcc_12_06"],
+        "//engine/build:platform_x86_64_rhel9_cuda_12_2": ["@nvcc_12_02"],
+        "//engine/build:platform_hp21ea_sbsa": ["@nvcc_12_02"],
+        "//engine/build:platform_hp21ga_sbsa": ["@nvcc_12_06"],
+        "//engine/build:platform_jetpack60": ["@nvcc_12_02"],
+        "//engine/build:platform_jetpack61": ["@nvcc_12_06"],
         }),
     visibility = ["//visibility:public"],
 )
 
 filegroup(
-    name = "gcc_9_3_aarch64_linux_gnu_toolchain",
-    srcs = ["@gcc_9_3_aarch64_linux_gnu"],
+    name = "gcc_11_3_aarch64_linux_gnu_toolchain",
+    srcs = ["@gcc_11_3_aarch64_linux_gnu"],
     visibility = ["//visibility:public"],
 )
 
@@ -132,13 +165,6 @@ config_setting(
     visibility = ["//visibility:public"],
 )
 
-# Configuration settings for using c++17 compilation flag
-config_setting(
-    name = "cxx_17",
-    define_values = {"cpp_standard": "gcc_cxx_17"},
-    visibility = ["//visibility:public"],
-)
-
 # Configuration settings for disabling c++11 abi
 config_setting(
     name = "disable_cxx11_abi",
@@ -148,7 +174,32 @@ config_setting(
 
 # Configuration settings for using c++17 compilation flag
 config_setting(
-    name = "python3_7",
-    define_values = {"python": "python3_7"},
+    name = "python3_10",
+    define_values = {"python": "python3_10"},
+    visibility = ["//visibility:public"],
+)
+
+# Config settings for choose python3
+selects.config_setting_group(
+    name = "rhel_python3_10",
+    match_all = ["//engine/build:rhel", "//engine/build:python3_10"],
+)
+
+selects.config_setting_group(
+    name = "ubuntu_python3_10",
+    match_all = ["//engine/build:ubuntu", "//engine/build:python3_10"],
+)
+
+alias(
+    name = "docker_base_image",
+    actual = select(
+        {
+            "@com_nvidia_gxf//engine/build:cpu_host": "@gxf_docker_image_cuda12_2//image",
+            "@com_nvidia_gxf//engine/build:cpu_aarch64": "@gxf_docker_image_aarch64_jp60//image",
+            "@com_nvidia_gxf//conditions:default": "@gxf_docker_image_cuda12_2//image",
+        },
+        no_match_error = "Please build only for x86 or arm64 platforms only",
+    ),
+    tags = ["docker"],
     visibility = ["//visibility:public"],
 )

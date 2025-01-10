@@ -1,5 +1,5 @@
 """
-Copyright (c) 2020-2022, NVIDIA CORPORATION. All rights reserved.
+Copyright (c) 2020-2024, NVIDIA CORPORATION. All rights reserved.
 
 NVIDIA CORPORATION and its licensors retain all intellectual property
 and proprietary rights in and to this software, related documentation
@@ -80,6 +80,11 @@ def _get_binaries(binaries, arch):
 
   return bin
 
+def _get_license_filepath(ctx):
+  if ctx.file.license_file != None:
+    return ctx.file.license_file.path
+  return "None"
+
 def _get_local_deps_runfiles(ctx):
   deps = []
   for d in ctx.attr.local_dependencies:
@@ -144,9 +149,9 @@ def _verify_platform_config(ctx):
   if ctx.attr.os not in ["linux", "qnx"]:
     fail("platform os config does not match the requirement. "
     + "\"os\" has to be one of: \"linux\"")
-  if ctx.attr.distribution not in ["ubuntu_20.04", "qnx_sdp_7.1"]:
+  if ctx.attr.distribution not in ["ubuntu_22.04", "qnx_sdp_7.1", "rhel9"]:
     fail("platform distribution config does not match the requirement. "
-    + "\"distribution\" has to be one of: \"ubuntu_20.04\", \"qnx_sdp_7.1\"")
+    + "\"distribution\" has to be one of: \"ubuntu_22.04\", \"qnx_sdp_7.1\", \"rhel9\"")
 
 def _get_substitutions(ctx):
   # We require that the label name is "register_foo_ext":
@@ -161,7 +166,7 @@ def _get_substitutions(ctx):
   subs = {"{NAME}": ctx.label.name[9:len(ctx.label.name)-4],
           "{EXTENSION_LIBRARY}": _get_extension_lib_path(ctx),
           "{VERSION}": ctx.attr.version,
-          "{LICENSE_FILE}": ctx.file.license_file.path,
+          "{LICENSE_FILE}": _get_license_filepath(ctx),
           "{UUID}": ctx.attr.uuid,
           "{URL}": ctx.attr.url,
           "{GIT_REPOSITORY}": ctx.attr.git_repository,
@@ -205,8 +210,8 @@ def _register_ext_impl(ctx):
 
   # Register extension. Collect all registration inputs
   action_inputs = ctx.attr.extension.files.to_list()
-  action_inputs += ctx.attr._registry[DefaultInfo].data_runfiles.files.to_list()
-  action_inputs += ctx.attr._registry[DefaultInfo].default_runfiles.files.to_list()
+  action_inputs += ctx.attr.extension[DefaultInfo].data_runfiles.files.to_list()
+  action_inputs += ctx.attr.extension[DefaultInfo].default_runfiles.files.to_list()
 
   if ctx.attr.local_dependencies:
       action_inputs += ctx.files.local_dependencies
@@ -226,11 +231,15 @@ def _register_ext_impl(ctx):
   for binary in ctx.attr.binaries:
       action_inputs += binary.files.to_list()
 
-  # Uncomment below line to make license file mandatory for all extensions
-  # action_inputs.append(ctx.file.license_file)
+  if ctx.file.license_file != None:
+      action_inputs.append(ctx.file.license_file)
 
   # Add all files from dependent extensions
   action_inputs += _get_local_deps_files(ctx) + _get_local_deps_runfiles(ctx)
+
+  # Add registry tool and its dependencies
+  action_inputs += ctx.attr._registry[DefaultInfo].data_runfiles.files.to_list()
+  action_inputs += ctx.attr._registry[DefaultInfo].default_runfiles.files.to_list()
 
   if ctx.attr.arch in ["x86_64"]:
     # Update dependency info in manifest
@@ -308,7 +317,7 @@ register_ext_rule = rule(
             mandatory = True),
     "license_file": attr.label(
             allow_single_file = ["LICENSE"],
-            mandatory = True),
+            mandatory = False),
     "uuid": attr.string(
             doc = "uuid of the extension",
             mandatory = True),
@@ -322,13 +331,13 @@ register_ext_rule = rule(
             doc = "deployment priority of extension",
             default = "P0"),
     "arch": attr.string(
-            doc = "deployment plaform arch",
+            doc = "deployment platform arch",
             mandatory = True),
     "os": attr.string(
-            doc = "deployment plaform os",
+            doc = "deployment platform os",
             mandatory = True),
     "distribution": attr.string(
-            doc = "deployment plaform distribution",
+            doc = "deployment platform distribution",
             mandatory = True),
     "cuda": attr.string(
             doc = "cuda compute stack version"),
@@ -381,9 +390,9 @@ def register_extension(
         extension,
         uuid,
         version,
-        license_file,
         url,
         priority,
+        license_file = None,
         license = None,
         arch = None,
         os = None,

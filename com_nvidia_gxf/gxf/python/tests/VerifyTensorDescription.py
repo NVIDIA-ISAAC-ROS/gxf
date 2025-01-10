@@ -14,20 +14,18 @@
  See the License for the specific language governing permissions and
  limitations under the License.
 """
-from gxf.core import MessageEntity
+import numpy as np
+
 from gxf.std import Clock
-from gxf.std import MemoryStorageType
 from gxf.std import Receiver
-from gxf.std import Shape
 from gxf.std import Tensor
 from gxf.python_codelet import CodeletAdapter
-import ctypes
 
 class VerifyTensorDescription(CodeletAdapter):
     """ Python codelet to receive a msg on tick()
 
     Python implementation of TensorDescription.
-    Receives a message on the Reciever on every tick()
+    Receives a message on the Receiver on every tick()
     """
 
     def start(self):
@@ -49,12 +47,13 @@ class VerifyTensorDescription(CodeletAdapter):
 
         SHAPE_SIZE=1024
         SHAPE_RANK=2
-        BYTES_PER_ELEMENT=32
+        BYTES_PER_ELEMENT=4
 
         # The values are from CreateTensor.py, should be same as host_tensor
-        assert(tensor0.get_tensor_description().shape.size()==SHAPE_SIZE)
-        assert(tensor0.get_tensor_description().shape.rank()==SHAPE_RANK)
-        assert(tensor0.get_tensor_description().bytes_per_element==BYTES_PER_ELEMENT)
+        np.testing.assert_equal(tensor0.get_tensor_description().shape.size(), SHAPE_SIZE)
+        np.testing.assert_equal(tensor0.get_tensor_description().shape.rank(), SHAPE_RANK)
+        np.testing.assert_equal(tensor0.get_tensor_description().bytes_per_element,
+                                BYTES_PER_ELEMENT)
 
         return
 

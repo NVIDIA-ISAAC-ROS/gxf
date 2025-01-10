@@ -1,5 +1,5 @@
 """
-Copyright (c) 2023, NVIDIA CORPORATION. All rights reserved.
+Copyright (c) 2023-2024, NVIDIA CORPORATION. All rights reserved.
 
 NVIDIA CORPORATION and its licensors retain all intellectual property
 and proprietary rights in and to this software, related documentation
@@ -40,12 +40,12 @@ def _prepare_registry_script(repository_ctx):
     # Install registry if has not been installed
     registry_cmd = _get_registry_cmd(repository_ctx)
     if registry_cmd != "":
-        print("Registry CLI is alreay installed")
+        print("Registry CLI is already installed")
         return (registry_cmd)
-    tar_file = "registry_binary-any-any-release-23.04_20230420_71698e3f_internal.tar"
+    tar_file = "registry_binary-any-any-master_20240222_dab14706_internal.tar"
     exec_res = repository_ctx.execute([
         "wget",
-        "https://urm.nvidia.com/artifactory/sw-isaac-gxf-generic-local/nightly/release-23.04/" +
+        "https://urm.nvidia.com/artifactory/sw-isaac-gxf-generic-local/release/engineering/24.02-r4.0.0/" +
         tar_file,
     ])
     if exec_res.return_code != 0:
@@ -124,7 +124,7 @@ def _graph_create_repo(repository_ctx, registry_cmd, repo_name):
             "-o",
             "nv-gxf-dev",
             "-t",
-            "ngc-public",
+            "dev-4",
         ])
         if exec_res.return_code != 0:
             print("[WARNING] Failed to add registry repo. Error:\n" +
@@ -244,7 +244,7 @@ gxf_import_ext = repository_rule(
             ),
             "distribution": attr.string(
                 mandatory = True,
-                default = "ubuntu_20.04",
+                default = "ubuntu_22.04",
             ),
             "os": attr.string(
                 mandatory = True,
@@ -335,7 +335,7 @@ publish_extension_rule = rule(
             ),
             "distribution": attr.string(
                 mandatory = True,
-                default = "ubuntu_20.04",
+                default = "ubuntu_22.04",
             ),
             "os": attr.string(
                 mandatory = True,

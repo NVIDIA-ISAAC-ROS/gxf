@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2021-2023, NVIDIA CORPORATION. All rights reserved.
+Copyright (c) 2021-2024, NVIDIA CORPORATION. All rights reserved.
 
 NVIDIA CORPORATION and its licensors retain all intellectual property
 and proprietary rights in and to this software, related documentation
@@ -23,7 +23,7 @@ GXF_EXT_FACTORY_BEGIN()
 GXF_EXT_FACTORY_SET_INFO(0x9e6e55d41bc911ec, 0x96210242ac130002,
                          "BehaviorTreeExtension",
                          "Extension with behavior tree components",
-                         "Nvidia_Gxf", "0.3.0", "NVIDIA");
+                         "Nvidia_Gxf", "0.6.0", "NVIDIA");
 GXF_EXT_FACTORY_SET_DISPLAY_INFO("Behavior Tree Extension", "Behavior Tree",
                                  "GXF Behavior Tree Extension");
 GXF_EXT_FACTORY_ADD(

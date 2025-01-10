@@ -39,7 +39,7 @@ class FixedMap {
   template <typename TContainer>
   using ConstIterator = Iterator<const TContainer, const typename TContainer::value_type>;
 
-  // Use STL naming convension for compatibility with STL algorithms
+  // Use STL naming convention for compatibility with STL algorithms
   using key_type               = Key;
   using mapped_type            = T;
   using value_type             = std::pair<const key_type, mapped_type>;
@@ -363,7 +363,7 @@ class FixedMap {
     return kSuccess;
   }
 
-  // Assings an the value to the given key if it exists, else creates a new object
+  // Assigns an the value to the given key if it exists, else creates a new object
   template <typename... Args>
   Expected<void> insert_or_assign(Args&&... args) {
     value_type value(std::forward<Args>(args)...);

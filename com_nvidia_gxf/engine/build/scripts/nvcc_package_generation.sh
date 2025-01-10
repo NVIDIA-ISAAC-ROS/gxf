@@ -51,7 +51,7 @@ function generate_nvcc_package () {
     echo "Using output path:" $output_path
 
 
-    # A list of CUDA packages and dependecies to install.
+    # A list of CUDA packages and dependencies to install.
     # Note, while dpkg doesn't install dependencies automatically,
     # it will issue an error, if a dependency is missing.
     local packages=(
@@ -82,7 +82,7 @@ function generate_nvcc_package () {
     mkdir -p output/db/{updates,info,triggers}
     touch output/db/{status,diversions,statoverride}
 
-    # Install sellected CUDA and CuDNN packages into the output folder.
+    # Install selected CUDA and CuDNN packages into the output folder.
     fakeroot dpkg --log=/dev/null --admindir=output/db --instdir=output \
         --ignore-depends=$ignore_dependencies -i ${packages[@]/%/*}
     cd -

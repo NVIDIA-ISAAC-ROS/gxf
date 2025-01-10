@@ -38,6 +38,10 @@ Expected<void> RouterGroup::syncInbox(const Entity& entity) {
     const auto& router = routers_.at(i).value();
     result &= router->syncInbox(entity);
   }
+  for (size_t i = 0; i < routers_.size(); i++) {
+    const auto& router = routers_.at(i).value();
+    result &= router->wait(entity);
+  }
   return result;
 }
 

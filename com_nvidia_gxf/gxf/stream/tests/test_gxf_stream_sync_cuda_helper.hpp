@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-FileCopyrightText: Copyright (c) 2022-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * SPDX-License-Identifier: Apache-2.0
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -25,6 +25,7 @@
 
 #include "common/assert.hpp"
 #include "gxf/cuda/cuda_common.hpp"
+#include "gxf/cuda/cuda_stream.hpp"
 #include "gxf/cuda/cuda_stream_id.hpp"
 #include "gxf/cuda/cuda_stream_pool.hpp"
 #include "gxf/std/allocator.hpp"
@@ -125,8 +126,6 @@ class StreamTensorGeneratorNew : public StreamBasedOpsNew {
 
     stream_sync = stream_sync_.get();
 
-    GXF_ASSERT_SUCCESS(stream_sync->initialize());
-
     void *syncObj{nullptr};
     GXF_ASSERT_SUCCESS(stream_sync->allocate_sync_object(static_cast<SyncType>(signaler_.get()),
                                                          static_cast<SyncType>(waiter_.get()),
@@ -141,8 +140,6 @@ class StreamTensorGeneratorNew : public StreamBasedOpsNew {
 
     return GXF_SUCCESS;
   }
-
-  gxf_result_t start() override { return GXF_SUCCESS; }
 
   gxf_result_t tick() override {
     Expected<Entity> maybe_dev_msg = Entity::New(context());
@@ -183,8 +180,6 @@ class StreamTensorGeneratorNew : public StreamBasedOpsNew {
 
     return GXF_SUCCESS;
   }
-
-  gxf_result_t stop() override { return GXF_SUCCESS; }
 
   gxf_result_t registerInterface(Registrar* registrar) override {
     Expected<void> result;
@@ -274,7 +269,7 @@ class DotProductExeNew {
     GXF_ASSERT(rx_ && tx_ && tensor_pool_, "dotproduct received empty in_msg");
 
     // get tensors
-    auto in_tensors = in_msg.findAll<Tensor>();
+    auto in_tensors = in_msg.findAllHeap<Tensor>();
     GXF_ASSERT(in_tensors, "failed to find Tensors in in_msg");
     GXF_ASSERT(in_tensors->size() == 2, "doesn't find Tensors in in_msg");
     GXF_ASSERT(in_tensors->at(0).value()->rank() == 2, "Input tensor rank is not 2");
@@ -362,8 +357,6 @@ class CublasDotProductNew : public StreamBasedOpsNew {
   }
 
   // gxf_result_t start() override { return ToResultCode(initOpsEvent()); }
-  gxf_result_t start() override { return GXF_SUCCESS; }
-  gxf_result_t stop() override { return GXF_SUCCESS; }
 
   gxf_result_t tick() override {
     Expected<Entity> in_msg = rx_->receive();
@@ -420,9 +413,6 @@ class HostDotProductNew : public Codelet {
     return GXF_SUCCESS;
   }
 
-  gxf_result_t start() override { return GXF_SUCCESS; }
-  gxf_result_t stop() override { return GXF_SUCCESS; }
-
   gxf_result_t tick() override {
     Expected<Entity> in_msg = rx_->receive();
 
@@ -450,9 +440,6 @@ class HostDotProductNew : public Codelet {
 // Stream based Memory copy from device to host
 class MemCpy2HostNew : public StreamBasedOpsNew {
  public:
-  gxf_result_t start() override { return GXF_SUCCESS; }
-  gxf_result_t stop() override { return GXF_SUCCESS; }
-
   gxf_result_t tick() override {
     auto in = rx_->receive();
     GXF_ASSERT(in, "rx received empty message");
@@ -511,9 +498,6 @@ class MemCpy2HostNew : public StreamBasedOpsNew {
 // Equal verification
 class VerifyEqualNew : public Codelet {
  public:
-  gxf_result_t start() override { return GXF_SUCCESS; }
-  gxf_result_t stop() override { return GXF_SUCCESS; }
-
   gxf_result_t tick() override {
     GXF_LOG_DEBUG("verifying frame: %d", count_++);
     auto in0 = rx0_->receive();

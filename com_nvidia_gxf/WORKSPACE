@@ -1,5 +1,5 @@
 """
-Copyright (c) 2020-2022, NVIDIA CORPORATION. All rights reserved.
+Copyright (c) 2020-2024, NVIDIA CORPORATION. All rights reserved.
 
 NVIDIA CORPORATION and its licensors retain all intellectual property
 and proprietary rights in and to this software, related documentation
@@ -16,6 +16,9 @@ load("//gxf:repo.bzl", "nv_gxf_git_repository", "nv_gxf_http_archive", "nv_gxf_n
 load("//third_party:cuda.bzl", "cuda_workspace")
 load("//third_party:gxf.bzl", "gxf_test_data", "gxf_workspace", "gxf_python_workspace", "gxf_tools_workspace")
 load("//third_party:nvsci.bzl", "nvsci_workspace")
+load("//third_party/ucx:ucx.bzl", "ucx_workspace")
+
+ucx_workspace()
 
 nvsci_workspace()
 
@@ -36,17 +39,35 @@ load("//engine/build/toolchain:toolchain.bzl", "toolchain_configure")
 
 toolchain_configure(name = "toolchain")
 
+# Register python toolchain for various python versions
+register_toolchains("//engine/build/toolchain/python:py_toolchain")
+
+# Register go toolchain.
+load("@io_bazel_rules_go//go:deps.bzl", "go_register_toolchains")
+go_register_toolchains()
+
+# Register docker toolchain.
+load(
+    "@io_bazel_rules_docker//toolchains/docker:toolchain.bzl",
+    docker_toolchain_configure = "toolchain_configure",
+)
+docker_toolchain_configure(name = "docker_config", client_config = "$HOME/.docker", docker_path = "/usr/bin/docker")
+
 ####################################################################################################
 
 # Load compilation database repo used to support static analysis tools
-nv_gxf_git_repository(
+# Package created from - https://github.com/xiay-nv/bazel-compilation-database.git
+# commit = "c058a4f4646849fa11a3c71f0efd35ae776e8f02"
+nv_gxf_http_archive(
     name = "compdb",
-    commit = "c058a4f4646849fa11a3c71f0efd35ae776e8f02",
+    sha256 = "279299e9fda917a3793b4541dfa4d4bcff02d88d9e11191bbc79f659cb6cf72c",
+    strip_prefix = "bazel-compilation-database-c058a4f4646849fa11a3c71f0efd35ae776e8f02",
+    url = "https://urm.nvidia.com/artifactory/sw-isaac-gxf-generic-local/dependencies/external/bazel-compilation-database/c058a4f4646849fa11a3c71f0efd35ae776e8f02.tar.gz",
     licenses = [
         "Apache License 2.0",
         "https://github.com/xiay-nv/bazel-compilation-database/blob/c058a4f4/LICENSE",
     ],
-    remote = "https://github.com/xiay-nv/bazel-compilation-database.git",
+    type = "tar.gz",
 )
 
 load("@compdb//:config.bzl", "config_clang_compdb")
@@ -61,9 +82,45 @@ pip_install(
     name = "pip_dependencies",
     requirements = "//registry/build:requirements.txt"
 )
+pip_install(
+    name = "pip_deps_scripts",
+    requirements = "//engine/build/scripts:requirements.txt",
+)
 
 load("@rules_pkg//:deps.bzl", "rules_pkg_dependencies")
 rules_pkg_dependencies()
 
-# Register python toolchain for various python versions
-register_toolchains("//engine/build/toolchain/python:py_toolchain")
+
+#####################################################################################
+# The global base images for GXF
+load("//bzl:docker_images.bzl", "docker_images")
+docker_images()
+
+load("@io_bazel_rules_go//go:deps.bzl", "go_rules_dependencies")
+go_rules_dependencies()
+
+load("@bazel_gazelle//:deps.bzl", "gazelle_dependencies")
+gazelle_dependencies()
+
+load("@io_bazel_rules_docker//repositories:repositories.bzl", container_repositories = "repositories")
+container_repositories()
+load("@io_bazel_rules_docker//repositories:deps.bzl", container_deps = "deps")
+container_deps()
+
+#####################################################################################
+
+#####################################################################################
+
+# ipc dependencies
+load("//third_party/ipc:ipc.bzl", "ipc_workspace")
+ipc_workspace()
+
+# Load boost package
+load("@com_github_nelhage_rules_boost//:boost/boost.bzl", "boost_deps")
+boost_deps()
+
+# grpc dependencies
+load("@com_github_grpc_grpc//bazel:grpc_deps.bzl", "grpc_deps")
+grpc_deps()
+load("@com_github_grpc_grpc//bazel:grpc_extra_deps.bzl", "grpc_extra_deps")
+grpc_extra_deps()

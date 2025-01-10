@@ -1,5 +1,5 @@
 """
- SPDX-FileCopyrightText: Copyright (c) 2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ SPDX-FileCopyrightText: Copyright (c) 2022-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  SPDX-License-Identifier: Apache-2.0
 
  Licensed under the Apache License, Version 2.0 (the "License");
@@ -21,11 +21,14 @@ load("@rules_cc//cc:defs.bzl", "cc_library")
 cc_library(
     name = "CudaExtension",
     hdrs = [
+        "cuda_allocator.hpp",
+        "cuda_buffer.hpp",
         "cuda_common.hpp",
         "cuda_event.hpp",
         "cuda_stream.hpp",
         "cuda_stream_id.hpp",
         "cuda_stream_pool.hpp",
+        "cuda_scheduling_terms.hpp",
     ],
     include_prefix = "gxf/cuda",
     visibility = ["//visibility:public"],

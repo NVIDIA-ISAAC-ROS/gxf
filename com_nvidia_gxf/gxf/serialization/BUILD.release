@@ -1,5 +1,5 @@
 """
- SPDX-FileCopyrightText: Copyright (c) 2021-2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ SPDX-FileCopyrightText: Copyright (c) 2021-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  SPDX-License-Identifier: Apache-2.0
 
  Licensed under the Apache License, Version 2.0 (the "License");
@@ -29,12 +29,13 @@ nv_gxf_ext_deps(name = "serialization_ext_deps",
 alias(
     name = "libgxf_serialization.so",
     actual = select({
-        "@com_nvidia_gxf//engine/build:platform_x86_64_cuda_11_8": "//gxf_x86_64_cuda_11_8/serialization:libgxf_serialization.so_release",
-        "@com_nvidia_gxf//engine/build:platform_x86_64_cuda_12_1": "//gxf_x86_64_cuda_12_1/serialization:libgxf_serialization.so_release",
-        "@com_nvidia_gxf//engine/build:platform_hp11_sbsa": "//gxf_hp11_sbsa/serialization:libgxf_serialization.so_release",
-        "@com_nvidia_gxf//engine/build:platform_hp20_sbsa": "//gxf_hp20_sbsa/serialization:libgxf_serialization.so_release",
+        "@com_nvidia_gxf//engine/build:platform_x86_64_cuda_12_2": "//gxf_x86_64_cuda_12_2/serialization:libgxf_serialization.so_release",
+        "@com_nvidia_gxf//engine/build:platform_x86_64_cuda_12_6": "//gxf_x86_64_cuda_12_6/serialization:libgxf_serialization.so_release",
+        "@com_nvidia_gxf//engine/build:platform_x86_64_rhel9_cuda_12_2": "//gxf_x86_64_rhel9_cuda_12_2/serialization:libgxf_serialization.so_release",
         "@com_nvidia_gxf//engine/build:platform_hp21ea_sbsa": "//gxf_hp21ea_sbsa/serialization:libgxf_serialization.so_release",
-        "@com_nvidia_gxf//engine/build:platform_jetpack51": "//gxf_jetpack51/serialization:libgxf_serialization.so_release",
+        "@com_nvidia_gxf//engine/build:platform_hp21ga_sbsa": "//gxf_hp21ga_sbsa/serialization:libgxf_serialization.so_release",
+        "@com_nvidia_gxf//engine/build:platform_jetpack60": "//gxf_jetpack60/serialization:libgxf_serialization.so_release",
+        "@com_nvidia_gxf//engine/build:platform_jetpack61": "//gxf_jetpack61/serialization:libgxf_serialization.so_release",
     }),
     tags = ["manual"],
     visibility = ["//visibility:public"],
@@ -64,12 +65,13 @@ cc_import(
 cc_library(
     name = "entity_serializer",
     srcs = select({
-        "@com_nvidia_gxf//engine/build:platform_x86_64_cuda_11_8": ["//gxf_x86_64_cuda_11_8/serialization:libentity_serializer.lo_release"],
-        "@com_nvidia_gxf//engine/build:platform_x86_64_cuda_12_1": ["//gxf_x86_64_cuda_12_1/serialization:libentity_serializer.lo_release"],
-        "@com_nvidia_gxf//engine/build:platform_hp11_sbsa": ["//gxf_hp11_sbsa/serialization:libentity_serializer.lo_release"],
-        "@com_nvidia_gxf//engine/build:platform_hp20_sbsa": ["//gxf_hp20_sbsa/serialization:libentity_serializer.lo_release"],
+        "@com_nvidia_gxf//engine/build:platform_x86_64_cuda_12_2": ["//gxf_x86_64_cuda_12_2/serialization:libentity_serializer.lo_release"],
+        "@com_nvidia_gxf//engine/build:platform_x86_64_cuda_12_6": ["//gxf_x86_64_cuda_12_6/serialization:libentity_serializer.lo_release"],
+        "@com_nvidia_gxf//engine/build:platform_x86_64_rhel9_cuda_12_2": ["//gxf_x86_64_rhel9_cuda_12_2/serialization:libentity_serializer.lo_release"],
         "@com_nvidia_gxf//engine/build:platform_hp21ea_sbsa": ["//gxf_hp21ea_sbsa/serialization:libentity_serializer.lo_release"],
-        "@com_nvidia_gxf//engine/build:platform_jetpack51": ["//gxf_jetpack51/serialization:libentity_serializer.lo_release"],
+        "@com_nvidia_gxf//engine/build:platform_hp21ga_sbsa": ["//gxf_hp21ga_sbsa/serialization:libentity_serializer.lo_release"],
+        "@com_nvidia_gxf//engine/build:platform_jetpack60": ["//gxf_jetpack60/serialization:libentity_serializer.lo_release"],
+        "@com_nvidia_gxf//engine/build:platform_jetpack61": ["//gxf_jetpack61/serialization:libentity_serializer.lo_release"],
     }),
     hdrs = ["entity_serializer.hpp"],
     linkstatic = True,
@@ -81,12 +83,13 @@ cc_library(
 cc_library(
     name = "serialization_buffer",
     srcs = select({
-        "@com_nvidia_gxf//engine/build:platform_x86_64_cuda_11_8": ["//gxf_x86_64_cuda_11_8/serialization:libserialization_buffer.lo_release"],
-        "@com_nvidia_gxf//engine/build:platform_x86_64_cuda_12_1": ["//gxf_x86_64_cuda_12_1/serialization:libserialization_buffer.lo_release"],
-        "@com_nvidia_gxf//engine/build:platform_hp11_sbsa": ["//gxf_hp11_sbsa/serialization:libserialization_buffer.lo_release"],
-        "@com_nvidia_gxf//engine/build:platform_hp20_sbsa": ["//gxf_hp20_sbsa/serialization:libserialization_buffer.lo_release"],
+        "@com_nvidia_gxf//engine/build:platform_x86_64_cuda_12_2": ["//gxf_x86_64_cuda_12_2/serialization:libserialization_buffer.lo_release"],
+        "@com_nvidia_gxf//engine/build:platform_x86_64_cuda_12_6": ["//gxf_x86_64_cuda_12_6/serialization:libserialization_buffer.lo_release"],
+        "@com_nvidia_gxf//engine/build:platform_x86_64_rhel9_cuda_12_2": ["//gxf_x86_64_rhel9_cuda_12_2/serialization:libserialization_buffer.lo_release"],
         "@com_nvidia_gxf//engine/build:platform_hp21ea_sbsa": ["//gxf_hp21ea_sbsa/serialization:libserialization_buffer.lo_release"],
-        "@com_nvidia_gxf//engine/build:platform_jetpack51": ["//gxf_jetpack51/serialization:libserialization_buffer.lo_release"],
+        "@com_nvidia_gxf//engine/build:platform_hp21ga_sbsa": ["//gxf_hp21ga_sbsa/serialization:libserialization_buffer.lo_release"],
+        "@com_nvidia_gxf//engine/build:platform_jetpack60": ["//gxf_jetpack60/serialization:libserialization_buffer.lo_release"],
+        "@com_nvidia_gxf//engine/build:platform_jetpack61": ["//gxf_jetpack61/serialization:libserialization_buffer.lo_release"],
     }),
     hdrs = ["serialization_buffer.hpp"],
     linkstatic = True,

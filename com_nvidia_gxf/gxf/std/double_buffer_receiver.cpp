@@ -23,9 +23,7 @@ gxf_result_t DoubleBufferReceiver::registerInterface(Registrar* registrar) {
 }
 
 gxf_result_t DoubleBufferReceiver::initialize() {
-  if (capacity_ == 0) {
-    return GXF_ARGUMENT_OUT_OF_RANGE;
-  }
+  if (capacity_ == 0) { return GXF_ARGUMENT_OUT_OF_RANGE; }
   queue_ = std::make_unique<queue_t>(
       capacity_, (::gxf::staging_queue::OverflowBehavior)(policy_.get()), Entity{});
   return GXF_SUCCESS;
@@ -34,9 +32,13 @@ gxf_result_t DoubleBufferReceiver::initialize() {
 gxf_result_t DoubleBufferReceiver::deinitialize() {
   // Empty queue
   if (!queue_) {
-    GXF_LOG_ERROR("Bad Queue in DoubleBufferReceiver with name '%s' and cid [C%05zu]",
-                  name(), cid());
+    GXF_LOG_ERROR("Bad Queue in DoubleBufferReceiver with name '%s' and cid [C%05zu]", name(),
+                  cid());
     return GXF_CONTRACT_INVALID_SEQUENCE;
+  }
+  if (size() != 0) {
+    GXF_LOG_WARNING("Unprocessed num of message %lu in queue: %s:%s", size(), entity().name(),
+                    name());
   }
   queue_->popAll();
   queue_->sync();
@@ -47,8 +49,8 @@ gxf_result_t DoubleBufferReceiver::deinitialize() {
 gxf_result_t DoubleBufferReceiver::pop_abi(gxf_uid_t* uid) {
   if (uid == nullptr) { return GXF_ARGUMENT_NULL; }
   if (!queue_) {
-    GXF_LOG_ERROR("Bad Queue in DoubleBufferReceiver with name '%s' and cid [C%05zu]",
-                  name(), cid());
+    GXF_LOG_ERROR("Bad Queue in DoubleBufferReceiver with name '%s' and cid [C%05zu]", name(),
+                  cid());
     return GXF_FAILURE;
   }
 

@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2021, NVIDIA CORPORATION. All rights reserved.
+Copyright (c) 2021-2023, NVIDIA CORPORATION. All rights reserved.
 
 NVIDIA CORPORATION and its licensors retain all intellectual property
 and proprietary rights in and to this software, related documentation
@@ -38,9 +38,8 @@ Expected<void> VideoBuffer::resizeCustom(VideoBufferInfo buffer_info, uint64_t s
 }
 
 Expected<void> VideoBuffer::wrapMemory(VideoBufferInfo buffer_info, uint64_t size,
-                                      MemoryStorageType storage_type,
-                                      void* pointer,
-                                      release_function_t release_func) {
+                                       MemoryStorageType storage_type, void* pointer,
+                                       release_function_t release_func) {
   auto result = memory_buffer_.freeBuffer();
   if (!result) { return ForwardError(result); }
 
@@ -52,9 +51,9 @@ Expected<void> VideoBuffer::wrapMemory(VideoBufferInfo buffer_info, uint64_t siz
   return Success;
 }
 
-Expected<void> VideoBuffer::moveToTensor(Handle<Tensor>& tensor) {
+Expected<void> VideoBuffer::moveToTensor(Tensor* tensor) {
   if (!tensor) {
-    GXF_LOG_ERROR("VideoBuffer received invalid tensor handle");
+    GXF_LOG_ERROR("VideoBuffer received invalid tensor pointer");
     return Unexpected{GXF_ARGUMENT_NULL};
   }
 
@@ -66,9 +65,11 @@ Expected<void> VideoBuffer::moveToTensor(Handle<Tensor>& tensor) {
   auto w = static_cast<int32_t>(buffer_info_.width);
 
   if ((c < 1) || (h < 1) || (w < 1)) {
-      GXF_LOG_ERROR("VideoBuffer cannot be converted to tensor."
-                    " Invalid dimensions [CHW]:[%d,%d,%d]", c, h, w);
-      return Unexpected{GXF_INVALID_DATA_FORMAT};
+    GXF_LOG_ERROR(
+        "VideoBuffer cannot be converted to tensor."
+        " Invalid dimensions [CHW]:[%d,%d,%d]",
+        c, h, w);
+    return Unexpected{GXF_INVALID_DATA_FORMAT};
   }
 
   // Ignore channel dims of 1
@@ -93,6 +94,18 @@ Expected<void> VideoBuffer::moveToTensor(Handle<Tensor>& tensor) {
   return result;
 }
 
+Expected<void> VideoBuffer::moveToTensor(Handle<Tensor>& tensor) {
+  if (!tensor) {
+    GXF_LOG_ERROR("VideoBuffer received invalid tensor handle");
+    return Unexpected{GXF_ARGUMENT_NULL};
+  }
+  auto result = tensor.try_get();
+  if (!result) {
+    GXF_LOG_ERROR("VideoBuffer received invalid tensor handle");
+    return Unexpected{GXF_ARGUMENT_INVALID};
+  }
+  return moveToTensor(result.value());
+}
 
 }  // namespace gxf
 }  // namespace nvidia

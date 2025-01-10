@@ -1,4 +1,4 @@
-# Copyright (c) 2020-2022, NVIDIA CORPORATION.  All rights reserved.
+# Copyright (c) 2020-2024, NVIDIA CORPORATION.  All rights reserved.
 #
 # NVIDIA CORPORATION and its licensors retain all intellectual property
 # and proprietary rights in and to this software, related documentation
@@ -196,9 +196,9 @@ class Extension:
             logger.error("Platform attribute does not match requirement"
                          "\"os\" has to be one of : \"linux\", \"qnx\"")
             return False
-        if platform["distribution"] not in ["ubuntu_20.04", "qnx_sdp_7.1"]:
+        if platform["distribution"] not in ["ubuntu_22.04", "qnx_sdp_7.1", "rhel9"]:
             logger.error("Platform attribute does not match the requirement. "
-            + "\"distribution\" has to be one of: \"ubuntu_20.04\", \"qnx_sdp_7.1\"")
+            + "\"distribution\" has to be one of: \"ubuntu_22.04\", \"qnx_sdp_7.1\"")
             return False
         return True
 

@@ -1,5 +1,5 @@
 #! /usr/bin/python3
-# Copyright (c) 2020-2023, NVIDIA CORPORATION.  All rights reserved.
+# Copyright (c) 2020-2024, NVIDIA CORPORATION.  All rights reserved.
 #
 # NVIDIA CORPORATION and its licensors retain all intellectual property
 # and proprietary rights in and to this software, related documentation
@@ -51,7 +51,7 @@ setup(
     license = "NVIDIA proprietary",
     package_data ={{"registry/bindings": ["pygxf.so"],
     "registry/pytransform": ["_pytransform.so"]}},
-    install_requires = ["packaging","pyyaml", "result", "requests", "toml"],
+    install_requires = ["packaging==23.1","pyyaml==5.3.1", "result==0.10.0", "requests==2.25.1", "toml==0.10.2"],
     packages=["registry/cli", "registry/core", "registry/bindings",
               "registry/pytransform", "registry"],
     entry_points = {{"console_scripts": "{reg} = registry.run:main"}},
@@ -78,7 +78,7 @@ setup(
     author_email = "",
     license = "NVIDIA proprietary",
     package_data ={{"registry/bindings": ["pygxf.so"]}},
-    install_requires = ["packaging","pyyaml", "result", "requests", "toml"],
+    install_requires = ["packaging==23.1","pyyaml==5.3.1", "result==0.10.0", "requests==2.25.1", "toml==0.10.2"],
     packages=["registry/cli", "registry/core", "registry/bindings", "registry"],
     entry_points = {{"console_scripts": "{reg} = registry.run:main"}},
     platforms=["{platform}"],
@@ -226,7 +226,7 @@ def make_standalone_bin(yaml_content):
     os.chdir(BUILD_REGISTRY_BIN)
     data = ["registry/pytransform/_pytransform.so"] if enable_pyarmor else []
     data_dirs = [os.path.dirname(elm) for elm in data]
-    cmd = "pyinstaller --onefile registry/run.py "
+    cmd = "pyinstaller --onefile registry/run.py --hidden-import pkg_resources.extern"
     for i in range(len(data)):
         cmd += f" --add-data \"{data[i]}:{data_dirs[i]}\""
 

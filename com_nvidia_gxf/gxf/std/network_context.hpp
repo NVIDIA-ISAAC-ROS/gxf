@@ -25,6 +25,7 @@ namespace gxf {
 
 class NetworkContext : public Component {
  public:
+  virtual gxf_result_t init_context() = 0;
   // Finds transmitters and receivers passes the network context to transmitter
   // and receivers and make connection between them
   virtual Expected<void> addRoutes(const Entity& entity) = 0;

@@ -14,19 +14,17 @@
  See the License for the specific language governing permissions and
  limitations under the License.
 """
-from gxf.core import MessageEntity
-from gxf.std import MemoryStorageType
+import numpy as np
+
 from gxf.std import Receiver
-from gxf.std import Shape
 from gxf.std import Tensor
 from gxf.python_codelet import CodeletAdapter
-import ctypes
-import numpy as np
+
 class VerifyTensorInfo(CodeletAdapter):
     """ Python codelet to receive a msg on tick()
 
     Python implementation of test tensor info.
-    Receives a message on the Reciever on every tick()
+    Receives a message on the Receiver on every tick()
     """
 
     def start(self):
@@ -43,18 +41,17 @@ class VerifyTensorInfo(CodeletAdapter):
         tensor0 = tensors[0]
         tensor1 = tensors[1]
 
-        SHAPE_SIZE=32768
+        SHAPE_SIZE=4096
         SHAPE_RANK=2
         SHAPE_DIMENSIONS=[1024,1]
         TENSOR_STRIDES=[0,0]
 
         # The values are from CreateTensor.py, should be same as host_tensor
-        assert(tensor0.get_tensor_info()[1]==SHAPE_SIZE)
-        assert(tensor0.get_tensor_info()[3]==SHAPE_RANK)
-        assert(tensor0.get_tensor_info()[4]==SHAPE_DIMENSIONS)
-        assert(tensor0.get_tensor_info()[5]==TENSOR_STRIDES)
-        assert(np.array_equal(tensor1, np.int32([[1, 2, 4], [2, 3, 4]])))
-
+        np.testing.assert_equal(tensor0.get_tensor_info()[1], SHAPE_SIZE)
+        np.testing.assert_equal(tensor0.get_tensor_info()[3], SHAPE_RANK)
+        np.testing.assert_equal(tensor0.get_tensor_info()[4], SHAPE_DIMENSIONS)
+        np.testing.assert_equal(tensor0.get_tensor_info()[5], TENSOR_STRIDES)
+        np.testing.assert_array_equal(tensor1, np.int32([[1, 2, 4], [2, 3, 4]]))
         return
 
     def stop(self):

@@ -121,15 +121,33 @@ class Parameter:
                                 self._min_value, self._max_value, self._step_value)
         return result
 
+    @staticmethod
+    def round_nested_list(lst: Any) -> Any:
+        # Function to round float value to prevent precision loss
+            def round_float(item):
+                if isinstance(item, (float, int)):
+                    return round(item, 6)
+                elif isinstance(item, list):
+                    return [round_float(sub_item) for sub_item in item]
+                else:
+                    return item
+            if isinstance(lst, (float, int)):
+                return round(lst, 6)
+            elif isinstance(lst, list):
+                return [round_float(item) for item in lst]
+            else:
+                return lst
+
     def to_metadata(self):
         """ Create a yaml node from parameter
         """
+
         p_node = {}
         p_node['key'] = self._key
         p_node['headline'] = self._headline
         p_node['description'] = self._desc
         p_node['gxf_parameter_type'] = self._parameter_type
-        p_node['default'] = self._default
+        p_node['default'] = self.round_nested_list(self._default)
         p_node['handle_type'] = self._handle_type
         p_node['flags'] = self._flags
         p_node['rank'] = self._rank

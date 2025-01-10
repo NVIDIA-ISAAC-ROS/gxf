@@ -141,6 +141,40 @@ Expected<void> ExtensionLoader::load(const char* filename) {
   return result;
 }
 
+Expected<void> ExtensionLoader::registerRuntimeComponent(const gxf_tid_t& component_tid,
+                                                         const gxf_tid_t& ext_id) {
+  const auto ext_it = extension_factory_.find(ext_id);
+  if (ext_it == extension_factory_.end()) {
+    GXF_LOG_ERROR("Extension not found. Have you loaded it ?");
+    return Unexpected{GXF_EXTENSION_NOT_FOUND};
+  }
+
+  const auto extension = ext_it->second;
+  if (!extension->hasComponent(component_tid)) {
+    GXF_LOG_ERROR("Component not found. Have you loaded it in the extension ?");
+    return Unexpected{GXF_ENTITY_COMPONENT_NOT_FOUND};
+  }
+
+  const auto it = component_factory_.find(component_tid);
+  if (it != component_factory_.end()) {
+    GXF_LOG_ERROR("Duplicated component TID. TID: %016lx%016lx",
+                  component_tid.hash1, component_tid.hash2);
+    gxf_component_info_t info;
+    const auto result = extension->getComponentInfo(component_tid, &info);
+    if (result) {
+      GXF_LOG_ERROR("Component name: %s", info.base_name);
+    } else {
+      GXF_LOG_ERROR("Component name: (error)");
+    }
+    return Unexpected{GXF_FACTORY_DUPLICATE_TID};
+  }
+
+  std::unique_lock<std::shared_timed_mutex> lock(mutex_);
+  component_factory_[component_tid] = extension;
+  return Success;
+}
+
+
 Expected<void> ExtensionLoader::load(Extension* extension, void* handle) {
   {
     auto result = extension->checkInfo();
@@ -150,6 +184,8 @@ Expected<void> ExtensionLoader::load(Extension* extension, void* handle) {
     info.num_components = 0;
     result = extension->getInfo(&info);
     if (!result) { return ForwardError(result);}
+
+    GXF_LOG_VERBOSE("Loading extension: %s", info.name);
 
     // Check if the gxf core version used to compile the extension is compatible
     // with the current runtime version

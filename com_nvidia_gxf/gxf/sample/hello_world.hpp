@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-FileCopyrightText: Copyright (c) 2022-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * SPDX-License-Identifier: Apache-2.0
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -27,14 +27,10 @@ class HelloWorld : public Codelet {
  public:
   virtual ~HelloWorld() = default;
 
-  gxf_result_t start() override { return GXF_SUCCESS; }
-
   gxf_result_t tick() override {
     GXF_LOG_INFO("Hello world");
     return GXF_SUCCESS;
   }
-
-  gxf_result_t stop() override { return GXF_SUCCESS; }
 };
 
 }  // namespace gxf

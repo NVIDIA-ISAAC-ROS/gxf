@@ -1,6 +1,6 @@
 #!/bin/bash -e
 #
-# Copyright (c) 2021, NVIDIA CORPORATION.  All rights reserved.
+# Copyright (c) 2021-2024, NVIDIA CORPORATION.  All rights reserved.
 #
 # NVIDIA CORPORATION and its licensors retain all intellectual property
 # and proprietary rights in and to this software, related documentation
@@ -19,10 +19,10 @@ GXF_REPO_PATH="${ROOT}/com_nvidia_gxf"
 RELEASE_TARBALL_DIR="${ROOT}"
 RELEASE_TARBALL_FILE="gxf_isaac_release.tar.gz"
 
-SUPPORTED_PLATFORMS=("x86_64_cuda_11_8" "jetpack51")
+SUPPORTED_PLATFORMS=("x86_64_cuda_12_6" "jetpack61")
 
 # Arguments
-ISAAC_ROS_GXF_ROOT="${ROOT}/../../../ros_ws/src/isaac_ros_nitros/isaac_ros_gxf"
+ISAAC_ROS_GXF_ROOT="/workspaces/isaac_ros-dev/ros_ws/src/isaac_ros_nitros/isaac_ros_gxf"
 TARGET_GXF_DIR="${ISAAC_ROS_GXF_ROOT}/gxf/core"
 
 # Print utils
@@ -98,7 +98,7 @@ done
 # Help
 function usage {
   print_info "Usage: build_install_gxf_release.sh -i {path to isaac_ros_gxf package}"
-  print_info "Copyright (c) 2023, NVIDIA CORPORATION."
+  print_info "Copyright (c) 2023-2024, NVIDIA CORPORATION."
 }
 
 if [[ ! -d "$GXF_REPO_PATH" ]]; then
@@ -167,6 +167,9 @@ rsync -qrvm \
 --exclude "sample/" \
 --exclude "gxf/sample/" \
 --exclude "gxf/python_codelet/" \
+--exclude "gxf/ucx/" \
+--exclude "gxf/rmm/" \
+--exclude "gxf/app/" \
 --exclude "test/" \
 --exclude "*.sh" \
 --exclude "*.py" \

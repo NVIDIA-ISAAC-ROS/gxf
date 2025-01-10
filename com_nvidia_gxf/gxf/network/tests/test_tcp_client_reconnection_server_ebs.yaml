@@ -1,0 +1,95 @@
+%YAML 1.2
+# Copyright (c) 2023, NVIDIA CORPORATION.  All rights reserved.
+#
+# NVIDIA CORPORATION and its licensors retain all intellectual property
+# and proprietary rights in and to this software, related documentation
+# and any modifications thereto.  Any use, reproduction, disclosure or
+# distribution of this software and related documentation without an express
+# license agreement from NVIDIA CORPORATION is strictly prohibited.
+---
+name: server
+components:
+- name: channel_1
+  type: nvidia::gxf::test::MockTransmitter
+- name: channel_2
+  type: nvidia::gxf::test::MockTransmitter
+- name: allocator
+  type: nvidia::gxf::test::MockAllocator
+- name: component_serializer
+  type: nvidia::gxf::StdComponentSerializer
+  parameters:
+    allocator: allocator
+- name: entity_serializer
+  type: nvidia::gxf::StdEntitySerializer
+  parameters:
+    component_serializers: [ component_serializer ]
+- name: tcp_server
+  type: nvidia::gxf::TcpServer
+  parameters:
+    transmitters: [ channel_1, channel_2 ]
+    entity_serializer: entity_serializer
+    address: 127.0.0.1
+    port: 7000
+    timeout_period: 100ms
+    async_scheduling_term: async_st
+    max_duration_ms: 15000
+- name: async_st
+  type: nvidia::gxf::AsynchronousSchedulingTerm
+---
+name: receiver_1
+components:
+- name: input
+  type: nvidia::gxf::test::MockReceiver
+- type: nvidia::gxf::MessageAvailableSchedulingTerm
+  parameters:
+    receiver: input
+    min_size: 1
+- type: nvidia::gxf::PingRx
+  parameters:
+    signal: input
+- type: nvidia::gxf::test::StepCount
+  parameters:
+    expected_count: 2000
+---
+name: receiver_2
+components:
+- name: input
+  type: nvidia::gxf::test::MockReceiver
+- type: nvidia::gxf::MessageAvailableSchedulingTerm
+  parameters:
+    receiver: input
+    min_size: 1
+- type: nvidia::gxf::PingRx
+  parameters:
+    signal: input
+- type: nvidia::gxf::test::StepCount
+  parameters:
+    expected_count: 2000
+---
+components:
+- type: nvidia::gxf::Connection
+  parameters:
+    source: server/channel_1
+    target: receiver_1/input
+---
+components:
+- type: nvidia::gxf::Connection
+  parameters:
+    source: server/channel_2
+    target: receiver_2/input
+---
+components:
+- name: clock
+  type: nvidia::gxf::RealtimeClock
+- type: nvidia::gxf::EventBasedScheduler
+  parameters:
+    max_duration_ms: 15000
+    clock: clock
+    worker_thread_number: 4
+    stop_on_deadlock: true
+    stop_on_deadlock_timeout: 500
+
+    #- type: nvidia::gxf::JobStatistics
+    #  parameters:
+    #    clock: clock
+    #    codelet_statistics: true

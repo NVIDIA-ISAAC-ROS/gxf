@@ -1,5 +1,5 @@
 """
- SPDX-FileCopyrightText: Copyright (c) 2020-2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ SPDX-FileCopyrightText: Copyright (c) 2020-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  SPDX-License-Identifier: Apache-2.0
 
  Licensed under the Apache License, Version 2.0 (the "License");
@@ -60,23 +60,23 @@ py_binary(
     srcs = ["test_stress_cpu_gpu_storage.py"],
 )
 
-test_stress_brodcast_gather_yaml_files = [
-    "test_stress_brodcast_gather_greedy_gen.yaml",
-    "test_stress_brodcast_gather_multithread_gen.yaml",
+test_stress_broadcast_gather_yaml_files = [
+    "test_stress_broadcast_gather_greedy_gen.yaml",
+    "test_stress_broadcast_gather_multithread_gen.yaml",
 ]
 
 genrule(
-    name = "test_stress_brodcast_gather_gen",
-    outs = test_stress_brodcast_gather_yaml_files,
-    cmd = "$(location :test_stress_brodcast_gather) $(RULEDIR)",
-    message = "----- Generating the test_stress_brodcast_gather_gen.yaml file",
-    tools = [":test_stress_brodcast_gather"],
+    name = "test_stress_broadcast_gather_gen",
+    outs = test_stress_broadcast_gather_yaml_files,
+    cmd = "$(location :test_stress_broadcast_gather) $(RULEDIR)",
+    message = "----- Generating the test_stress_broadcast_gather_gen.yaml file",
+    tools = [":test_stress_broadcast_gather"],
     visibility = ["//visibility:public"],
 )
 
 py_binary(
-    name = "test_stress_brodcast_gather",
-    srcs = ["test_stress_brodcast_gather.py"],
+    name = "test_stress_broadcast_gather",
+    srcs = ["test_stress_broadcast_gather.py"],
 )
 
 test_stress_tensor_device_to_host_yaml_files = [
@@ -156,6 +156,18 @@ nv_gxf_app(
         "//gxf/test/extensions:test",
     ],
     gxf_file = "test_ping.yaml",
+    docker_base_image = "//engine/build:docker_base_image",
+    docker_repository = "nv-gxf-dev/dev-4",
+)
+
+nv_gxf_app(
+    name = "test_synchronization_multi",
+    extensions = [
+        "//gxf/std",
+        "//gxf/sample",
+        "//gxf/test/extensions:test",
+    ],
+    gxf_file = "test_synchronization_multi.yaml",
 )
 
 nv_gxf_app(
@@ -166,6 +178,16 @@ nv_gxf_app(
         "//gxf/test/extensions:test",
     ],
     gxf_file = "test_ping_multi_thread.yaml",
+)
+
+nv_gxf_app(
+    name = "test_ping_multithread_interrupt",
+    extensions = [
+        "//gxf/std",
+        "//gxf/sample",
+        "//gxf/test/extensions:test",
+    ],
+    gxf_file = "test_ping_multi_thread_interrupt.yaml",
 )
 
 nv_gxf_app(
@@ -292,6 +314,7 @@ nv_gxf_app(
     srcs = ["test_ping_graph.yaml", "test_ping_graph_parameters.yaml"],
 )
 
+
 nv_gxf_app(
     name = "test_timestamps",
     extensions = [
@@ -341,26 +364,26 @@ nv_gxf_app(
 )
 
 nv_gxf_app(
-    name = "test_stress_brodcast_gather_greedy_app",
+    name = "test_stress_broadcast_gather_greedy_app",
     extensions = [
         "//gxf/std",
         "//gxf/sample",
         "//gxf/npp",
         "//gxf/test/extensions:test",
     ],
-    gxf_file = "test_stress_brodcast_gather_greedy_gen.yaml",
+    gxf_file = "test_stress_broadcast_gather_greedy_gen.yaml",
 )
 
 
 nv_gxf_app(
-    name = "test_stress_brodcast_gather_multithread_app",
+    name = "test_stress_broadcast_gather_multithread_app",
     extensions = [
         "//gxf/std",
         "//gxf/sample",
         "//gxf/npp",
         "//gxf/test/extensions:test",
     ],
-    gxf_file = "test_stress_brodcast_gather_multithread_gen.yaml",
+    gxf_file = "test_stress_broadcast_gather_multithread_gen.yaml",
 )
 
 nv_gxf_app(
@@ -613,16 +636,6 @@ nv_gxf_app(
 )
 
 nv_gxf_app(
-    name = "test_camera_message",
-    extensions = [
-        "//gxf/std",
-        "//gxf/test/extensions:test",
-        "//gxf/multimedia"
-    ],
-    gxf_file = "test_camera_message.yaml",
-)
-
-nv_gxf_app(
     name = "test_ping_target_time_multi_thread",
     extensions = [
         "//gxf/std",
@@ -671,4 +684,159 @@ nv_gxf_app(
         "//gxf/test/extensions:test",
     ],
     gxf_file = "test_deadlock_timeout_greedy.yaml",
+)
+
+nv_gxf_test_app(
+    name= "test_ping_topics",
+    srcs = ["test_ping_topics.yaml"],
+    extensions = [
+        "//gxf/std",
+        "//gxf/sample",
+        "//gxf/test/extensions:test",
+    ],
+)
+
+nv_gxf_test_app(
+    name= "test_ping_multi_connect",
+    srcs = ["test_ping_multi_connect.yaml"],
+    extensions = [
+        "//gxf/std",
+        "//gxf/sample",
+        "//gxf/test/extensions:test",
+    ],
+)
+
+nv_gxf_test_app(
+    name = "test_ebs_mock_codelet",
+    srcs = ["test_ebs_mock_codelet.yaml"],
+    extensions = [
+        "//gxf/std",
+        "//gxf/sample",
+        "//gxf/test/extensions:test",
+    ],
+)
+
+nv_gxf_test_app(
+    name = "test_entity_group_default_ebs",
+    srcs = ["test_entity_group_default_ebs.yaml"],
+    extensions = [
+        "//gxf/std",
+        "//gxf/sample",
+        "//gxf/test/extensions:test",
+    ],
+)
+
+nv_gxf_test_app(
+    name = "test_entity_group_users_ebs",
+    srcs = ["test_entity_group_users_ebs.yaml"],
+    extensions = [
+        "//gxf/std",
+        "//gxf/sample",
+        "//gxf/test/extensions:test",
+    ],
+)
+
+nv_gxf_test_app(
+    name = "test_entity_group_default_and_users_ebs",
+    srcs = ["test_entity_group_default_and_users_ebs.yaml"],
+    extensions = [
+        "//gxf/std",
+        "//gxf/sample",
+        "//gxf/test/extensions:test",
+    ],
+)
+
+nv_gxf_test_app(
+    name = "test_entity_group_root_and_subgraph_ebs",
+    srcs = ["test_entity_group_root_and_subgraph_ebs.yaml"],
+    extensions = [
+        "//gxf/std",
+        "//gxf/sample",
+        "//gxf/test/extensions:test",
+    ],
+    data = [
+        "entity_group_subgraph.yaml"
+    ],
+)
+
+nv_gxf_test_app(
+    name = "hello_world_ebs",
+    srcs = ["test_hello_world_ebs.yaml"],
+    extensions = [
+        "//gxf/std",
+        "//gxf/sample",
+        "//gxf/test/extensions:test",
+    ],
+)
+
+nv_gxf_test_app(
+    name = "hello_world_ebs_unscheduled",
+    srcs = ["test_hello_world_ebs_unscheduled.yaml"],
+    extensions = [
+        "//gxf/std",
+        "//gxf/sample",
+        "//gxf/test/extensions:test",
+    ],
+)
+
+nv_gxf_test_app(
+    name = "test_ebs_pool",
+    srcs = ["test_ebs_pool.yaml"],
+    extensions = [
+        "//gxf/std",
+        "//gxf/sample",
+        "//gxf/test/extensions:test",
+    ],
+)
+
+
+nv_gxf_test_app(
+    name = "test_ping_target_time_ebs",
+    srcs = ["test_ping_target_time_ebs.yaml"],
+    extensions = [
+        "//gxf/std",
+        "//gxf/sample",
+        "//gxf/test/extensions:test",
+        "//gxf/multimedia"
+    ],
+)
+
+nv_gxf_test_app(
+    name = "test_message_available_frequency_throttler_ebs",
+    srcs = ["test_message_available_frequency_throttler_ebs.yaml"],
+    extensions = [
+        "//gxf/std",
+        "//gxf/sample",
+        "//gxf/test/extensions:test",
+    ],
+)
+
+nv_gxf_test_app(
+    name = "test_deadlock_timeout_ebs",
+    srcs = ["test_deadlock_timeout_ebs.yaml"],
+    extensions = [
+        "//gxf/std",
+        "//gxf/sample",
+        "//gxf/test/extensions:test",
+    ],
+)
+
+nv_gxf_test_app(
+    name = "test_or_scheduling_term",
+    srcs = ["test_ping_or_scheduling_term.yaml"],
+    extensions = [
+        "//gxf/std",
+        "//gxf/sample",
+        "//gxf/test/extensions:test",
+    ],
+)
+
+nv_gxf_test_app(
+    name = "test_or_scheduling_term_greedy",
+    srcs = ["test_ping_or_scheduling_term_greedy.yaml"],
+    extensions = [
+        "//gxf/std",
+        "//gxf/sample",
+        "//gxf/test/extensions:test",
+    ],
 )

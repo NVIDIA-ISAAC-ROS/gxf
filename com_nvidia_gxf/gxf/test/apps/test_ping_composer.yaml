@@ -1,5 +1,5 @@
 %YAML 1.2
-# SPDX-FileCopyrightText: Copyright (c) 2021 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2021-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,13 +17,13 @@
 dependencies:
 - extension: StandardExtension
   uuid: 8ec2d5d6-b5df-48bf-8dee-0252606fdd7e
-  version: 2.3.0
+  version: 2.6.0
 - extension: TestHelperExtension
   uuid: 1b99ffeb-c250-4ced-8117-62ac05969a50
-  version: 2.3.0
+  version: 2.6.0
 - extension: SampleExtension
   uuid: a6ad78b6-1682-11ec-9621-0242ac130002
-  version: 1.3.0
+  version: 1.6.0
 ---
 components:
 - name: downstream_receptive_scheduling_term0..f710

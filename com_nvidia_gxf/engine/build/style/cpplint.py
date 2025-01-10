@@ -3856,11 +3856,11 @@ def CheckBraces(filename, clean_lines, linenum, error):
   # its line, and the line after that should have an indent level equal to or
   # lower than the if. We also check for ambiguous if/else nesting without
   # braces.
-  if_else_match = Search(r'\b(if\s*\(|else\b)', line)
+  if_else_match = Search(r'\b(if\s*(|constexpr)\s*\(|else\b)', line)
   if if_else_match and not Match(r'\s*#', line):
     if_indent = GetIndentLevel(line)
     endline, endlinenum, endpos = line, linenum, if_else_match.end()
-    if_match = Search(r'\bif\s*\(', line)
+    if_match = Search(r'\bif\s*(|constexpr)\s*\(', line)
     if if_match:
       # This could be a multiline if condition, so find the end first.
       pos = if_match.end() - 1
@@ -5206,7 +5206,7 @@ def CheckForReferenceAndPointerSpacing(filename, clean_lines, linenum,
   if '&' not in line and '*' not in line:
     return
 
-  # Check if the line matchs a (const) Some::Type &|*var =
+  # Check if the line matches a (const) Some::Type &|*var =
   if Match(r'.*[\s\(](?:const\s*)?[a-zA-Z_]([\w<>]|::)*\s+[&\*]\s?[a-zA-Z_]+\s*=\s*', line):
     error(filename, linenum, 'whitespace/references_and_pointers', 2,
           'Pointers* and References& need the space after the operator')
@@ -5295,7 +5295,7 @@ def CheckForReferenceAndPointerSpacing(filename, clean_lines, linenum,
     # Once we reach the = sign, we're passed the type declaration
     if c == '=':
       break
-    # We have detected an occurence of ' &' or ' *',
+    # We have detected an occurrence of ' &' or ' *',
     if c != ' ' and c != '&' and detected:
       error(filename, linenum, 'whitespace/references_and_pointers', 2,
             'Pointers* and References& need the space after the operator')

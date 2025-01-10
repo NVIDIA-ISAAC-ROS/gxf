@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2020-2023, NVIDIA CORPORATION. All rights reserved.
+Copyright (c) 2020-2024, NVIDIA CORPORATION. All rights reserved.
 
 NVIDIA CORPORATION and its licensors retain all intellectual property
 and proprietary rights in and to this software, related documentation
@@ -16,6 +16,7 @@ license agreement from NVIDIA CORPORATION is strictly prohibited.
 #include <map>
 #include <memory>
 #include <mutex>
+#include <set>
 #include <string>
 #include <utility>
 #include <vector>
@@ -38,8 +39,9 @@ gxf_result_t EntityExecutor::initialize(Handle<Router> router,
   if (!network_router) { return GXF_ARGUMENT_NULL; }
   network_router_ = network_router;
 
-  statistics_ = std::make_shared<FixedVector<Handle<JobStatistics>, kMaxComponents>>
-    (FixedVector<Handle<JobStatistics>, kMaxComponents>());
+  FixedVector<Handle<JobStatistics>> jobStatistics;
+  jobStatistics.reserve(kMaxComponents);
+  statistics_ = std::make_shared<FixedVector<Handle<JobStatistics>>>(std::move(jobStatistics));
 
   nvtx_domain_ = nvtxDomainCreate("GXF");
 
@@ -67,7 +69,7 @@ gxf_result_t EntityExecutor::activate(gxf_context_t context, gxf_uid_t eid) {
   }
 
   // Added to active items
-  std::unique_lock<std::mutex> lock(mutex_);
+  std::unique_lock<std::shared_timed_mutex> lock(mutex_);
   items_.emplace(eid, std::move(item));
 
   return GXF_SUCCESS;
@@ -77,7 +79,7 @@ gxf_result_t EntityExecutor::deactivate(gxf_uid_t eid) {
   // Find and remove the item under lock
   std::unique_ptr<EntityItem> item;
   {
-    std::unique_lock<std::mutex> lock(mutex_);
+    std::unique_lock<std::shared_timed_mutex> lock(mutex_);
 
     const auto it = items_.find(eid);
     if (it == items_.end()) {
@@ -91,7 +93,7 @@ gxf_result_t EntityExecutor::deactivate(gxf_uid_t eid) {
   }
 
   // Deactivate the item outside of the lock. This call is stopping codelets and can potentially
-  // lead to recusrive deactivations.
+  // lead to recursive deactivations.
   item->deactivate();
 
   return GXF_SUCCESS;
@@ -101,13 +103,13 @@ gxf_result_t EntityExecutor::deactivateAll() {
   // Get a copy of the items under lock and clear the list.
   std::map<gxf_uid_t, std::unique_ptr<EntityItem>> items;
   {
-    std::unique_lock<std::mutex> lock(mutex_);
+    std::unique_lock<std::shared_timed_mutex> lock(mutex_);
     items = std::move(items_);
     items_.clear();
   }
 
   // Deactivate the item outside of the lock. This call is stopping codelets and can potentially
-  // lead to recusrive deactivations.
+  // lead to recursive deactivations.
   Expected<void> code;
   for (auto& kvp : items) {
     code = AccumulateError(code, kvp.second->deactivate());
@@ -117,7 +119,7 @@ gxf_result_t EntityExecutor::deactivateAll() {
 }
 
 Expected<void> EntityExecutor::getEntities(FixedVectorBase<gxf_uid_t>& entities) const {
-  std::unique_lock<std::mutex> lock(mutex_);
+  std::shared_lock<std::shared_timed_mutex> lock(mutex_);
 
   entities.clear();
   for (const auto& kvp : items_) {
@@ -143,7 +145,7 @@ gxf_result_t EntityExecutor::setClock(Handle<Clock> clock) {
 Expected<SchedulingCondition> EntityExecutor::executeEntity(gxf_uid_t eid, int64_t timestamp) {
   EntityItem* item;
   {
-    std::unique_lock<std::mutex> lock(mutex_);
+    std::shared_lock<std::shared_timed_mutex> lock(mutex_);
 
     const auto it = items_.find(eid);
     if (it == items_.end()) {
@@ -189,7 +191,7 @@ Expected<SchedulingCondition> EntityExecutor::executeEntity(gxf_uid_t eid, int64
 Expected<SchedulingCondition> EntityExecutor::checkEntity(gxf_uid_t eid, int64_t timestamp) {
   EntityItem* item;
   {
-    std::unique_lock<std::mutex> lock(mutex_);
+    std::shared_lock<std::shared_timed_mutex> lock(mutex_);
 
     const auto it = items_.find(eid);
     if (it == items_.end()) {
@@ -200,29 +202,43 @@ Expected<SchedulingCondition> EntityExecutor::checkEntity(gxf_uid_t eid, int64_t
   return item->check(timestamp);
 }
 
-gxf_result_t EntityExecutor::getEntityStatus(gxf_uid_t eid, gxf_entity_status_t* entity_status) {
+Expected<void> EntityExecutor::getEntityStatus(gxf_uid_t eid, gxf_entity_status_t* entity_status) {
   EntityItem* item;
   {
-    std::unique_lock<std::mutex> lock(mutex_);
+    std::shared_lock<std::shared_timed_mutex> lock(mutex_);
 
     const auto it = items_.find(eid);
     if (it == items_.end()) {
       GXF_LOG_ERROR("Entity with eid %ld not found!", eid);
-      return GXF_ENTITY_NOT_FOUND;
+      return Unexpected{GXF_ENTITY_NOT_FOUND};
     }
     item = it->second.get();
   }
   auto status = item->getEntityStatus();
-  if (!status) { return status.error(); }
+  if (!status) { return Unexpected(status.error()); }
   *entity_status = status.value();
-  return GXF_SUCCESS;
+  return Success;
+}
+
+bool EntityExecutor::isEntityBusy(gxf_uid_t eid) {
+  gxf_entity_status_t entity_status;
+  auto result = getEntityStatus(eid, &entity_status);
+  if (!result) { return result.error(); }
+
+  if (entity_status == GXF_ENTITY_STATUS_START_PENDING ||
+      entity_status == GXF_ENTITY_STATUS_TICK_PENDING ||
+      entity_status == GXF_ENTITY_STATUS_TICKING ) {
+        return true;
+  }
+
+  return false;
 }
 
 gxf_result_t EntityExecutor::getEntityBehaviorStatus(gxf_uid_t eid,
                                                      entity_state_t& behavior_status) {
   EntityItem* item;
   {
-    std::unique_lock<std::mutex> lock(mutex_);
+    std::shared_lock<std::shared_timed_mutex> lock(mutex_);
 
     const auto it = items_.find(eid);
     if (it == items_.end()) {
@@ -237,6 +253,28 @@ gxf_result_t EntityExecutor::getEntityBehaviorStatus(gxf_uid_t eid,
 
 Expected<SchedulingCondition> EntityExecutor::EntityItem::check(int64_t timestamp) const {
   SchedulingCondition combined{SchedulingConditionType::READY, 0};
+
+  for (size_t i = 0; i < combiners.size(); ++i) {
+    auto combiner = GXF_UNWRAP_OR_RETURN(combiners.at(i));
+    auto term_list = combiner->getTermList();
+    SchedulingCondition combiner_result;
+
+    for (size_t j = 0; j < term_list.size(); ++j) {
+      auto term = term_list.at(j).value();
+      auto result = GXF_UNWRAP_OR_RETURN(term->check(timestamp));
+      for (size_t k = 0; k < statistics_->size(); ++k) {
+        statistics_->at(k).value()->postTermCheck(entity.eid(), term.cid(),
+                                                SchedulingConditionTypeStr(result.type));
+      }
+      // Dont combine the first term in the combiner, combination starts
+      // with the second term onwards
+      combiner_result = j == 0 ? result : combiner->combine(combiner_result, result);
+    }
+    // AND combine results from all combiners
+    combined = AndCombine(combined, combiner_result);
+  }
+
+  // result of all the combiners would be AND combined with the rest of the terms in the entity
   for (size_t i = 0; i < terms.size(); i++) {
     auto& term = terms.at(i).value();
     Expected<SchedulingCondition> result = term->check(timestamp);
@@ -252,7 +290,7 @@ Expected<SchedulingCondition> EntityExecutor::EntityItem::check(int64_t timestam
 
 Expected<bool> EntityExecutor::EntityItem::activate(
     Entity other, MessageRouter* message_router,
-    std::shared_ptr<FixedVector<Handle<JobStatistics>, kMaxComponents>> statistics,
+    std::shared_ptr<FixedVector<Handle<JobStatistics>>> statistics,
     nvtxDomainHandle_t nvtx_domain, uint32_t nvtx_category_id) {
   if (message_router == nullptr) { return Unexpected{GXF_ARGUMENT_NULL}; }
 
@@ -267,30 +305,57 @@ Expected<bool> EntityExecutor::EntityItem::activate(
 
   setEntityStatus(GXF_ENTITY_STATUS_NOT_STARTED);
 
-  auto result = entity.findAll<PeriodicSchedulingTerm>()
-      .assign_to(periodic_terms)
-      .and_then([&]() { return entity.findAll<DownstreamReceptiveSchedulingTerm>(); })
+  auto result = entity.findAll<DownstreamReceptiveSchedulingTerm>()
       .assign_to(downstream_receptive_terms)
       .and_then([&]() { return entity.findAll<SchedulingTerm>(); })
       .assign_to(terms)
+      .and_then([&]() { return entity.findAll<SchedulingTermCombiner>(); })
+      .assign_to(combiners)
       .and_then([&]() { return entity.findAll<Codelet>(); })
       .assign_to(codelets);
   if (!result) {
     return ForwardError(result);
   }
 
+  std::set<gxf_uid_t> terms_in_combiners;
+  for (size_t i = 0; i < combiners.size(); i++) {
+    auto combiner = combiners.at(i).value();
+    auto term_list = combiner->getTermList();
+    for (const auto& t : term_list) {
+      terms_in_combiners.insert(t.value()->cid());
+    }
+  }
+
+  // Remove terms in combiners from the "terms" collection to prevent accounting it twice while
+  // checking the state of the entity
+  for (size_t i = 0; i < terms.size(); ) {
+    auto& term = terms.at(i).value();
+    if (terms_in_combiners.find(term.cid()) != terms_in_combiners.end()) {
+      terms.erase(i);
+    } else {
+      ++i;
+    }
+  }
+
+  // Connect all downstream receptive terms to their receivers.
   for (size_t i = 0; i < downstream_receptive_terms.size(); i++) {
     const auto& term = downstream_receptive_terms.at(i).value();
     // Find the receiver which is connected to the transmitter and give it to the scheduling
     // term.
-    if (const auto rx = message_router->getRx(term->transmitter())) {
-      term->setReceiver(rx.value());
-    } else {
+    const auto maybe_receivers = message_router->getConnectedReceivers(term->transmitter());
+    if (!maybe_receivers) {
+      GXF_LOG_ERROR("Could not get connected receivers for transmitter '%s'.",
+          term->transmitter()->name());
+      return ForwardError(maybe_receivers);
+    }
+    if (maybe_receivers.value().size() == 0) {
       // Not connected => term will never succeed
       GXF_LOG_ERROR(
           "[E%05zu] No receiver connected to transmitter of DownstreamReceptiveSchedulingTerm "
           "%zu of entity \"%s\". The entity will never tick.",
           entity.eid(), term.cid(), entity.name());
+    } else {
+      term->setReceivers(maybe_receivers.value());
     }
   }
 
@@ -308,8 +373,9 @@ Expected<SchedulingCondition> EntityExecutor::EntityItem::execute(
     GXF_LOG_ERROR("Entity %s cannot be executed before being started", entity.name());
     return Unexpected{GXF_INVALID_EXECUTION_SEQUENCE};
   }
-  if (status_ == GXF_ENTITY_STATUS_TICK_PENDING) {
-    GXF_LOG_ERROR("Entity %s is already waiting to be executed", entity.name());
+  // Entity is over scheduled below. need to handle better
+  if (status_ == GXF_ENTITY_STATUS_TICK_PENDING || status_ == GXF_ENTITY_STATUS_TICKING) {
+    GXF_LOG_WARNING("Entity %s is already waiting to be executed", entity.name());
     return Unexpected{GXF_INVALID_EXECUTION_SEQUENCE};
   }
   if (status_ == GXF_ENTITY_STATUS_STOP_PENDING) {
@@ -317,7 +383,7 @@ Expected<SchedulingCondition> EntityExecutor::EntityItem::execute(
     return Unexpected{GXF_INVALID_EXECUTION_SEQUENCE};
   }
 
-  std::unique_lock<std::mutex> lock(mutex_);
+  std::unique_lock<std::mutex> lock(execution_mutex_);
 
   // If the entity was not started yet, then start it now.
   if (status_ == GXF_ENTITY_STATUS_NOT_STARTED) {
@@ -430,7 +496,7 @@ Expected<SchedulingCondition> EntityExecutor::EntityItem::execute(
 }
 
 Expected<void> EntityExecutor::EntityItem::deactivate() {
-  std::unique_lock<std::mutex> lock(mutex_);
+  std::unique_lock<std::mutex> lock(execution_mutex_);
   // As this is executed under lock we are not in a state where an operation is pending.
 
   // If we the entity was not started there is nothing to do.
@@ -438,7 +504,7 @@ Expected<void> EntityExecutor::EntityItem::deactivate() {
     return Success;
   }
 
-  GXF_LOG_VERBOSE("Deactivating entity name:[%s] eid:[%lu]]", entity.name(), entity.eid());
+  GXF_LOG_VERBOSE("Deactivating entity name:[%s] eid:[%lu]", entity.name(), entity.eid());
   auto result = stop();
   nvtxDomainDestroy(nvtx_domain_);
   return result;
@@ -447,12 +513,12 @@ Expected<void> EntityExecutor::EntityItem::deactivate() {
 Expected<void> EntityExecutor::EntityItem::start(int64_t timestamp) {
   if (status_ != GXF_ENTITY_STATUS_NOT_STARTED) {
     GXF_LOG_ERROR("Entity must be in GXF_ENTITY_STATUS_NOT_STARTED stage before starting."
-                  " Current state is %s", entityStatusStr(status_));
+                  " Current state is %s", GxfEntityStatusStr(status_));
     return Unexpected{GXF_INVALID_LIFECYCLE_STAGE};
   }
 
+  GXF_LOG_DEBUG("Starting entity [%s]", entity.name());
   setEntityStatus(GXF_ENTITY_STATUS_START_PENDING);
-
   // initialize execution times
   for (size_t i = 0; i < codelets.size(); i++) {
     codelets.at(i).value()->beforeStart(timestamp);
@@ -470,13 +536,14 @@ Expected<void> EntityExecutor::EntityItem::start(int64_t timestamp) {
     nvtxDomainRangeEnd(nvtx_domain_, nvtx_range_codelet_start_);
     if (!code) {
       // FIXME (v1) stop codelets which started successfully so far.
+      GXF_LOG_WARNING("Failed to start entity [%s]", entity.name());
       return code;
     }
   }
 
   setEntityStatus(GXF_ENTITY_STATUS_STARTED);
   last_execution_timestamp_ = timestamp;
-
+  GXF_LOG_DEBUG("Started entity [%s]", entity.name());
   return Success;
 }
 
@@ -485,7 +552,7 @@ Expected<void> EntityExecutor::EntityItem::tick(int64_t timestamp, Router* route
 
   if (status_ != GXF_ENTITY_STATUS_TICK_PENDING) {
     GXF_LOG_ERROR("Entity [%s] must be in GXF_ENTITY_STATUS_TICK_PENDING stage before ticking."
-                  " Current state is %s", entity.name(), entityStatusStr(status_));
+                  " Current state is %s", entity.name(), GxfEntityStatusStr(status_));
     return Unexpected{GXF_INVALID_LIFECYCLE_STAGE};
   }
 
@@ -562,7 +629,7 @@ Expected<void> EntityExecutor::EntityItem::stop() {
       (status_ != GXF_ENTITY_STATUS_TICKING)) {
     GXF_LOG_ERROR("Entity [%s] must be in Started, Tick Pending, Ticking or Idle"
                   " stage before stopping. Current state is %s",
-                  entity.name(), entityStatusStr(status_));
+                  entity.name(), GxfEntityStatusStr(status_));
     return Unexpected{GXF_INVALID_LIFECYCLE_STAGE};
   }
 
@@ -635,21 +702,22 @@ Expected<void> EntityExecutor::removeMonitor(Handle<Monitor> monitor) {
 }
 
 Expected<void> EntityExecutor::EntityItem::startCodelet(const Handle<Codelet>& codelet) {
-  GXF_LOG_DEBUG("[C%05zu] starting codelet '%s/%s'", codelet->cid(), codelet->entity().name(),
-               codelet->name());
+  GXF_LOG_DEBUG("[C%05zu] starting codelet '%s' in entity '%s'", codelet->cid(), codelet->name(),
+                codelet->entity().name());
   return ExpectedOrCode(codelet->start());
 }
 
 Expected<void> EntityExecutor::EntityItem::tickCodelet(const Handle<Codelet>& codelet) {
-  GXF_LOG_DEBUG("[C%05zu] tick codelet %s", codelet->cid(), codelet->name());
+  GXF_LOG_DEBUG("[C%05zu] tick codelet %s in entity %s", codelet->cid(), codelet->name(),
+                codelet->entity().name());
 
   // Lets check if statistics_ is valid and contains statistics components.
   // Collect codelet statistics if requested
   if (statistics_ && statistics_->size() != 0) {
-      for (size_t i = 0; i < statistics_->size(); i++) {
-        if (statistics_->at(i).value()->isCodeletStatistics()) {
-          statistics_->at(i).value()->preTick(codelet->eid(), codelet->cid());
-        }
+    for (size_t i = 0; i < statistics_->size(); i++) {
+      if (statistics_->at(i).value()->isCodeletStatistics()) {
+        statistics_->at(i).value()->preTick(codelet->eid(), codelet->cid());
+      }
     }
 
     auto code = codelet->tick();
@@ -667,15 +735,18 @@ Expected<void> EntityExecutor::EntityItem::tickCodelet(const Handle<Codelet>& co
 }
 
 Expected<void> EntityExecutor::EntityItem::stopCodelet(const Handle<Codelet>& codelet) {
-  GXF_LOG_DEBUG("[C%05zu] stop codelet %s", codelet->cid(), codelet->name());
+  GXF_LOG_DEBUG("[C%05zu] stop codelet %s from entity %s", codelet->cid(),
+                codelet->name(), codelet->entity().name());
   return ExpectedOrCode(codelet->stop());
 }
 
 Expected<gxf_entity_status_t> EntityExecutor::EntityItem::getEntityStatus() {
+  std::lock_guard<std::mutex> lock(status_mutex_);
   return status_;
 }
 
 Expected<void> EntityExecutor::EntityItem::setEntityStatus(const gxf_entity_status_t next_state) {
+  std::lock_guard<std::mutex> lock(status_mutex_);
   if (!first_status_change_) {
     if (status_ != GXF_ENTITY_STATUS_NOT_STARTED && status_ != GXF_ENTITY_STATUS_IDLE) {
       nvtxDomainRangeEnd(nvtx_domain_, nvtx_range_entity_state_);
@@ -687,13 +758,13 @@ Expected<void> EntityExecutor::EntityItem::setEntityStatus(const gxf_entity_stat
   status_ = next_state;
   Expected<void> result;
   for (size_t i = 0; i < statistics_->size(); ++i) {
-      statistics_->at(i).value()->onLifecycleChange(entity.eid(), entityStatusStr(next_state));
+      statistics_->at(i).value()->onLifecycleChange(entity.eid(), GxfEntityStatusStr(next_state));
   }
 
   // We do not emit NVTX ranges for "NotStarted" and "Idle" states because they will occupy
-  // too much space on profiling tools' timeline, making it hard to find more useful activties.
+  // too much space on profiling tools' timeline, making it hard to find more useful activities.
   if (next_state != GXF_ENTITY_STATUS_NOT_STARTED && next_state != GXF_ENTITY_STATUS_IDLE) {
-    std::string nvtx_string = "entity state update: " + std::string(entityStatusStr(next_state));
+    std::string nvtx_string = "entity state update: " + std::string(GxfEntityStatusStr(next_state));
     auto blue_marker = CreateBlueEvent(nvtx_string, nvtx_category_id_);
     // It is possible for a state to start in one thread, but end in a different thread.  Therefore
     // we cannot use `nvtxDomainRangePush/Pop` here and must use `nvtxDomainRangeStart/End` to emit
@@ -702,20 +773,6 @@ Expected<void> EntityExecutor::EntityItem::setEntityStatus(const gxf_entity_stat
   }
 
   return Success;
-}
-
-const char* EntityExecutor::EntityItem::entityStatusStr(gxf_entity_status_t status) {
-  switch (status) {
-    GXF_ENUM_TO_STR(GXF_ENTITY_STATUS_NOT_STARTED, NotStarted)
-    GXF_ENUM_TO_STR(GXF_ENTITY_STATUS_START_PENDING, StartPending)
-    GXF_ENUM_TO_STR(GXF_ENTITY_STATUS_STARTED, Started)
-    GXF_ENUM_TO_STR(GXF_ENTITY_STATUS_TICK_PENDING, Pending)
-    GXF_ENUM_TO_STR(GXF_ENTITY_STATUS_TICKING, Ticking)
-    GXF_ENUM_TO_STR(GXF_ENTITY_STATUS_IDLE, Idle)
-    GXF_ENUM_TO_STR(GXF_ENTITY_STATUS_STOP_PENDING, StopPending)
-    default:
-      return "N/A";
-  }
 }
 
 }  // namespace gxf

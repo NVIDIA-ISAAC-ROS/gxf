@@ -1,0 +1,204 @@
+%YAML 1.2
+# SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+---
+########################
+# Benchmark Controller #
+########################
+name: benchmark_controller
+components:
+- name: allocator
+  type: nvidia::gxf::UnboundedAllocator
+- name: report
+  type: nvidia::gxf::File
+  parameters:
+    allocator: allocator
+    file_path: /tmp/test_benchmark_data_replay_control.json
+    file_mode: wb
+- name: benchmark_controller
+  type: nvidia::gxf::benchmark::BenchmarkController
+  parameters:
+    benchmark_controller_target_time_scheduling_term: target_time_scheduling_term
+    benchmark_controller_boolean_scheduling_term: boolean_scheduling_term
+    benchmark_sinks: [benchmark_sink/sink]
+    benchmark_publishers: [benchmark_publisher/benchmark_publisher]
+    data_replay_control_transmitter: data_replay_control_transmitter
+    title: "Test Benchmark Framework - Data Replay Control"
+    exported_report: report
+    benchmark_duration_ms: 500
+    benchmark_iterations: 3
+    entity_buffer_size: 10
+- name: data_replay_control_transmitter
+  type: nvidia::gxf::test::MockTransmitter
+- name: boolean_scheduling_term
+  type: nvidia::gxf::BooleanSchedulingTerm
+  parameters:
+    enable_tick: true
+- name: target_time_scheduling_term
+  type: nvidia::gxf::TargetTimeSchedulingTerm
+  parameters:
+    clock: system/clock
+- type: nvidia::gxf::benchmark::test::BenchmarkReportChecker
+  parameters:
+    report: report
+---
+#################
+# Data Replayer #
+#################
+name: data_replayer
+components:
+- name: receiver
+  type: nvidia::gxf::test::MockReceiver
+- name: data_replayer
+  type: nvidia::gxf::benchmark::test::AsyncTriggerDataReplayer
+  parameters:
+    receiver: receiver
+    replay_data_source_async_scheduling_term: data_source/async_scheduling_term
+- type: nvidia::gxf::MessageAvailableSchedulingTerm
+  parameters:
+    receiver: receiver
+    min_size: 1
+---
+#####################
+# Dummy Data Source #
+#####################
+name: data_source
+components:
+- name: transmitter
+  type: nvidia::gxf::test::MockTransmitter
+- name: ping
+  type: nvidia::gxf::PingTx
+  parameters:
+    signal: transmitter
+    clock: system/clock
+- name: async_scheduling_term
+  type: nvidia::gxf::AsynchronousSchedulingTerm
+- type: nvidia::gxf::PeriodicSchedulingTerm
+  parameters:
+    recess_period: 10Hz
+---
+####################
+# Benchmark Buffer #
+####################
+name: benchmark_buffer
+components:
+- name: receiver
+  type: nvidia::gxf::test::MockReceiver
+- name: entity_buffer
+  type: nvidia::gxf::benchmark::EntityBuffer
+  parameters:
+    receiver: receiver
+- type: nvidia::gxf::MessageAvailableSchedulingTerm
+  parameters:
+    receiver: receiver
+    min_size: 1
+---
+#######################
+# Benchmark Publisher #
+#######################
+name: benchmark_publisher
+components:
+- name: async_scheduling_term
+  type: nvidia::gxf::AsynchronousSchedulingTerm
+- type: nvidia::gxf::DownstreamReceptiveSchedulingTerm
+  parameters:
+    transmitter: transmitter
+    min_size: 1
+- name: benchmark_publisher
+  type: nvidia::gxf::benchmark::BenchmarkPublisher
+  parameters:
+    entity_buffer: benchmark_buffer/entity_buffer
+    transmitter: transmitter
+    benchmark_publisher_async_scheduling_term: async_scheduling_term
+- name: transmitter
+  type: nvidia::gxf::test::MockTransmitter
+---
+####################
+# Graph under Test #
+####################
+name: graph_under_test
+components:
+- name: receiver
+  type: nvidia::gxf::test::MockReceiver
+- name: transmitter
+  type: nvidia::gxf::test::MockTransmitter
+- type: nvidia::gxf::Forward
+  parameters:
+    in: receiver
+    out: transmitter
+- type: nvidia::gxf::MessageAvailableSchedulingTerm
+  parameters:
+    receiver: receiver
+    min_size: 1
+- type: nvidia::gxf::DownstreamReceptiveSchedulingTerm
+  parameters:
+    transmitter: transmitter
+    min_size: 1
+---
+##################
+# Benchmark Sink #
+##################
+name: benchmark_sink
+components:
+- name: receiver
+  type: nvidia::gxf::test::MockReceiver
+- name: sink
+  type: nvidia::gxf::benchmark::BenchmarkSink
+  parameters:
+    receiver: receiver
+    benchmark_publisher: benchmark_publisher/benchmark_publisher
+    performance_calculators: [basic_metrics]
+- type: nvidia::gxf::MessageAvailableSchedulingTerm
+  parameters:
+    receiver: receiver
+    min_size: 1
+- name: basic_metrics
+  type: nvidia::gxf::benchmark::BasicMetricsCalculator
+---
+###############
+# Connections #
+###############
+components:
+- type: nvidia::gxf::Connection
+  parameters:
+    source: benchmark_controller/data_replay_control_transmitter
+    target: data_replayer/receiver
+- type: nvidia::gxf::Connection
+  parameters:
+    source: data_source/transmitter
+    target: benchmark_buffer/receiver
+- type: nvidia::gxf::Connection
+  parameters:
+    source: benchmark_publisher/transmitter
+    target: graph_under_test/receiver
+- type: nvidia::gxf::Connection
+  parameters:
+    source: graph_under_test/transmitter
+    target: benchmark_sink/receiver
+---
+##########
+# System #
+##########
+name: system
+components:
+- name: clock
+  type: nvidia::gxf::RealtimeClock
+- type: nvidia::gxf::JobStatistics
+  parameters:
+    clock: clock
+- type: nvidia::gxf::EventBasedScheduler
+  parameters:
+    clock: clock
+    worker_thread_number: 4

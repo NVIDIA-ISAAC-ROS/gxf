@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2021-2023, NVIDIA CORPORATION. All rights reserved.
+Copyright (c) 2021-2024, NVIDIA CORPORATION. All rights reserved.
 
 NVIDIA CORPORATION and its licensors retain all intellectual property
 and proprietary rights in and to this software, related documentation
@@ -18,7 +18,7 @@ GXF_EXT_FACTORY_BEGIN()
 
 GXF_EXT_FACTORY_SET_INFO(0xf50665e5ade2f71b, 0xde2a2380614b1725, "NetworkExtension",
                          "Extension for communications external to a computation graph",
-                         "Nvidia_Gxf", "1.3.0", "NVIDIA");
+                         "Nvidia_Gxf", "1.6.0", "NVIDIA");
 GXF_EXT_FACTORY_SET_DISPLAY_INFO("Network Extension", "Network", "GXF Network Extension");
 
 GXF_EXT_FACTORY_ADD(0xa61832d1b0f942b3, 0x97b2ccec0e864e61, nvidia::gxf::ClockSyncPrimary,

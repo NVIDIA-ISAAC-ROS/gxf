@@ -1,5 +1,5 @@
 """
-Copyright (c) 2021, NVIDIA CORPORATION. All rights reserved.
+Copyright (c) 2021-2024, NVIDIA CORPORATION. All rights reserved.
 
 NVIDIA CORPORATION and its licensors retain all intellectual property
 and proprietary rights in and to this software, related documentation
@@ -8,7 +8,9 @@ distribution of this software and related documentation without an express
 license agreement from NVIDIA CORPORATION is strictly prohibited.
 """
 
-load("//gxf:gxf.bzl", "nv_gxf_pkg")
+load("@com_nvidia_gxf//gxf:gxf.bzl", "nv_gxf_pkg")
+load("@com_nvidia_gxf//bzl:docker.bzl", "gxf_docker_image")
+
 
 def _expand_extension_dep(target):
     """
@@ -85,8 +87,8 @@ def _data_name(app):
 
 def nv_pygxf_test(
         name,
-        app,
-        manifest_path_hack,
+        app = None,
+        manifest_path_hack = None,
         manifest = None,
         extensions = [],
         data = [],
@@ -96,32 +98,74 @@ def nv_pygxf_test(
     ext_manifest, ext_deps = _process_extensions(name, extensions)
     if manifest == None:
         manifest = ext_manifest
-
+    py_test_data = []
+    if app == None:
+        py_test_data = data + ext_deps
+    else:
+        py_test_data = data + [_data_name(app)] + ext_deps
     native.py_test(
         name = name,
         visibility = ["//visibility:public"],
-        data = data + [_data_name(app)] + ext_deps,
+        data = py_test_data,
         **kwargs
     )
 
+    nv_gxf_pkg(
+        name = name + "-pkg",
+        srcs = [name],
+        visibility = ["//visibility:public"],
+        testonly = True,
+        tags = ["manual"],
+    )
+
+# A rule to create a PyGXF app, optionally wrapped in a Docker container
+#
+#
+# When a image target is provided in the docker_base_image argument,
+# then in addition to the regular binary and package build, a Docker
+# container containing this app will also be built. The name of the
+# Docker image target is the same as the app's name with the '-image'
+# suffix appended. A '-push' target will be provided that can be used
+# by calling it with `bazel run` to push the newly built containers to
+# NGC.
+#
+# The name of the image will be auto-generated from the target
+# name. If this is not desired, the docker_name argument can be
+# used to override the container name. However, manually specifying
+# the name is generally not recommended to avoid naming conflicts.
+#
+# Similarly, the registry can be changed from the default nvcr.io to a
+# custom target using the docker_registry argument. The default
+# tagging scheme can be changed using the docker_tag argument.
+
 def nv_pygxf_app(
         name,
-        app,
-        manifest_path_hack,
+        app = None,
+        manifest_path_hack = None,
         manifest = None,
         extensions = [],
         data = [],
+        docker_base_image = "",
+        docker_registry = None,
+        docker_repository = None,
+        docker_name = None,
+        docker_tag = None,
         **kwargs):
     """
     """
     ext_manifest, ext_deps = _process_extensions(name, extensions)
     if manifest == None:
         manifest = ext_manifest
+
+    if app == None:
+        py_binary_data = data + ext_deps
+    else:
+        py_binary_data = data + [_data_name(app)] + ext_deps
 
     native.py_binary(
         name = name,
         visibility = ["//visibility:public"],
-        data = data + [_data_name(app)] + ext_deps,
+        data = py_binary_data,
         **kwargs
     )
 
@@ -130,4 +174,14 @@ def nv_pygxf_app(
         srcs = [name],
         visibility = ["//visibility:public"],
         tags = ["manual"],
+    )
+
+    gxf_docker_image(
+        name = name,
+        data = data,
+        docker_base_image = docker_base_image,
+        docker_registry = docker_registry,
+        docker_repository = docker_repository,
+        docker_name = docker_name,
+        docker_tag = docker_tag,
     )

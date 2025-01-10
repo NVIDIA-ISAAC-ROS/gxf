@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
+Copyright (c) 2022-2024, NVIDIA CORPORATION. All rights reserved.
 
 NVIDIA CORPORATION and its licensors retain all intellectual property
 and proprietary rights in and to this software, related documentation
@@ -487,6 +487,20 @@ TEST(test_gxf_core_GxfParameterSetFromYaml, various_types_testcase) {
   GXF_ASSERT_EQ(obj->vector_2d_string_.get().at(1).size(), 2);
   GXF_ASSERT_TRUE(obj->vector_2d_string_.get().at(1).at(0) == "string3");
   GXF_ASSERT_TRUE(obj->vector_2d_string_.get().at(1).at(1) == "string4");
+
+  // complex64
+  YAML::Node complex64_node = YAML::Load("2.0 + 1.5j");
+  GXF_ASSERT_SUCCESS(
+      GxfParameterSetFromYamlNode(context, cid, "complex64", &complex64_node, ""));
+  GXF_ASSERT_EQ(obj->complex64_.get().real(), 2.0);
+  GXF_ASSERT_EQ(obj->complex64_.get().imag(), 1.5);
+
+  // complex128
+  YAML::Node complex128_node = YAML::Load("-2.102-3i");
+  GXF_ASSERT_SUCCESS(
+      GxfParameterSetFromYamlNode(context, cid, "complex128", &complex128_node, ""));
+  GXF_ASSERT_EQ(obj->complex128_.get().real(), -2.102);
+  GXF_ASSERT_EQ(obj->complex128_.get().imag(), -3.0);
 
   GXF_ASSERT_SUCCESS(GxfContextDestroy(context));
 }

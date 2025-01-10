@@ -283,7 +283,7 @@ components:
   parameters:
   - key: recess_period
     headline: Recess Period
-    description: 'The recess period indicates the miniumum amount of time which has
+    description: 'The recess period indicates the minimum amount of time which has
       to pass before the entity is permitted to execute again. The period is specified
       as a string containing of a number and an (optional) unit. If no unit is given
       the value is assumed to be in nanoseconds. Supported units are: Hz, s, ms. Example:
@@ -739,7 +739,7 @@ components:
   - key: block_size
     headline: Block size
     description: The size of one block of memory in byte. Allocation requests can
-      only be fullfilled if they fit into one block. If less memory is requested still
+      only be fulfilled if they fit into one block. If less memory is requested still
       a full block is issued.
     gxf_parameter_type: GXF_PARAMETER_TYPE_UINT64
     default: N/A
@@ -1185,7 +1185,7 @@ components:
     step_value: null
   - key: outputs
     headline: Outputs
-    description: All the outputs for synchronization, number of outpus must match
+    description: All the outputs for synchronization, number of outputs must match
       that of the inputs.
     gxf_parameter_type: GXF_PARAMETER_TYPE_HANDLE
     default: N/A

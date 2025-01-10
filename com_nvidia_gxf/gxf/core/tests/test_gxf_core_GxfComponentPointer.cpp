@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
+Copyright (c) 2022-2024, NVIDIA CORPORATION. All rights reserved.
 
 NVIDIA CORPORATION and its licensors retain all intellectual property
 and proprietary rights in and to this software, related documentation
@@ -55,5 +55,5 @@ TEST_F(GxfComponentPointer_Test, InvalidContext) {
 
 TEST_F(GxfComponentPointer_Test, InvalidComponent) {
   GXF_ASSERT_EQ(GxfComponentPointer(context, kNullUid, tid,  &raw_pointer),
-                GXF_ENTITY_COMPONENT_NOT_FOUND);
+                GXF_ENTITY_NOT_FOUND);
 }

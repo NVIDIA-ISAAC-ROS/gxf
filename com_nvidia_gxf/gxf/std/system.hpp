@@ -32,14 +32,14 @@ class System : public Component {
   virtual gxf_result_t runAsync_abi() = 0;
   virtual gxf_result_t stop_abi() = 0;
   virtual gxf_result_t wait_abi() = 0;
-  virtual gxf_result_t event_notify_abi(gxf_uid_t eid) = 0;
+  virtual gxf_result_t event_notify_abi(gxf_uid_t eid, gxf_event_t event) = 0;
 
   Expected<void> schedule(const Entity& entity);
   Expected<void> unschedule(const Entity& entity);
   Expected<void> runAsync();
   Expected<void> stop();
   Expected<void> wait();
-  Expected<void> event_notify(gxf_uid_t eid);
+  Expected<void> event_notify(gxf_uid_t eid, gxf_event_t event);
 };
 
 }  // namespace gxf

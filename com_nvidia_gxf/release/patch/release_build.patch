@@ -47,7 +47,7 @@ index cd5cc9b..1a3acef 100644
          self._added_repo_list.clear()
 @@ -110,8 +110,8 @@ class GraphHandler:
              if not reg_conf.force_create:
-                 logger.info('registry repo %s alread existed, skipped', name)
+                 logger.info('registry repo %s already existed, skipped', name)
                  return
 -            logger.info('force removing registry repo %s before re-add', name)
 -            registry.remove_repo(name)
@@ -127,45 +127,4 @@ index 60226ece..b780c746 100644
      parser_list = subpars_repo.add_parser("list", help="List of repositories")
      parser_list.set_defaults(subparser_name="list")
      parser_list.add_argument("-d", "--details", dest="details",
-diff --git a/common/BUILD.release b/common/BUILD.release
-index 8bdf7b31..6983e9ca 100644
---- a/common/BUILD.release
-+++ b/common/BUILD.release
-@@ -22,7 +22,6 @@ cc_library(
-         "assert.hpp",
-         "backtrace.hpp",
-         "byte.hpp",
--        "endian.hpp",
-         "expected.hpp",
-         "fixed_map.hpp",
-         "fixed_string.hpp",
-@@ -31,7 +30,6 @@ cc_library(
-         "logger.hpp",
-         "memory_utils.hpp",
-         "nvtx_helper.hpp",
--        "span.hpp",
-         "singleton.hpp",
-         "strong_type.hpp",
-         "type_name.hpp",
-
-diff --git a/release/tarball_content.yaml b/release/tarball_content.yaml
-index 8d145492..abd732cb 100644
---- a/release/tarball_content.yaml
-+++ b/release/tarball_content.yaml
-@@ -211,7 +211,6 @@ files_to_copy_test_as_is: [
-     "common/backtrace.hpp",
-     "common/byte.hpp",
-     "common/expected.hpp",
--    "common/endian.hpp",
-     "common/fixed_map.hpp",
-     "common/fixed_string.hpp",
-     "common/fixed_vector.hpp",
-@@ -220,7 +219,6 @@ files_to_copy_test_as_is: [
-     "common/memory_utils.hpp",
-     "common/nvtx_helper.hpp",
-     "common/singleton.hpp",
--    "common/span.hpp",
-     "common/strong_type.hpp",
-     "common/type_name_gnuc.hpp",
-     "common/type_name.hpp",
 

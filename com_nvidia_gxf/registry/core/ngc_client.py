@@ -1,4 +1,4 @@
-# Copyright (c) 2020-2023, NVIDIA CORPORATION.  All rights reserved.
+# Copyright (c) 2020-2024, NVIDIA CORPORATION.  All rights reserved.
 #
 # NVIDIA CORPORATION and its licensors retain all intellectual property
 # and proprietary rights in and to this software, related documentation
@@ -33,6 +33,7 @@ from registry.core.packager import Packager
 from registry.core.utils import TargetConfig, uuid_validator, get_ext_subdir
 from registry.core.yaml_loader import YamlLoader
 import registry.core.logger as log
+from registry.core.logger import ComplexEncoder
 
 NGC_AUTH_TOKEN_TIMEOUT = 10    # Second
 
@@ -59,7 +60,7 @@ class PublicNGCClient:
 
     def _get_ext_download_url(self, ext_name, ext_version):
         ext_name = ext_name.lower()
-        return self._v2_url + f"/resources/nvidia/graph-composer/{ext_name}/versions/{ext_version}/zip"
+        return self._v2_url + f"/resources/nvidia/graph-composer/{ext_name}/versions/{ext_version}/files"
 
     def _get_ext_file_download_url(self, ext_name, ext_version, filename):
         ext_name = ext_name.lower()
@@ -138,7 +139,7 @@ class PublicNGCClient:
         return versions
 
     def get_extension_list(self):
-        import_dp =  tempfile.mkdtemp(prefix=f"{tempfile.gettempdir()}//.nvgraph.")
+        import_dp =  tempfile.mkdtemp(prefix=f"{tempfile.gettempdir()}//.gxf.")
 
         def download_manifest(url):
             headers = self._get_download_headers(url)
@@ -246,43 +247,6 @@ class PublicNGCClient:
 
         return True
 
-    def _download_zip(self, url, headers, import_path):
-        res = self._makedirs(import_path)
-        if not res:
-            return False
-
-        split_url = url.split('/')
-        # This downloads a zip file of the contents
-        zip_file = path.join(import_path, f'{split_url[-4]}_{split_url[-2]}.{split_url[-1]}')
-        # Streaming enabled for large files...
-        with self._session.get(url, headers=headers, stream=True) as r:
-            try:
-                r.raise_for_status()
-            except requests.exceptions.RequestException as err:
-                logger.error(f"File download failed {zip_file}")
-                logger.debug(f"Request failed due to {err}")
-                return False
-
-            with open(zip_file, 'wb') as f:
-                logger.debug(f"Downloading zip file {zip_file}")
-                for chunk in r.iter_content(chunk_size=8192):
-                    if chunk: # filter out keep-alive new chunks
-                        f.write(chunk)
-
-        with ZipFile(zip_file) as zipf:
-            logger.debug(f"Extracting zip file {zip_file}")
-            contents = zipf.namelist()
-            gzf = [file for file in contents if file.endswith("tar.gz")]
-
-            for gz in gzf:
-                zipf.extract(gz, import_path)
-                gzpath = path.join(import_path, gz)
-                self._extract_tar_file(gzpath, import_path)
-                os.remove(gzpath)
-
-        os.remove(zip_file)
-        return True
-
     def get_latest_version(self, ext_name):
         versions = self.get_extension_versions(ext_name)
         if not versions:
@@ -358,7 +322,28 @@ class PublicNGCClient:
         if headers is None:
             return False
 
-        return self._download_zip(ext_url, headers, import_path)
+        split_url = ext_url.split('/')
+        response = self._session.get(ext_url, headers=headers)
+        payload = json.loads(response.text)
+        if "recipeFiles" not in payload:
+            logger.warning(f"Extension interface corrupted, no files found {split_url[-4]}")
+            return None
+
+        files = [file["path"] for file in payload["recipeFiles"]]
+        for f in files:
+            f_url = ext_url + f"/{f}"
+            headers = self._get_download_headers(f_url)
+            ret = self._download_file(f_url, headers, import_path)
+            if not ret: return ret
+
+            # Unpack tar.gz files
+            if f_url.endswith("tar.gz"):
+                gz = f_url.split('/')[-1]
+                gzpath = path.join(import_path, gz)
+                self._extract_tar_file(gzpath, import_path)
+                os.remove(gzpath)
+
+        return True
 
     def pull_ext_variant(self, ext_name, eid, import_path, ext_ver,
                        target_cfg: TargetConfig):
@@ -421,7 +406,7 @@ class PublicNGCClient:
         if response.text:
             json_loaded = json.loads(response.text)
             if json_loaded:
-                logger.debug(json.dumps(json_loaded, indent=4))
+                logger.debug(json.dumps(json_loaded, indent=4, cls=ComplexEncoder))
 
 class NGCClient:
     """Implementation of an NGC Client which interacts with NGC registry
@@ -620,7 +605,7 @@ class NGCClient:
         if not config:
             return None
 
-        return self._v2_url + config + f"resources/"
+        return self._v2_url + config + f"resources"
 
     def _get_ext_download_url(self, ext_name, ext_version):
         ext_name = ext_name.lower()
@@ -628,7 +613,7 @@ class NGCClient:
         if not config:
             return None
 
-        return self._v2_url + config + f"resources/{ext_name}/versions/{ext_version}/zip"
+        return self._v2_url + config + f"resources/{ext_name}/versions/{ext_version}/files"
 
     def _get_ext_file_download_url(self, ext_name, ext_version, filename):
         ext_name = ext_name.lower()
@@ -1221,44 +1206,6 @@ class NGCClient:
 
         return True
 
-
-    def _download_zip(self, url, headers, import_path):
-        res = self._makedirs(import_path)
-        if not res:
-            return False
-
-        split_url = url.split('/')
-        # This downloads a zip file of the contents
-        zip_file = path.join(import_path, f'{split_url[-4]}_{split_url[-2]}.{split_url[-1]}')
-        # Streaming enabled for large files...
-        with self._session.get(url, headers=headers, stream=True) as r:
-            try:
-                r.raise_for_status()
-            except requests.exceptions.RequestException as err:
-                logger.error(f"File download failed {zip_file}")
-                logger.debug(f"Request failed due to {err}")
-                return False
-
-            with open(zip_file, 'wb') as f:
-                logger.debug(f"Downloading zip file {zip_file}")
-                for chunk in r.iter_content(chunk_size=8192):
-                    if chunk: # filter out keep-alive new chunks
-                        f.write(chunk)
-
-        with ZipFile(zip_file) as zipf:
-            logger.debug(f"Extracting zip file {zip_file}")
-            contents = zipf.namelist()
-            gzf = [file for file in contents if file.endswith("tar.gz")]
-
-            for gz in gzf:
-                zipf.extract(gz, import_path)
-                gzpath = path.join(import_path, gz)
-                self._extract_tar_file(gzpath, import_path)
-                os.remove(gzpath)
-
-        os.remove(zip_file)
-        return True
-
     def get_latest_version(self, ext_name):
         versions = self.get_extension_versions(ext_name)
         if not versions:
@@ -1335,7 +1282,28 @@ class NGCClient:
         if headers is None:
             return False
 
-        return self._download_zip(ext_url, headers, import_path)
+        split_url = ext_url.split('/')
+        response = self._session.get(ext_url, headers=headers)
+        payload = json.loads(response.text)
+        if "recipeFiles" not in payload:
+            logger.warning(f"Extension interface corrupted, no files found {split_url[-4]}")
+            return None
+
+        files = [file["path"] for file in payload["recipeFiles"]]
+        for f in files:
+            f_url = ext_url + f"/{f}"
+            headers = self._get_download_headers(f_url)
+            ret = self._download_file(f_url, headers, import_path)
+            if not ret: return ret
+
+            # Unpack tar.gz files
+            if f_url.endswith("tar.gz"):
+                gz = f_url.split('/')[-1]
+                gzpath = path.join(import_path, gz)
+                self._extract_tar_file(gzpath, import_path)
+                os.remove(gzpath)
+
+        return True
 
     def pull_ext_variant(self, ext_name, eid, import_path, ext_ver,
                         target_cfg: TargetConfig):
@@ -1403,6 +1371,6 @@ class NGCClient:
             try:
                 json_loaded = json.loads(response.text)
                 if json_loaded:
-                    logger.debug(json.dumps(json_loaded, indent=4))
+                    logger.debug(json.dumps(json_loaded, indent=4, cls=ComplexEncoder))
             except json.decoder.JSONDecodeError:
                   pass

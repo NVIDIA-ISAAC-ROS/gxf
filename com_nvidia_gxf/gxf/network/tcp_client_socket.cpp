@@ -43,6 +43,7 @@ Expected<void> TcpClientSocket::open() {
     if (fd_socket_ < 0) {
       return Unexpected{GXF_FAILURE};
     }
+    GXF_LOG_INFO("TCP open %u", fd_socket_);
   }
 
   return Success;

@@ -12,10 +12,6 @@ license agreement from NVIDIA CORPORATION is strictly prohibited.
 namespace nvidia {
 namespace gxf {
 
-gxf_result_t PingBatchRx::start() {
-  return GXF_SUCCESS;
-}
-
 gxf_result_t PingBatchRx::tick() {
   for (int64_t i = 0; i < batch_size_; i++) {
     auto message = signal_->receive();

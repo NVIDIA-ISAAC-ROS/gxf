@@ -148,6 +148,10 @@ gxf_result_t DefaultExtension::registerComponents_abi(gxf_context_t context) {
   return GXF_SUCCESS;
 }
 
+gxf_result_t DefaultExtension::hasComponent_abi(const gxf_tid_t& tid) {
+  return ToResultCode(find(tid));
+}
+
 gxf_result_t DefaultExtension::getComponentTypes_abi(gxf_tid_t* pointer, size_t* size) {
   if (pointer == nullptr) {
     return GXF_ARGUMENT_NULL;

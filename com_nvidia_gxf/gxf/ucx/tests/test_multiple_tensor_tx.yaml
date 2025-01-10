@@ -1,0 +1,117 @@
+# SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+application:
+  name: test_multiple_tensor_tx
+---
+dependencies:
+- extension: TestHelperExtension
+  uuid: 1b99ffeb-c250-4ced-8117-62ac05969a50
+  version: 2.6.0
+- extension: StandardExtension
+  uuid: 8ec2d5d6-b5df-48bf-8dee-0252606fdd7e
+  version: 2.6.0
+- extension: UcxExtension
+  uuid: 525f8a1a-dfb5-426b-8ddb-00c3ac839994
+  version: 0.8.0
+---
+components:
+- name: tensor_generator1
+  parameters:
+    allocator: mock_allocator5
+    enable_timestamps: true
+    number_of_tensors: 10
+    output: ucx_transmitter1
+    shape: [ 4, 4, 4, 4 ]
+    storage_type: 1
+  type: nvidia::gxf::test::TensorGenerator
+- name: mock_allocator5
+  type: nvidia::gxf::test::MockAllocator
+- name: count_scheduling_term31
+  parameters:
+    count: 10
+  type: nvidia::gxf::CountSchedulingTerm
+- name: step_count33
+  parameters:
+    expected_count: 10
+  type: nvidia::gxf::test::StepCount
+- name: mock_allocator2
+  type: nvidia::gxf::test::MockAllocator
+- name: ucx_serialization_buffer0
+  parameters:
+    allocator: mock_allocator2
+    buffer_size: 8192
+  type: nvidia::gxf::UcxSerializationBuffer
+- name: ucx_transmitter1
+  parameters:
+    buffer: ucx_serialization_buffer0
+    port: 13337
+  type: nvidia::gxf::UcxTransmitter
+name: TensorGenerator
+ui_property:
+  position:
+    x: -110.72563171386719
+    y: 319.48040771484375
+---
+components:
+- name: greedy_scheduler41
+  parameters:
+    clock: clock
+    stop_on_deadlock: false
+  type: nvidia::gxf::GreedyScheduler
+- name: clock
+  type: nvidia::gxf::RealtimeClock
+name: GreedyScheduler
+ui_property:
+  position:
+    x: 297.3033142089844
+    y: 469.2560729980469
+---
+components:
+- name: ucx_context7
+  parameters:
+    serializer: ucx_entity_serializer8
+  type: nvidia::gxf::UcxContext
+- name: ucx_entity_serializer8
+  parameters:
+    component_serializers:
+    - ucx_component_serializer9
+  type: nvidia::gxf::UcxEntitySerializer
+- name: ucx_component_serializer9
+  parameters:
+    allocator: mock_allocator10
+  type: nvidia::gxf::UcxComponentSerializer
+- name: mock_allocator10
+  type: nvidia::gxf::test::MockAllocator
+name: UcxContext
+ui_property:
+  position:
+    x: 76.73534393310547
+    y: 673.377685546875
+---
+name: gpu_resource_entity_0
+components:
+- type: nvidia::gxf::GPUDevice
+  name: gpu_resource_0
+  parameters:
+    dev_id: 0
+---
+EntityGroups:
+- name: entity_group_0
+  target:
+  - "TensorGenerator"
+  - "UcxContext"
+  - "gpu_resource_entity_0"
+---

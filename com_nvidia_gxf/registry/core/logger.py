@@ -1,4 +1,4 @@
-# Copyright (c) 2021, NVIDIA CORPORATION.  All rights reserved.
+# Copyright (c) 2021-2024, NVIDIA CORPORATION.  All rights reserved.
 #
 # NVIDIA CORPORATION and its licensors retain all intellectual property
 # and proprietary rights in and to this software, related documentation
@@ -10,12 +10,26 @@
 
 import sys
 import logging
+import json
 from logging.handlers import RotatingFileHandler
 import tempfile
 from typing import Optional
 
 REGISTRY_PACKAGE_NAME: str = 'Registry'
 
+
+class ComplexEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, complex):
+            cplx_str = f"{obj.real} "
+            if (obj.imag > 0):
+                cplx_str += "+"
+            cplx_str += f"{obj.imag}j"
+            return cplx_str
+            # return {'real': obj.real, 'imag': obj.imag}
+
+        # Let the base class default method raise the TypeError
+        return json.JSONEncoder.default(self, obj)
 
 class RegistryLogging:
     """ Class RegistryLogger
@@ -39,7 +53,7 @@ class RegistryLogging:
         stream_handler.setLevel(logging.INFO)
         logger.addHandler(stream_handler)
         fh = RotatingFileHandler(
-            tempfile.gettempdir() + "//nvgraph_registry.log", mode='a', maxBytes=1048576, backupCount=5)
+            tempfile.gettempdir() + "//gxf_registry.log", mode='a', maxBytes=1048576, backupCount=5)
         fh.setLevel(logging.DEBUG)
         fh.setFormatter(formatter)
         logger.addHandler(fh)

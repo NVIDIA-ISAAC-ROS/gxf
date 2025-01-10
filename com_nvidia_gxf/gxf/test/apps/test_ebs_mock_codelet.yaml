@@ -1,0 +1,277 @@
+%YAML 1.2
+# SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+---
+dependencies:
+- extension: StandardExtension
+  uuid: 8ec2d5d6-b5df-48bf-8dee-0252606fdd7e
+  version: 2.6.0
+- extension: TestHelperExtension
+  uuid: 1b99ffeb-c250-4ced-8117-62ac05969a50
+  version: 2.6.0
+- extension: SampleExtension
+  uuid: a6ad78b6-1682-11ec-9621-0242ac130002
+  version: 1.6.0
+---
+name: message_generator
+components:
+- name: signal
+  type: nvidia::gxf::DoubleBufferTransmitter
+  parameters:
+    capacity: 5
+- type: nvidia::gxf::DownstreamReceptiveSchedulingTerm
+  parameters:
+    transmitter: signal
+    min_size: 1
+- name: message_src
+  type: nvidia::gxf::test::MockCodelet
+  parameters:
+    mode: SRC
+    clock: misc/clock
+    transmitter: signal
+    duration_lower_ms: 10
+    duration_upper_ms: 11
+- type: nvidia::gxf::CountSchedulingTerm
+  parameters:
+    count: 10
+- name: cpu_thread
+  type: nvidia::gxf::CPUThread
+  parameters:
+    pin_entity: false
+- type: nvidia::gxf::test::StepCount
+  parameters:
+    expected_count: 10
+---
+name: codelet0
+components:
+- name: receiver
+  type: nvidia::gxf::DoubleBufferReceiver
+  parameters:
+    capacity: 5
+- type: nvidia::gxf::MessageAvailableSchedulingTerm
+  parameters:
+    receiver: receiver
+    min_size: 1
+- name: transmitter
+  type: nvidia::gxf::DoubleBufferTransmitter
+  parameters:
+    capacity: 5
+- type: nvidia::gxf::DownstreamReceptiveSchedulingTerm
+  parameters:
+    transmitter: transmitter
+    min_size: 1
+- name: mock_codelet0
+  type: nvidia::gxf::test::MockCodelet
+  parameters:
+    clock: misc/clock
+    receiver: receiver
+    transmitter: transmitter
+    duration_lower_ms: 4
+    duration_upper_ms: 5
+- name: cpu_thread
+  type: nvidia::gxf::CPUThread
+  parameters:
+    pin_entity: true
+- type: nvidia::gxf::test::StepCount
+  parameters:
+    expected_count: 10
+---
+components:
+- type: nvidia::gxf::Connection
+  parameters:
+    source: message_generator/signal
+    target: codelet0/receiver
+---
+name: codelet1
+components:
+- name: receiver
+  type: nvidia::gxf::DoubleBufferReceiver
+  parameters:
+    capacity: 5
+- type: nvidia::gxf::MessageAvailableSchedulingTerm
+  parameters:
+    receiver: receiver
+    min_size: 1
+- name: transmitter
+  type: nvidia::gxf::DoubleBufferTransmitter
+  parameters:
+    capacity: 5
+- type: nvidia::gxf::DownstreamReceptiveSchedulingTerm
+  parameters:
+    transmitter: transmitter
+    min_size: 1
+- name: mock_codelet1
+  type: nvidia::gxf::test::MockCodelet
+  parameters:
+    clock: misc/clock
+    receiver: receiver
+    transmitter: transmitter
+    duration_lower_ms: 4
+    duration_upper_ms: 5
+- name: cpu_thread
+  type: nvidia::gxf::CPUThread
+  parameters:
+    pin_entity: true
+- type: nvidia::gxf::test::StepCount
+  parameters:
+    expected_count: 10
+---
+components:
+- type: nvidia::gxf::Connection
+  parameters:
+    source: codelet0/transmitter
+    target: codelet1/receiver
+---
+name: codelet2
+components:
+- name: receiver
+  type: nvidia::gxf::DoubleBufferReceiver
+  parameters:
+    capacity: 5
+- type: nvidia::gxf::MessageAvailableSchedulingTerm
+  parameters:
+    receiver: receiver
+    min_size: 1
+- name: transmitter
+  type: nvidia::gxf::DoubleBufferTransmitter
+  parameters:
+    capacity: 5
+- type: nvidia::gxf::DownstreamReceptiveSchedulingTerm
+  parameters:
+    transmitter: transmitter
+    min_size: 1
+- name: mock_codelet2
+  type: nvidia::gxf::test::MockCodelet
+  parameters:
+    clock: misc/clock
+    receiver: receiver
+    transmitter: transmitter
+    duration_lower_ms: 4
+    duration_upper_ms: 5
+- name: cpu_thread
+  type: nvidia::gxf::CPUThread
+  parameters:
+    pin_entity: true
+- type: nvidia::gxf::test::StepCount
+  parameters:
+    expected_count: 10
+---
+components:
+- type: nvidia::gxf::Connection
+  parameters:
+    source: codelet1/transmitter
+    target: codelet2/receiver
+---
+name: message_sink
+components:
+- name: signal
+  type: nvidia::gxf::DoubleBufferReceiver
+  parameters:
+    capacity: 5
+- type: nvidia::gxf::MessageAvailableSchedulingTerm
+  parameters:
+    receiver: signal
+    min_size: 1
+- name: message_sink
+  type: nvidia::gxf::test::MockCodelet
+  parameters:
+    mode: SINK
+    clock: misc/clock
+    receiver: signal
+    include_mock_latency: false
+- name: cpu_thread
+  type: nvidia::gxf::CPUThread
+  parameters:
+    pin_entity: false
+- type: nvidia::gxf::test::StepCount
+  parameters:
+    expected_count: 10
+---
+components:
+- type: nvidia::gxf::Connection
+  parameters:
+    source: codelet2/transmitter
+    target: message_sink/signal
+---
+
+name: scheduler
+components:
+- name: clock
+  type: nvidia::gxf::RealtimeClock
+- type: nvidia::gxf::EventBasedScheduler
+  parameters:
+    max_duration_ms: 10000
+    clock: clock
+    worker_thread_number: 2
+    stop_on_deadlock: False
+    stop_on_deadlock_timeout: 1000
+    # only applicable for MTS
+    #check_recession_period_ms: 0.2
+#- type: nvidia::gxf::test::EntityMonitor
+- type: nvidia::gxf::JobStatistics
+  parameters:
+    clock: clock
+---
+name: misc
+components:
+- name: clock
+  type: nvidia::gxf::RealtimeClock
+---
+name: cpu_resource_entity_0
+components:
+- name: thread_pool_0
+  type: nvidia::gxf::ThreadPool
+  parameters:
+    initial_size: 0
+---
+name: cpu_resource_entity_1
+components:
+- name: thread_pool_1
+  type: nvidia::gxf::ThreadPool
+  parameters:
+    initial_size: 0
+---
+name: cpu_resource_entity_2
+components:
+- name: thread_pool_2
+  type: nvidia::gxf::ThreadPool
+  parameters:
+    initial_size: 0
+---
+name: cpu_resource_entity_3
+components:
+- name: thread_pool_3
+  type: nvidia::gxf::ThreadPool
+  parameters:
+    initial_size: 0
+---
+EntityGroups:
+- name: entity_group_0
+  target:
+  - "message_generator"
+  - "message_sink"
+  - "cpu_resource_entity_0"
+- name: entity_group_1
+  target:
+  - "codelet0"
+  - "cpu_resource_entity_1"
+- name: entity_group_2
+  target:
+  - "codelet1"
+  - "cpu_resource_entity_2"
+- name: entity_group_3
+  target:
+  - "codelet2"
+  - "cpu_resource_entity_3"

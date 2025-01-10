@@ -28,8 +28,8 @@ Expected<void> System::stop() {
 Expected<void> System::wait() {
   return ExpectedOrCode(wait_abi());
 }
-Expected<void> System::event_notify(gxf_uid_t eid) {
-  return ExpectedOrCode(event_notify_abi(eid));
+Expected<void> System::event_notify(gxf_uid_t eid, gxf_event_t event) {
+  return ExpectedOrCode(event_notify_abi(eid, event));
 }
 
 }  // namespace gxf

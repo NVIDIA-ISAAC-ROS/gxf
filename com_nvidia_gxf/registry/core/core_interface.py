@@ -1,4 +1,4 @@
-# Copyright (c) 2020-2023, NVIDIA CORPORATION.  All rights reserved.
+# Copyright (c) 2020-2024, NVIDIA CORPORATION.  All rights reserved.
 #
 # NVIDIA CORPORATION and its licensors retain all intellectual property
 # and proprietary rights in and to this software, related documentation
@@ -52,7 +52,7 @@ class Registry:
 
     def set_cache_path(self, path: str) -> Result:
         """ Set registry cache path, if not set then it uses default path
-        /home/<username>/.cache/nvgraph_registry
+        /home/<username>/.cache/gxf_registry
         """
         if not self.registry_core.set_cache_path(path):
             return Err("Cannot set cache path")
@@ -340,8 +340,8 @@ class Registry:
         """
         res = self.registry_core.update_graph_dependencies(graphs)
         if not res:
-            return Err("Failed to update graph depdencies")
-        return Ok("All graphs updated with latest depedencies!")
+            return Err("Failed to update graph dependencies")
+        return Ok("All graphs updated with latest dependencies!")
 
     def import_extension_interface(self, ext_name: str, version: str,
                                   import_dp: str, uuid: str) -> Result:

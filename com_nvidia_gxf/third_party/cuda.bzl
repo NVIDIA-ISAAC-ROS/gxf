@@ -1,5 +1,5 @@
 """
- SPDX-FileCopyrightText: Copyright (c) 2020-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ SPDX-FileCopyrightText: Copyright (c) 2020-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  SPDX-License-Identifier: Apache-2.0
 
  Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,11 +17,7 @@
 load(
     "//gxf:repo.bzl",
     "nv_gxf_http_archive",
-    "nv_gxf_new_git_repository",
-    "nv_gxf_new_local_repository",
-)
-
-load("//third_party:deps.bzl", "local_archive")
+    )
 
 CUDA_SO = [
     "cudart",
@@ -94,16 +90,8 @@ def cuda_nv_tools_ext_so_path(family, version):
 # Creates CUDA related dependencies. The arguments `family` and `version` are used to find the
 # library and header files in the package
 def cuda_device_deps(family, version):
-    if family == "aarch64-qnx":
-        cuda_target_prefix = "usr/local/cuda-" + version + "/targets/" + family
-        cuda_include_prefix = cuda_target_prefix + "/include"
-    elif family == 'aarch64_sbsa':
-        cuda_target_prefix = "usr/local/cuda-" + version + "/targets/" + "sbsa-linux"
-        cuda_include_prefix = cuda_target_prefix + "/include"
-    else:
-        cuda_target_prefix = "usr/local/cuda-" + version + "/targets/" + family + "-linux"
-        cuda_include_prefix = cuda_target_prefix + "/include"
-
+    cuda_target_prefix = "usr/local/cuda-" + version
+    cuda_include_prefix = cuda_target_prefix + "/include"
     # CUDA
     cuda_hdrs = native.glob([
         # FIXME separate out headers
@@ -113,6 +101,10 @@ def cuda_device_deps(family, version):
         cuda_include_prefix + "/crt/*",
         cuda_include_prefix + "/nvtx3/**/*.h",
         cuda_include_prefix + "/cuda/std/**/*",
+        cuda_include_prefix + "/cuda/std/detail/libcxx/**/*",
+        cuda_include_prefix + "/cuda/**/*",
+        cuda_include_prefix + "/thrust/**/*",
+        cuda_include_prefix + "/cub/**/*",
         cuda_include_prefix + "/nv/**/*",
     ])
 
@@ -267,111 +259,28 @@ def cuda_device_deps(family, version):
                 "--as-needed",
             ],
         )
-    elif family == 'x86_64':
+    else:
+        linkopts = []
+        if version == "12.6":
+            linkopts.append("-Wl,--no-as-needed,-l:libcudnn.so.9,--as-needed")
+        else:
+            linkopts.append("-Wl,--no-as-needed,-l:libcudnn.so.8,--as-needed")
+
         native.cc_library(
             name = "cudnn",
             hdrs = native.glob([cuda_include_prefix + "/cudnn*.h"]),
             includes = [cuda_include_prefix],
             strip_include_prefix = cuda_include_prefix,
-            srcs = native.glob(["usr/local/cuda-" + version + "/lib64/libcudnn*.so*"]),
+            srcs = native.glob([cuda_target_prefix + "/lib64/libcudnn*.so*"]),
             deps = ["cudart"],
             linkstatic = True,
-            linkopts = [
-                "-Wl,--no-as-needed," +
-                "-l:libcudnn.so.8," +
-                "--as-needed",
-            ],
+            linkopts = linkopts,
             visibility = ["//visibility:public"],
         )
         native.cc_library(
             name = "cublas",
-            hdrs = native.glob(["usr/include/*.h"]),
-            srcs = native.glob(["usr/local/cuda-" + version + "/lib64/libcublas*.so*"]),
-            strip_include_prefix = "usr/include",
-            visibility = ["//visibility:public"],
-            linkopts = [
-                "-Wl,--no-as-needed," +
-                "-l:libcublasLt.so,-l:libcublas.so," +
-                "--as-needed",
-            ],
-        )
-    elif family == 'aarch64':
-        if version == '11.4':
-            native.cc_library(
-                name = "cudnn",
-                hdrs = native.glob(["usr/include/cudnn*.h"]),
-                includes = [cuda_include_prefix],
-                strip_include_prefix = "usr/include",
-                srcs = native.glob(["usr/local/cuda-11.4/lib64/libcudnn*.so*"]),
-                deps = ["cudart"],
-                linkstatic = True,
-                linkopts = [
-                    "-Wl,--no-as-needed," +
-                    "-l:libcudnn.so.8," +
-                    "--as-needed",
-                ],
-                visibility = ["//visibility:public"],
-            )
-            native.cc_library(
-                name = "cublas",
-                hdrs = native.glob(["usr/local/cuda-11.4/include/*.h"]),
-                srcs = native.glob(["usr/local/cuda-11.4/lib64/libcublas*.so*"]),
-                strip_include_prefix = "usr/local/cuda-11.4",
-                visibility = ["//visibility:public"],
-                linkopts = [
-                    "-Wl,--no-as-needed," +
-                    "-l:libcublasLt.so,-l:libcublas.so," +
-                    "--as-needed",
-                ],
-            )
-        else:
-            native.cc_library(
-                name = "cudnn",
-                hdrs = native.glob(["usr/include/cudnn*.h"]),
-                includes = [cuda_include_prefix],
-                strip_include_prefix = "usr/include",
-                srcs = native.glob(["usr/lib/aarch64-linux-gnu/libcudnn*.so*"]),
-                deps = ["cudart"],
-                linkstatic = True,
-                linkopts = [
-                    "-Wl,--no-as-needed," +
-                    "-l:libcudnn.so.8," +
-                    "--as-needed",
-                ],
-                visibility = ["//visibility:public"],
-            )
-            native.cc_library(
-            name = "cublas",
-            hdrs = native.glob(["usr/include/*.h"]),
-            srcs = native.glob(["usr/lib/aarch64-linux-gnu/libcublas*.so*"]),
-            strip_include_prefix = "usr/include",
-            visibility = ["//visibility:public"],
-            linkopts = [
-                "-Wl,--no-as-needed," +
-                "-l:libcublasLt.so,-l:libcublas.so," +
-                "--as-needed",
-            ],
-            )
-    elif family == "aarch64_sbsa":
-            native.cc_library(
-                name = "cudnn",
-                hdrs = native.glob([cuda_include_prefix + "/cudnn*.h"]),
-                includes = [cuda_include_prefix],
-                strip_include_prefix = cuda_include_prefix,
-                srcs = native.glob([cuda_target_prefix + "/lib/libcudnn*.so*"]),
-                deps = ["cudart"],
-                linkstatic = True,
-                linkopts = [
-                    "-Wl,--no-as-needed," +
-                    "-l:libcudnn.so.8," +
-                    "--as-needed",
-                ],
-                visibility = ["//visibility:public"],
-            )
-            native.cc_library(
-            name = "cublas",
-            hdrs = native.glob([cuda_include_prefix + "/cublas*.h"]),
-            srcs = native.glob([cuda_target_prefix + "/lib/libcublas*.so*"]),
+            hdrs = native.glob([cuda_include_prefix + "/*.h"]),
+            srcs = native.glob([cuda_target_prefix + "/lib64/libcublas*.so*"]),
             strip_include_prefix = cuda_include_prefix,
             visibility = ["//visibility:public"],
             linkopts = [
@@ -379,20 +288,19 @@ def cuda_device_deps(family, version):
                 "-l:libcublasLt.so,-l:libcublas.so," +
                 "--as-needed",
             ],
-            )
-    else:
-        pass
+        )
 
 
 # Selects the correct version of `target` based on the current platform
 def _cuda_select(target):
     return select({
-        "//engine/build:platform_x86_64_cuda_11_8": ["@cuda_x86_64_11080//:" + target],
-        "//engine/build:platform_x86_64_cuda_12_1": ["@cuda_x86_64_12010//:" + target],
-        "//engine/build:platform_hp11_sbsa": ["@cuda_aarch64_hp11_sbsa//:" + target],
-        "//engine/build:platform_hp20_sbsa": ["@cuda_aarch64_hp20_sbsa//:" + target],
+        "//engine/build:platform_x86_64_cuda_12_2": ["@cuda_x86_64_12020//:" + target],
+        "//engine/build:platform_x86_64_cuda_12_6": ["@cuda_x86_64_12060//:" + target],
+        "//engine/build:platform_x86_64_rhel9_cuda_12_2": ["@cuda_x86_64_rhel9_12020//:" + target],
         "//engine/build:platform_hp21ea_sbsa": ["@cuda_aarch64_hp21ea_sbsa//:" + target],
-        "//engine/build:platform_jetpack51": ["@cuda_aarch64_jetpack51//:" + target],
+        "//engine/build:platform_hp21ga_sbsa": ["@cuda_aarch64_hp21ga_sbsa//:" + target],
+        "//engine/build:platform_jetpack60": ["@cuda_aarch64_jetpack60//:" + target],
+        "//engine/build:platform_jetpack61": ["@cuda_aarch64_jetpack61//:" + target],
     })
 
 # Creates all CUDA related dependencies for the current platform
@@ -417,125 +325,87 @@ def clean_dep(dep):
 
 def cuda_workspace():
     """Loads external dependencies required to build apps with alice"""
-    # CUDA 11.4 from cuda-repo-l4t-11-4-local_11.4.14-1_arm64.deb
-    # CUDNN 8.3.2.49 from libcudnn8_8.3.1.22-1+cuda11.4_arm64.deb
-    # Debian's are obtained from https://urm.nvidia.com/artifactory/sw-sdkm-jetson-generic-local/5.0_DP/Linux/114/Jetson_50_b114/
-    # repackaged by cuda_cudnn_package_generation.sh
-    nv_gxf_http_archive(
-        name = "cuda_aarch64_jetpack50",
-        build_file = clean_dep("//third_party:cuda_aarch64_jetpack50.BUILD"),
-        sha256 = "a2691e58c2ef47a7183a8f4fd992ba0f54ccc671bf3316f71264bc9802936c4f",
-        patches = [clean_dep("//third_party:libcudacxx_aarch64_cuda_11_4.diff")],
-        url = "https://urm.nvidia.com/artifactory/sw-isaac-gxf-generic-local/dependencies/internal/cuda/cuda11.4-cudnn8.3.2.49-updated-arm64-tar-xz",
-        type = "tar.xz",
-        licenses = ["http://docs.nvidia.com/cuda/eula/index.html"],
-    )
-
-    # CUDA 11.4 from cuda-repo-l4t-11-4-local_11.4.14-1_arm64.deb
-    # CUDNN 8.4.1.50 from cudnn-local-repo-ubuntu2004-8.4.1.50_1.0-1_arm64.deb
-    # Debian's are obtained from https://urm.nvidia.com/artifactory/sw-sdkm-jetson-generic-local/5.0.2/Linux/201/Jetson_502_b201/
-    # repackaged by cuda_cudnn_package_generation.sh
-    nv_gxf_http_archive(
-        name = "cuda_aarch64_jetpack502",
-        build_file = clean_dep("//third_party:cuda_aarch64_jetpack502.BUILD"),
-        sha256 = "6ef973da37f3d1efb6ac9d36313e86220d2497ab6b07becf8a1926fa65938348",
-        patches = [clean_dep("//third_party:libcudacxx_aarch64_cuda_11_4.diff")],
-        url = "https://urm.nvidia.com/artifactory/sw-isaac-gxf-generic-local/dependencies/internal/cuda/cuda11.4-cudnn8.4.1.50-updated-arm64-tar-xz",
-        type = "tar.xz",
-        licenses = ["http://docs.nvidia.com/cuda/eula/index.html"],
-    )
-
-    # CUDA 11.6 from http://cuda-repo.nvidia.com/release-candidates/kitpicks/cuda-r11-6/11.6.1/005/repos/ubuntu2004/sbsa/
-    # CUDNN 8.3.3.40 from http://cuda-repo/release-candidates/kitpicks/cudnn-v8-3-cuda-11-5/8.3.3.40/003/repos/ubuntu2004/sbsa/
-    # repackaged by cuda_cudnn_package_generation.sh
-    nv_gxf_http_archive(
-        name = "cuda_aarch64_hp11_sbsa",
-        build_file = clean_dep("//third_party:cuda_aarch64_hp11_sbsa.BUILD"),
-        sha256 = "e1e3be1ed04dbb0b8f4a2feaf8827c4354ba00c1413e3fdd02edf6793d029ff6",
-        patches = [clean_dep("//third_party:libcudacxx_aarch64_cuda_11_6.diff")],
-        url = "https://urm.nvidia.com/artifactory/sw-isaac-gxf-generic-local/dependencies/internal/cuda/cuda11.6-cudnn8.3.3.40_sbsa-arm64-tar-xz",
-        type = "tar.xz",
-        licenses = ["http://docs.nvidia.com/cuda/eula/index.html"],
-    )
-
-    # CUDA 11.8 from http://cuda-internal.nvidia.com/release-candidates/kitpicks/cuda-r11-8/11.8.0/065/local_installers/cuda-repo-cross-sbsa-ubuntu2204-11-8-local_11.8.0-1_all.deb
-    # CUDNN 8.6.0 from http://cuda-repo/release-candidates/kitpicks/cudnn-v8-6-cuda-11-8/8.6.0.163/001/repos/ubuntu2004/sbsa/
-    # repackaged by cuda_cudnn_package_generation.sh
-    nv_gxf_http_archive(
-        name = "cuda_aarch64_hp20_sbsa",
-        build_file = clean_dep("//third_party:cuda_aarch64_hp20_sbsa.BUILD"),
-        sha256 = "60987ce0a75cc97ad210abd92e8f9a9af3c36d235ae161447d76a6f374e7c7ba",
-        url = "https://urm.nvidia.com/artifactory/sw-isaac-gxf-generic-local/dependencies/internal/cuda/cuda11.8-cudnn8.6.0.163-sbsa-arm64-tar-xz",
-        type = "tar.xz",
-        licenses = ["http://docs.nvidia.com/cuda/eula/index.html"],
-    )
-
-    # CUDA 12.1 from https://developer.download.nvidia.com/compute/cuda/12.1.1/local_installers/cuda-repo-ubuntu2004-12-1-local_12.1.1-530.30.02-1_arm64.deb
-    # CUDNN 8.9.2 from https://developer.nvidia.com/downloads/compute/cudnn/secure/8.9.2/local_installers/12.x/cudnn-local-repo-ubuntu2004-8.9.2.26_1.0-1_arm64.deb/
+    # CUDA 12.2 from http://cuda-repo/release-candidates/kitpicks/cuda-r12-2/12.2.1/020/repos/ubuntu2204/sbsa/
+    # CUDNN 8.9.2.29 http://cuda-repo/release-candidates/kitpicks/cudnn-v8-9-cuda-12-1/8.9.2.29/001/repos/ubuntu2204/sbsa/
     # repackaged by cuda_cudnn_package_generation.sh
     nv_gxf_http_archive(
         name = "cuda_aarch64_hp21ea_sbsa",
         build_file = clean_dep("//third_party:cuda_aarch64_hp21ea_sbsa.BUILD"),
-        sha256 = "3545ff42ecf52815bcf987958522787e1d3e767a892d2df8cb8329ea4ac41b26",
-        url = "https://urm.nvidia.com/artifactory/sw-isaac-gxf-generic-local/dependencies/internal/cuda/cuda12.1-cudnn8.9.2.26-arm64-tar-xz",
+        sha256 = "f63993349ff37eceae05675a59411cd2274bf94e0aa715faaf7afcbfa997d2b7",
+        url = "https://urm.nvidia.com/artifactory/sw-isaac-gxf-generic-local/dependencies/internal/cuda/cuda12.2-cudnn8.9.2.29-sbsa-tar-xz",
         type = "tar.xz",
         licenses = ["http://docs.nvidia.com/cuda/eula/index.html"],
     )
 
-    # CUDA 11.4 from cuda-repo-l4t-11-4-local_11.4.19-1_arm64.deb
-    # CUDNN 8.6.0 from cudnn-local-tegra-repo-ubuntu2004-8.6.0.166_1.0-1_arm64.deb
-    # Debian's are obtained from https://urm.nvidia.com/ui/native/sw-sdkm-jetson-generic-local/5.1/Linux/72/Jetson_51_b72/
-    # repackaged by cuda_cudnn_package_generation.sh
-    local_archive(
-        name = "cuda_aarch64_jetpack51",
-        build_file = clean_dep("//third_party:cuda_aarch64_jetpack51.BUILD"),
-        patches = [clean_dep("//third_party:libcudacxx_aarch64_cuda_11_4.diff")],
-        src = "//third_party:cuda11.4-cudnn8.6.0.166-arm64.tar.xz",
-    )
-
-    # CUDA 11.6.2 from https://developer.download.nvidia.com/compute/cuda/11.6.1/local_installers/cuda-repo-ubuntu2004-11-6-local_11.6.1-510.47.03-1_amd64.deb
-    # CUDNN 8.2.2.26 from http://cuda-repo.nvidia.com/release-candidates/Libraries/cuDNN/v8.2/8.2.2.26_20210701_30141842/11.4.x-r470/Installer/Ubuntu20_04-x64/libcudnn8-dev_8.2.2.26-1+cuda11.4_amd64.deb
+    # CUDA 12.6 from https://developer.download.nvidia.com/compute/cuda/12.6.0/local_installers/cuda-repo-ubuntu2204-12-6-local_12.6.0-560.28.03-1_arm64.deb
+    # CUDNN 9.3.0 from https://developer.download.nvidia.com/compute/cudnn/9.3.0/local_installers/cudnn-local-repo-ubuntu2204-9.3.0_1.0-1_arm64.deb
     # repackaged by cuda_cudnn_package_generation.sh
     nv_gxf_http_archive(
-        name = "cuda_x86_64",
-        build_file = clean_dep("//third_party:cuda_x86_64.BUILD"),
-        sha256 = "ac1eae69eb2a9f56181fb185e598cb11edaa20c3c3af415b24ee2b6d9c0e7b43",
-        patches = [clean_dep("//third_party:libcudacxx_x86_64_cuda_11_6.diff")],
-        url = "https://urm.nvidia.com/artifactory/sw-isaac-gxf-generic-local/dependencies/internal/cuda/cuda11.6-cudnn8.2.2.26-updated-amd64-tar-xz",
+        name = "cuda_aarch64_hp21ga_sbsa",
+        build_file = clean_dep("//third_party:cuda_aarch64_hp21ga_sbsa.BUILD"),
+        sha256 = "48fed6cd72206aa065ae7ee6b38c5f3f9d99fe3e96f5a97888d59feada258884",
+        url = "https://urm.nvidia.com/artifactory/sw-isaac-gxf-generic-local/dependencies/internal/cuda/cuda12.6-cudnn9.3.0.75-sbsa-tar-xz",
         type = "tar.xz",
         licenses = ["http://docs.nvidia.com/cuda/eula/index.html"],
     )
 
-    # CUDA 11.7.1 from http://cuda-repo/release-candidates/kitpicks/cuda-r11-7/11.7.1/017/local_installers/cuda-repo-ubuntu2004-11-7-local_11.7.1-515.65.01-1_amd64.deb
-    # CUDNN 8.4.1 from https://developer.nvidia.com/compute/cudnn/secure/8.4.1/local_installers/11.6/cudnn-local-repo-ubuntu2004-8.4.1.50_1.0-1_amd64.deb
+    # https://sdkm.nvidia.com/products?product=jetson&sdk=JetPack+6.0+DP&tab=src+dirs
+    # CUDA 12.2 from http://cuda-repo/release-candidates/kitpicks/cuda-r12-2-tegra/12.2.12/005/local_installers/cuda-tegra-repo-ubuntu2204-12-2-local_12.2.12-1_arm64.deb
+    # CUDNN 8.9.4.25 from http://cuda-repo/release-candidates/kitpicks/cudnn-v8-9-tegra/8.9.4.25/001/local_installers/cudnn-local-tegra-repo-ubuntu2204-8.9.4.25_1.0-1_arm64.deb
     # repackaged by cuda_cudnn_package_generation.sh
-    # update1 picks up most recent cuda-11.7 package which also includes libcudacxx headers
     nv_gxf_http_archive(
-        name = "cuda_x86_64_11071",
-        build_file = clean_dep("//third_party:cuda_x86_64_11071.BUILD"),
-        sha256 = "f77d81f5b3c32f10e758cd2dc1b371c5cc5cdfc91014b31c868761c0316752fe",
-        url = "https://urm.nvidia.com/artifactory/sw-isaac-gxf-generic-local/dependencies/internal/cuda/cuda11.7-cudnn8.4.1.50-updated-amd64-tar-xz",
+        name = "cuda_aarch64_jetpack60",
+        build_file = clean_dep("//third_party:cuda_aarch64_jetpack60.BUILD"),
+        sha256 = "735fd74bf36ce305dab226179fc76897ca6f4e3adc4c3f8a41cf6ef38f138045",
+        url = "https://urm.nvidia.com/artifactory/sw-isaac-gxf-generic-local/dependencies/internal/cuda/cuda12.2-cudnn8.9.4.25-arm64-tar-xz",
         type = "tar.xz",
         licenses = ["http://docs.nvidia.com/cuda/eula/index.html"],
     )
 
-    # CUDA 11.8.0 from http://cuda-internal.nvidia.com/release-candidates/kitpicks/cuda-r11-8/11.8.0/065/local_installers/cuda-repo-ubuntu2004-11-8-local_11.8.0-520.61.05-1_amd64.deb
-    # CUDNN 8.6.0 from http://cuda-internal.nvidia.com/release-candidates/kitpicks/cudnn-v8-6-cuda-11-8/8.6.0.163/001/repos/ubuntu2004/x86_64/libcudnn8-dev_8.6.0.163-1+cuda11.8_amd64.deb
-    # repackaged by cuda_cudnn_package_generation.sh
-    local_archive(
-        name = "cuda_x86_64_11080",
-        build_file = clean_dep("//third_party:cuda_x86_64_11080.BUILD"),
-        src = "//third_party:cuda11.8-cudnn8.6.0.163-amd64.tar.xz",
-    )
-
-    # CUDA 12.1.0 from https://developer.download.nvidia.com/compute/cuda/12.1.1/local_installers/cuda-repo-ubuntu2004-12-1-local_12.1.1-530.30.02-1_amd64.deb
-    # CUDNN 8.8.1 from https://developer.nvidia.com/downloads/compute/cudnn/secure/8.8.1/local_installers/12.0/cudnn-local-repo-ubuntu2004-8.8.1.3_1.0-1_amd64.deb/
+    # CUDA 12.6 from https://developer.download.nvidia.com/compute/cuda/12.6.0/local_installers/cuda-tegra-repo-ubuntu2204-12-6-local_12.6.0-1_arm64.deb
+    # CUDNN 9.3.0 from https://developer.download.nvidia.com/compute/cudnn/9.3.0/local_installers/cudnn-local-tegra-repo-ubuntu2204-9.3.0_1.0-1_arm64.deb
     # repackaged by cuda_cudnn_package_generation.sh
     nv_gxf_http_archive(
-        name = "cuda_x86_64_12010",
-        build_file = clean_dep("//third_party:cuda_x86_64_12010.BUILD"),
-        sha256 = "90c479e5f985097b71748c0ef120c9cc151288bf5d36a6dddefb77628f791bea",
-        url = "https://urm.nvidia.com/artifactory/sw-isaac-gxf-generic-local/dependencies/internal/cuda/cuda12.1-cudnn8.8.1.3-amd64-tar-xz",
+        name = "cuda_aarch64_jetpack61",
+        build_file = clean_dep("//third_party:cuda_aarch64_jetpack61.BUILD"),
+        sha256 = "65988373facdfa6a4c57a222bf0043dfb1dd06e5e4d0e5b0fac9b6a07e7abd5a",
+        url = "https://urm.nvidia.com/artifactory/sw-isaac-gxf-generic-local/dependencies/internal/cuda/cuda12.6-cudnn9.3.0.75-arm64-tar-xz",
+        type = "tar.xz",
+        licenses = ["http://docs.nvidia.com/cuda/eula/index.html"],
+    )
+
+    # CUDA 12.2.12 from http://cuda-repo/release-candidates/kitpicks/cuda-r12-2-tegra/12.2.12/005/local_installers/cuda-repo-ubuntu2204-12-2-local_12.2.12-535.104.05-1_amd64.deb
+    # CUDNN 8.9.4.25 from http://cuda-repo/release-candidates/kitpicks/cudnn-v8-9-cuda-12-2/8.9.4.25/001/local_installers/cudnn-local-repo-ubuntu2204-8.9.4.25_1.0-1_amd64.deb
+    # repackaged by cuda_cudnn_package_generation.sh
+    nv_gxf_http_archive(
+        name = "cuda_x86_64_12020",
+        build_file = clean_dep("//third_party:cuda_x86_64_12020.BUILD"),
+        sha256 = "ff01d8d27bbe1e71e4d8ae7badcac05e859418631f29455b0243576fb2202a6c",
+        url = "https://urm.nvidia.com/artifactory/sw-isaac-gxf-generic-local/dependencies/internal/cuda/cuda12.2-cudnn8.9.4.25-amd64-tar-xz",
+        type = "tar.xz",
+        licenses = ["http://docs.nvidia.com/cuda/eula/index.html"],
+    )
+
+    # CUDA 12.6 from https://developer.download.nvidia.com/compute/cuda/12.6.0/local_installers/cuda-repo-ubuntu2204-12-6-local_12.6.0-560.28.03-1_amd64.deb
+    # CUDNN 9.3.0 from https://developer.download.nvidia.com/compute/cudnn/9.3.0/local_installers/cudnn-local-repo-ubuntu2204-9.3.0_1.0-1_amd64.deb
+    # repackaged by cuda_cudnn_package_generation.sh
+    nv_gxf_http_archive(
+        name = "cuda_x86_64_12060",
+        build_file = clean_dep("//third_party:cuda_x86_64_12060.BUILD"),
+        sha256 = "a6c39c67009fa23dc52c324f69635784ac85a73e8ef8e5d4e8cb5b70d0ed0087",
+        url = "https://urm.nvidia.com/artifactory/sw-isaac-gxf-generic-local/dependencies/internal/cuda/cuda12.6-cudnn9.3.0.75-amd64-tar-xz",
+        type = "tar.xz",
+        licenses = ["http://docs.nvidia.com/cuda/eula/index.html"],
+    )
+
+    # CUDA 12.2.12 from http://cuda-repo/release-candidates/kitpicks/cuda-r12-2-tegra/12.2.12/005/local_installers/cuda-repo-ubuntu2204-12-2-local_12.2.12-535.104.05-1_amd64.deb
+    # CUDNN 8.9.4.25 from https://developer.nvidia.com/downloads/compute/cudnn/secure/8.9.2/local_installers/12.x/cudnn-local-repo-rhel9-8.9.2.26-1.0-1.x86_64.rpm
+    # repackaged by cuda_cudnn_package_generation.sh
+    nv_gxf_http_archive(
+        name = "cuda_x86_64_rhel9_12020",
+        build_file = clean_dep("//third_party:cuda_x86_64_rhel9_12020.BUILD"),
+        sha256 = "80f9e93b6ec7eaf7efc42e9bdad375f9aeaefbd95c19ccf475b4915bf81a8f84",
+        url = "https://urm.nvidia.com/artifactory/sw-isaac-gxf-generic-local/dependencies/internal/cuda/cuda12.2-cudnn8.9.4.25-amd64-rhel9-tar-xz",
         type = "tar.xz",
         licenses = ["http://docs.nvidia.com/cuda/eula/index.html"],
     )

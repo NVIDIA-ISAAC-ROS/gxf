@@ -152,8 +152,8 @@ class JobStatistics : public Component {
   // helper function to obtain entity and codelet name from id
   Expected<std::string> findParameterName(gxf_uid_t);
 
-  // helper function to obtain codelet type name from id
-  Expected<std::string> findCodeletTypeName(gxf_uid_t);
+  // helper function to obtain component type name from id
+  Expected<std::string> findComponentTypeName(gxf_uid_t);
 
   // Clock used for calculation execution timings
   Parameter<Handle<Clock>> clock_;

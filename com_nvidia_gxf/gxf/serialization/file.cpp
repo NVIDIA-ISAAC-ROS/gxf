@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2021, NVIDIA CORPORATION. All rights reserved.
+Copyright (c) 2021-2023, NVIDIA CORPORATION. All rights reserved.
 
 NVIDIA CORPORATION and its licensors retain all intellectual property
 and proprietary rights in and to this software, related documentation
@@ -11,7 +11,6 @@ license agreement from NVIDIA CORPORATION is strictly prohibited.
 
 #include <sys/stat.h>
 
-#include <cstdio>
 #include <ctime>
 #include <string>
 
@@ -180,13 +179,13 @@ Expected<void> File::flush() {
   return Success;
 }
 
-Expected<void> File::seek(size_t offset) {
+Expected<void> File::seek(int offset, int position) {
   std::unique_lock<std::recursive_mutex> lock(mutex_);
   if (file_ == nullptr) {
     GXF_LOG_ERROR("File is not open");
     return Unexpected{GXF_NULL_POINTER};
   }
-  const ssize_t result = fseek(file_, offset, SEEK_SET);
+  const ssize_t result = fseek(file_, offset, position);
   if (result != 0) {
     GXF_LOG_ERROR("%s", strerror(errno));
     return Unexpected{GXF_FAILURE};

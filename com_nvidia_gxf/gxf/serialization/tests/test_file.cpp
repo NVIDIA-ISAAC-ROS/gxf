@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
+Copyright (c) 2022-2024, NVIDIA CORPORATION. All rights reserved.
 
 NVIDIA CORPORATION and its licensors retain all intellectual property
 and proprietary rights in and to this software, related documentation
@@ -14,6 +14,7 @@ license agreement from NVIDIA CORPORATION is strictly prohibited.
 
 #include "gxf/core/gxf.h"
 #include "gxf/serialization/file.hpp"
+#include "gxf/serialization/file_stream.hpp"
 #include "gxf/std/allocator.hpp"
 
 namespace nvidia {
@@ -116,6 +117,7 @@ TEST_F(TestFile, Read) {
 
   byte buffer2[kBufferSizeSmall];
   std::memset(buffer2, 0x00, sizeof(buffer2));
+  ASSERT_TRUE(file->isReadAvailable());
   auto result = file->read(buffer2, sizeof(buffer2));
   ASSERT_TRUE(result);
   ASSERT_EQ(result.value(), sizeof(buffer2));
@@ -149,7 +151,7 @@ TEST_F(TestFile, Rename) {
   std::memset(buffer1, 0xAA, sizeof(buffer1));
   ASSERT_TRUE(file->open(file_path_old.c_str()));
   ASSERT_EQ(file->path(), file_path_old);
-
+  ASSERT_TRUE(file->isWriteAvailable());
   ASSERT_TRUE(file->write(buffer1, sizeof(buffer1)));
   ASSERT_TRUE(file->flush());
   ASSERT_TRUE(file->seek(0));
@@ -170,6 +172,60 @@ TEST_F(TestFile, Timestamp) {
   ASSERT_TRUE(file->close());
   ASSERT_TRUE(file->addTimestamp(0, true));
   ASSERT_EQ(file->path(), file_path_new);
+}
+
+TEST_F(TestFile, InvalidFileOpen) {
+  ASSERT_FALSE(file->open(nullptr));
+  ASSERT_FALSE(file->open(""));
+  ASSERT_FALSE(file->open("~/DummyFile"));
+}
+
+TEST_F(TestFile, InvalidFileClose) {
+  ASSERT_FALSE(file->close());
+}
+
+TEST_F(TestFile, InvalidFileFlush) {
+  ASSERT_FALSE(file->flush());
+}
+
+TEST_F(TestFile, FilePosition) {
+  const std::string file_path_old = "/tmp/test_file_timestamp";
+  const std::string file_path_new = "/tmp/1970-01-01_00-00-00_test_file_timestamp";
+  ASSERT_TRUE(file->open(file_path_old.c_str()));
+  size_t fileSize = 0;
+  ASSERT_TRUE(file->tell() == fileSize);
+}
+
+TEST(TestFileStrean, FileStream) {
+  std::string path = "DummyFile";
+  auto file_stream_ = FileStream("", path + nvidia::gxf::FileStream::kIndexFileExtension);
+  ASSERT_TRUE(file_stream_.open());
+  ASSERT_TRUE(file_stream_.setWriteOffset(0));
+  byte buffer[kBufferSizeSmall];
+  std::memset(buffer, 0xAA, sizeof(buffer));
+  ASSERT_TRUE(file_stream_.write(buffer, sizeof(buffer)));
+  auto offset = file_stream_.getWriteOffset();
+  ASSERT_TRUE(file_stream_.flush());
+  ASSERT_TRUE(offset == kBufferSizeSmall);
+  file_stream_.clear();
+  ASSERT_TRUE(file_stream_.close());
+}
+
+TEST(TestFileStrean, FileStreamRead) {
+  std::string path = "DummyFile";
+  auto file_write_stream_ = FileStream("", path + nvidia::gxf::FileStream::kIndexFileExtension);
+  ASSERT_TRUE(file_write_stream_.open());
+  byte buffer[kBufferSizeSmall];
+  std::memset(buffer, 0xAA, sizeof(buffer));
+  ASSERT_TRUE(file_write_stream_.write(buffer, sizeof(buffer)));
+
+  auto file_read_stream_ = FileStream(path + nvidia::gxf::FileStream::kIndexFileExtension, "");
+  ASSERT_TRUE(file_read_stream_.open());
+  constexpr auto fileOffsetToSet = 100;
+  ASSERT_TRUE(file_read_stream_.setReadOffset(fileOffsetToSet));
+  const size_t offset = file_read_stream_.getReadOffset().value();
+  ASSERT_TRUE(offset == fileOffsetToSet);
+  ASSERT_TRUE(file_read_stream_.close());
 }
 
 }  // namespace test

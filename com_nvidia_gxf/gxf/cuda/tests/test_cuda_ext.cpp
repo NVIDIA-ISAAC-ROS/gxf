@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2021-2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-FileCopyrightText: Copyright (c) 2021-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * SPDX-License-Identifier: Apache-2.0
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -20,7 +20,7 @@
 GXF_EXT_FACTORY_BEGIN()
 
 GXF_EXT_FACTORY_SET_INFO(0x469d921446a5431a, 0xb7b59e598d9fc1db, "TestCudaExtension",
-                         "Testing Cuda related components", "Nvidia_Gxf", "1.3.0", "NVIDIA");
+                         "Testing Cuda related components", "Nvidia_Gxf", "1.6.0", "NVIDIA");
 
 GXF_EXT_FACTORY_SET_DISPLAY_INFO("Test Cuda Extension", "Cuda", "GXF Cuda Test Extension");
 
@@ -44,5 +44,17 @@ GXF_EXT_FACTORY_ADD(0x4286872912cd4cae, 0xb0ea83d18715d774, nvidia::gxf::test::c
 
 GXF_EXT_FACTORY_ADD(0xe578e5bd15434de4, 0x8ed625fd24354ac0, nvidia::gxf::test::cuda::VerifyEqual,
                     nvidia::gxf::Codelet, "Verify whether 2 input tensors same");
+
+GXF_EXT_FACTORY_ADD(0x293190785f1a11ef, 0xa3d097895e79aba6,
+                    nvidia::gxf::test::cuda::CudaAsyncBufferGenerator,
+                    nvidia::gxf::Codelet, "Verify whether 2 input tensors same");
+
+GXF_EXT_FACTORY_ADD(0x4f2240205f1a11ef, 0xa0be4fd9265eca79, nvidia::gxf::test::cuda::Convolve2D,
+                    nvidia::gxf::Codelet, "Performs an async 2D convolution operation on "
+                    "incoming CudaBuffer objects");
+
+GXF_EXT_FACTORY_ADD(0x7468fe005f7e11ef, 0xbd4d2ba0f2a6467a, nvidia::gxf::test::cuda::CudaBufferRx,
+                    nvidia::gxf::Codelet, "Dequeue a message entity with a cuda buffer and ensures"
+                    " the data is available");
 
 GXF_EXT_FACTORY_END()

@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2021-2022, NVIDIA CORPORATION. All rights reserved.
+Copyright (c) 2021-2024, NVIDIA CORPORATION. All rights reserved.
 
 NVIDIA CORPORATION and its licensors retain all intellectual property
 and proprietary rights in and to this software, related documentation
@@ -10,6 +10,7 @@ license agreement from NVIDIA CORPORATION is strictly prohibited.
 #include <algorithm>
 #include <vector>
 
+#include "gxf/core/expected_macro.hpp"
 #include "gxf/std/synchronization.hpp"
 #include "gxf/std/timestamp.hpp"
 
@@ -23,7 +24,7 @@ gxf_result_t Synchronization::registerInterface(Registrar* registrar) {
       "All the inputs for synchronization, number of inputs must match that of the outputs.");
   result &= registrar->parameter(
       outputs_, "outputs", "Outputs",
-      "All the outputs for synchronization, number of outpus must match that of the inputs.");
+      "All the outputs for synchronization, number of outputs must match that of the inputs.");
   result &= registrar->parameter(
       sync_threshold_, "sync_threshold", "Synchronization threshold (ns)",
       "Synchronization threshold in nanoseconds. "
@@ -48,45 +49,42 @@ gxf_result_t Synchronization::start() {
 }
 
 gxf_result_t Synchronization::tick() {
+  /* Check if all input queues have messages */
+  for (const auto& rx : inputs_.get()) {
+    if (rx->size() == 0) {
+      /* Not all the inputs have messages, unexpected. */
+      GXF_LOG_ERROR("Not all the inputs have messages for synchronization!");
+      return GXF_CONTRACT_MESSAGE_NOT_AVAILABLE;
+    }
+  }
+
   /* First try reading the timestamps of available messages from all the inputs */
   std::vector<std::vector<int64_t>> acq_times;
   for (const auto& rx : inputs_.get()) {
-    if (rx->back_size() == 0 && rx->size() == 0) {
-      /* Not all the inputs have messages, unexpected. */
-      GXF_LOG_ERROR("Not all the inputs have messages for synchronization!");
-      return GXF_FAILURE;
-    } else {
-      std::vector<int64_t> ack_times_per_receiver;
-      size_t sizes[] = {rx->back_size(), rx->size()};
-      std::function<Expected<Entity>(size_t)> peek_funcs[] = {
-          [&rx](size_t i) { return rx->peekBack(i); },
-          [&rx](size_t i) { return rx->peek(i); }
-      };
-      for (auto i = 0; i < 2; i++) {
-        for (size_t index = sizes[i]; index > 0; index--) {
-          auto msg_result = peek_funcs[i](index - 1);
-          if (msg_result) {
-            auto timestamp_components = msg_result->findAll<Timestamp>();
-            if (!timestamp_components) {
-              return ToResultCode(timestamp_components);
-            }
-            if (0 == timestamp_components->size()) {
-              GXF_LOG_ERROR("No timestamp found from the input message");
-              return GXF_FAILURE;
-            }
-            ack_times_per_receiver.push_back(timestamp_components->front().value()->acqtime);
-          }
+    std::vector<int64_t> ack_times_per_receiver;
+    for (size_t index = rx->size(); index > 0; index--) {
+      auto msg_result = rx->peek(index - 1);
+      if (msg_result) {
+        auto timestamp_components = msg_result->findAllHeap<Timestamp>();
+        if (!timestamp_components) {
+          return ToResultCode(timestamp_components);
         }
+        if (0 == timestamp_components->size()) {
+          GXF_LOG_ERROR("No timestamp found from the input message");
+          return GXF_ENTITY_COMPONENT_NOT_FOUND;
+        }
+        ack_times_per_receiver.push_back(timestamp_components->front().value()->acqtime);
       }
-      acq_times.push_back(ack_times_per_receiver);
     }
+    acq_times.push_back(ack_times_per_receiver);
   }
+
   /* find latest timestamp we're going to pick from the fastest moving queue*/
   int64_t latest = 0;
   for (const auto& timestamps : acq_times) {
     if (timestamps.back() > latest) { latest = timestamps.back(); }
   }
-  GXF_LOG_DEBUG("Candidate timestamp for synching: %zd", latest);
+  GXF_LOG_DEBUG("Candidate timestamp for syncing: %zd", latest);
   /* check if in all the monitored receivers there are messages that are within the threshold of
      the latest timestamp, e.g., if there is a sync point */
   uint32_t synchronized = 0;
@@ -105,6 +103,7 @@ gxf_result_t Synchronization::tick() {
     }
   }
   const bool can_send = synchronized == inputs_.get().size();
+
   // poll the message queues based on the gathered timestamp information
   // the assumption here is the timestamps are in order
   for (size_t i = 0; i < acq_times.size(); i++) {
@@ -125,6 +124,10 @@ gxf_result_t Synchronization::tick() {
         // push the synchronized message
         GXF_LOG_DEBUG("Sending message from input %ld at %zd", i, acq_time);
         auto message = rx->receive();
+        if (!message) {
+          GXF_LOG_ERROR("Receiver queue corrupted, message not found");
+          return GXF_CONTRACT_MESSAGE_NOT_AVAILABLE;
+        }
         tx->publish(message.value());
         // send only one message per output per tick
         break;
@@ -134,10 +137,6 @@ gxf_result_t Synchronization::tick() {
   // if there are not enough synchronized messages, don't clear the queue, just wait for more;
   // any stale messages will be dropped on subsequent ticks
 
-  return GXF_SUCCESS;
-}
-
-gxf_result_t Synchronization::stop() {
   return GXF_SUCCESS;
 }
 

@@ -1,0 +1,254 @@
+%YAML 1.2
+# SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+---
+name: generator_host_1
+components:
+- name: output
+  type: nvidia::gxf::DoubleBufferTransmitter
+- name: allocator
+  type: nvidia::gxf::RMMAllocator
+- type: nvidia::gxf::test::TensorGenerator
+  parameters:
+    output: output
+    allocator: allocator
+    shape: [ 4, 4, 4, 4 ]
+    storage_type: 0
+    enable_timestamps: false
+- type: nvidia::gxf::DownstreamReceptiveSchedulingTerm
+  parameters:
+    transmitter: output
+    min_size: 1
+- type: nvidia::gxf::CountSchedulingTerm
+  parameters:
+    count: 500
+---
+name: generator_host_2
+components:
+- name: output
+  type: nvidia::gxf::DoubleBufferTransmitter
+- name: allocator
+  type: nvidia::gxf::RMMAllocator
+- type: nvidia::gxf::test::TensorGenerator
+  parameters:
+    output: output
+    allocator: allocator
+    shape: [ 4, 4, 4, 4 ]
+    storage_type: 0
+    enable_timestamps: false
+- type: nvidia::gxf::DownstreamReceptiveSchedulingTerm
+  parameters:
+    transmitter: output
+    min_size: 1
+- type: nvidia::gxf::CountSchedulingTerm
+  parameters:
+    count: 500
+---
+name: generator_host_3
+components:
+- name: output
+  type: nvidia::gxf::DoubleBufferTransmitter
+- name: allocator
+  type: nvidia::gxf::RMMAllocator
+- type: nvidia::gxf::test::TensorGenerator
+  parameters:
+    output: output
+    allocator: allocator
+    shape: [ 4, 4, 4, 4 ]
+    storage_type: 0
+    enable_timestamps: false
+- type: nvidia::gxf::DownstreamReceptiveSchedulingTerm
+  parameters:
+    transmitter: output
+    min_size: 1
+- type: nvidia::gxf::CountSchedulingTerm
+  parameters:
+    count: 500
+---
+name: generator_device_1
+components:
+- name: output
+  type: nvidia::gxf::DoubleBufferTransmitter
+- name: allocator
+  type: nvidia::gxf::RMMAllocator
+- type: nvidia::gxf::test::TensorGenerator
+  parameters:
+    output: output
+    allocator: allocator
+    shape: [ 4, 4, 4, 4 ]
+    storage_type: 1
+    enable_timestamps: false
+- type: nvidia::gxf::DownstreamReceptiveSchedulingTerm
+  parameters:
+    transmitter: output
+    min_size: 1
+- type: nvidia::gxf::CountSchedulingTerm
+  parameters:
+    count: 500
+---
+name: generator_device_2
+components:
+- name: output
+  type: nvidia::gxf::DoubleBufferTransmitter
+- name: allocator
+  type: nvidia::gxf::RMMAllocator
+- type: nvidia::gxf::test::TensorGenerator
+  parameters:
+    output: output
+    allocator: allocator
+    shape: [ 4, 4, 4, 4 ]
+    storage_type: 1
+    enable_timestamps: false
+- type: nvidia::gxf::DownstreamReceptiveSchedulingTerm
+  parameters:
+    transmitter: output
+    min_size: 1
+- type: nvidia::gxf::CountSchedulingTerm
+  parameters:
+    count: 500
+---
+name: generator_device_3
+components:
+- name: output
+  type: nvidia::gxf::DoubleBufferTransmitter
+- name: allocator
+  type: nvidia::gxf::RMMAllocator
+- type: nvidia::gxf::test::TensorGenerator
+  parameters:
+    output: output
+    allocator: allocator
+    shape: [ 4, 4, 4, 4 ]
+    storage_type: 1
+    enable_timestamps: false
+- type: nvidia::gxf::DownstreamReceptiveSchedulingTerm
+  parameters:
+    transmitter: output
+    min_size: 1
+- type: nvidia::gxf::CountSchedulingTerm
+  parameters:
+    count: 500
+---
+name: rx_host
+components:
+- name: signal_host_1
+  type: nvidia::gxf::DoubleBufferReceiver
+- name: signal_host_2
+  type: nvidia::gxf::DoubleBufferReceiver
+- name: signal_host_3
+  type: nvidia::gxf::DoubleBufferReceiver
+- type: nvidia::gxf::MessageAvailableSchedulingTerm
+  parameters:
+    receiver: signal_host_1
+    min_size: 1
+- type: nvidia::gxf::MessageAvailableSchedulingTerm
+  parameters:
+    receiver: signal_host_2
+    min_size: 1
+- type: nvidia::gxf::MessageAvailableSchedulingTerm
+  parameters:
+    receiver: signal_host_3
+    min_size: 1
+- type: nvidia::gxf::PingRx
+  parameters:
+    signal: signal_host_1
+- type: nvidia::gxf::PingRx
+  parameters:
+    signal: signal_host_2
+- type: nvidia::gxf::PingRx
+  parameters:
+    signal: signal_host_3
+---
+name: rx_device
+components:
+- name: signal_device_1
+  type: nvidia::gxf::DoubleBufferReceiver
+- name: signal_device_2
+  type: nvidia::gxf::DoubleBufferReceiver
+- name: signal_device_3
+  type: nvidia::gxf::DoubleBufferReceiver
+- type: nvidia::gxf::MessageAvailableSchedulingTerm
+  parameters:
+    receiver: signal_device_1
+    min_size: 1
+- type: nvidia::gxf::MessageAvailableSchedulingTerm
+  parameters:
+    receiver: signal_device_2
+    min_size: 1
+- type: nvidia::gxf::MessageAvailableSchedulingTerm
+  parameters:
+    receiver: signal_device_3
+    min_size: 1
+- type: nvidia::gxf::PingRx
+  parameters:
+    signal: signal_device_1
+- type: nvidia::gxf::PingRx
+  parameters:
+    signal: signal_device_2
+- type: nvidia::gxf::PingRx
+  parameters:
+    signal: signal_device_3
+---
+components:
+- type: nvidia::gxf::Connection
+  parameters:
+    source: generator_host_1/output
+    target: rx_host/signal_host_1
+---
+components:
+- type: nvidia::gxf::Connection
+  parameters:
+    source: generator_host_2/output
+    target: rx_host/signal_host_2
+---
+components:
+- type: nvidia::gxf::Connection
+  parameters:
+    source: generator_host_3/output
+    target: rx_host/signal_host_3
+---
+components:
+- type: nvidia::gxf::Connection
+  parameters:
+    source: generator_device_1/output
+    target: rx_device/signal_device_1
+---
+components:
+- type: nvidia::gxf::Connection
+  parameters:
+    source: generator_device_2/output
+    target: rx_device/signal_device_2
+---
+components:
+- type: nvidia::gxf::Connection
+  parameters:
+    source: generator_device_3/output
+    target: rx_device/signal_device_3
+---
+components:
+- name: clock
+  type: nvidia::gxf::RealtimeClock
+- type: nvidia::gxf::MultiThreadScheduler
+  parameters:
+    clock: clock
+    max_duration_ms: 30000
+    worker_thread_number: 2
+    stop_on_deadlock: true
+    stop_on_deadlock_timeout: 100
+- type: nvidia::gxf::JobStatistics
+  parameters:
+    clock: clock
+    codelet_statistics: true
+
+

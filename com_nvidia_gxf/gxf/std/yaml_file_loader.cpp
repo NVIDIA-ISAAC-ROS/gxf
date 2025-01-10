@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2020-2023, NVIDIA CORPORATION. All rights reserved.
+Copyright (c) 2020-2024, NVIDIA CORPORATION. All rights reserved.
 
 NVIDIA CORPORATION and its licensors retain all intellectual property
 and proprietary rights in and to this software, related documentation
@@ -10,16 +10,20 @@ license agreement from NVIDIA CORPORATION is strictly prohibited.
 #include "gxf/std/yaml_file_loader.hpp"
 
 #include <inttypes.h>
+#include <complex>
 #include <cstdlib>
 #include <ctime>
 #include <fstream>
 #include <map>
+#include <memory>
 #include <string>
 #include <utility>
 #include <vector>
 
 #include "common/assert.hpp"
-#include "gxf/std/parameter_storage.hpp"
+#include "gxf/core/common_expected_macro.hpp"
+#include "gxf/core/parameter_storage.hpp"
+#include "gxf/core/type_registry.hpp"
 
 namespace nvidia {
 namespace gxf {
@@ -118,7 +122,7 @@ Expected<void> ParseParameterOverride(const char* inputStr[],
 }
 
 // update the parameter value from the YAML node if any parameter override
-// found, otherwize return the original YAML node for component parameters
+// found, otherwise return the original YAML node for component parameters
 Expected<YAML::Node> performParameterOverride(
   YAML::Node component,
   std::vector<ParameterOverrides>& parameter_override,
@@ -470,9 +474,7 @@ Expected<void> YamlFileLoader::load(
       gxf_uid_t eid = subgraph_iterator.first;
       gxf_uid_t cid = kNullUid;
       const char* subgraph_entity_name = nullptr;
-      if (GXF_SUCCESS != GxfParameterGetStr(
-                    context, eid, kInternalNameParameterKey, &subgraph_entity_name)
-      ) {
+      if (GXF_SUCCESS != GxfEntityGetName(context, eid, &subgraph_entity_name)) {
           subgraph_entity_name = std::to_string(eid).c_str();
       }
       // go through the components, if there is any subgraph, let's perform the
@@ -570,8 +572,9 @@ Expected<void> YamlFileLoader::load(
               auto result = StdVectorToFixedVector(yaml_nodes, subgraph_nodes)
                   .and_then([&](){
                     const char* entity_name = nullptr;
-                    if (GXF_SUCCESS != GxfParameterGetStr(
-                        context, eid, kInternalNameParameterKey, &entity_name)
+                    if (GXF_SUCCESS != GxfEntityGetName(
+                      context, eid, &entity_name
+                      )
                     ) {
                       entity_name = std::to_string(eid).c_str();
                     }
@@ -643,7 +646,8 @@ Expected<void> YamlFileLoader::load(
 
 // Emit a component's parameter key and value pair to a YAML::Emitter object
 template <typename T>
-Expected<void> emitComponentParameter(YAML::Emitter& out, ParameterStorage* param_storage,
+Expected<void> emitComponentParameter(YAML::Emitter& out,
+                                      std::shared_ptr<ParameterStorage> param_storage,
                                       gxf_uid_t cid, gxf_parameter_info_t& param_info) {
   const char* param_key = param_info.key;
   const auto maybe_param_value = param_storage->get<T>(cid, param_key);
@@ -669,7 +673,8 @@ Expected<void> emitComponentParameter(YAML::Emitter& out, ParameterStorage* para
 
 // Emit a component's parameter key and value pair to a YAML::Emitter object
 template <typename T>
-Expected<void> emitComponentParameter(YAML::Emitter& out, ParameterStorage* param_storage,
+Expected<void> emitComponentParameter(YAML::Emitter& out,
+                                      std::shared_ptr<ParameterStorage> param_storage,
                                       gxf_uid_t cid, const char* param_key) {
   const auto maybe_param_value = param_storage->get<T>(cid, param_key);
   if (!maybe_param_value) {
@@ -686,7 +691,8 @@ Expected<void> emitComponentParameter(YAML::Emitter& out, ParameterStorage* para
 }
 
 // Emit a component's parameter key and value pair to a YAML::Emitter object
-Expected<void> emitComponentParameterViaWrap(YAML::Emitter& out, ParameterStorage* param_storage,
+Expected<void> emitComponentParameterViaWrap(YAML::Emitter& out,
+                                             std::shared_ptr<ParameterStorage> param_storage,
                                              gxf_uid_t cid, gxf_parameter_info_t& param_info) {
   auto maybe_node = param_storage->wrap(cid, param_info.key);
   if (maybe_node) {
@@ -731,7 +737,7 @@ Expected<void> YamlFileLoader::saveToFile(
 
     const gxf_uid_t eid = entities[i];
     const char *entity_name;
-    const gxf_result_t result_2 = GxfComponentName(context, eid, &entity_name);
+    const gxf_result_t result_2 = GxfEntityGetName(context, eid, &entity_name);
     if (result_2 != GXF_SUCCESS) {
       GXF_LOG_ERROR("Could not get name for the entity E%05zu", eid);
       return Unexpected{result_2};
@@ -837,8 +843,8 @@ Expected<void> YamlFileLoader::saveToFile(
                 continue;
               }
             GXF_LOG_ERROR(
-              "Could not get parameter \"%s\" as handle for component %s/%s (C%05zu)",
-              param_info.key, entity_name, comp_name, cid);
+              "Could not get parameter \"%s\" as handle for component %s/%s (C%05zu) %s",
+              param_info.key, entity_name, comp_name, cid, GxfResultStr(maybe_handle.error()));
             emit_result = gxf::ForwardError(maybe_handle);
             break;
           }
@@ -923,6 +929,18 @@ Expected<void> YamlFileLoader::saveToFile(
             out, parameter_storage_, cid, param_info);
           break;
         }
+        case GXF_PARAMETER_TYPE_COMPLEX64:
+        {
+          emit_result = emitComponentParameter<std::complex<float>>(
+            out, parameter_storage_, cid, param_info);
+          break;
+        }
+        case GXF_PARAMETER_TYPE_COMPLEX128:
+        {
+          emit_result = emitComponentParameter<std::complex<double>>(
+            out, parameter_storage_, cid, param_info);
+          break;
+        }
         case GXF_PARAMETER_TYPE_BOOL:
         {
           emit_result = emitComponentParameter<bool>(
@@ -973,7 +991,7 @@ Expected<void> YamlFileLoader::saveToFile(
   myfile << out.c_str();
   myfile << "\n";
   myfile.close();
-  GXF_LOG_INFO("Sucessfully exported graph to \"%s\"", filename.c_str());
+  GXF_LOG_INFO("Successfully exported graph to \"%s\"", filename.c_str());
   return Success;
 }
 
@@ -986,7 +1004,7 @@ Expected<gxf_uid_t> YamlFileLoader::findOrCreateEntity(
   //  not found: create new entity with that name and return it
 
   // try to find an existing entity
-  if (entity_name) {
+  if (entity_name && !entity_name->empty()) {
     gxf_uid_t eid;
     const gxf_result_t result_1 = GxfEntityFind(context, entity_name->c_str(), &eid);
     if (result_1 == GXF_SUCCESS) { return eid; }

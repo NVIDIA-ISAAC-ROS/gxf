@@ -1,0 +1,69 @@
+"""
+ SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ SPDX-License-Identifier: Apache-2.0
+
+ Licensed under the Apache License, Version 2.0 (the "License");
+ you may not use this file except in compliance with the License.
+ You may obtain a copy of the License at
+
+ http://www.apache.org/licenses/LICENSE-2.0
+
+ Unless required by applicable law or agreed to in writing, software
+ distributed under the License is distributed on an "AS IS" BASIS,
+ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ See the License for the specific language governing permissions and
+ limitations under the License.
+"""
+
+load(
+    "//gxf:gxf.bzl",
+    "nv_gxf_cc_test_group",
+    "nv_gxf_app"
+)
+
+nv_gxf_cc_test_group(
+    name = "tests",
+    apps = [
+        "gxf/rmm/tests/test_cuda_stream_dotproduct_rmm_allocator.yaml",
+        "gxf/rmm/tests/test_rmm_allocator_cuda_event_st_dotproduct.yaml"
+    ],
+    extensions = [
+        "//gxf/std",
+        "//gxf/cuda",
+        "//gxf/rmm",
+        "//gxf/cuda/tests:test_cuda",
+        "//gxf/test/extensions:test",
+    ],
+    manifest_path_hack = "gxf/rmm/tests/",
+    deps = ["//gxf/test:test_main", "//gxf/std:yaml_file_loader", "@yaml-cpp"],
+)
+
+test_stress_cuda_stream_dotproduct_rmm_allocator_yaml_files = [
+    "test_stress_cuda_stream_dotproduct_rmm_allocator_gen.yaml",
+]
+
+genrule(
+    name = "test_stress_cuda_stream_dotproduct_rmm_allocator_gen",
+    outs = test_stress_cuda_stream_dotproduct_rmm_allocator_yaml_files,
+    cmd = "$(location :test_stress_cuda_stream_dotproduct_rmm_allocator) $(RULEDIR)",
+    message = "----- Generating the test_cuda_stream_dotproduct_cuda_allocator_gen.yaml file",
+    tools = [":test_stress_cuda_stream_dotproduct_rmm_allocator"],
+    visibility = ["//visibility:public"],
+)
+
+py_binary(
+    name = "test_stress_cuda_stream_dotproduct_rmm_allocator",
+    srcs = ["test_stress_cuda_stream_dotproduct_rmm_allocator.py"],
+)
+
+nv_gxf_app(
+    name = "test_stress_cuda_stream_dotproduct_rmm_allocator_app",
+    extensions = [
+        "//gxf/std",
+        "//gxf/cuda",
+        "//gxf/rmm",
+        "//gxf/cuda/tests:test_cuda",
+        "//gxf/test/extensions:test",
+    ],
+    gxf_file = "test_stress_cuda_stream_dotproduct_rmm_allocator_gen.yaml",
+)

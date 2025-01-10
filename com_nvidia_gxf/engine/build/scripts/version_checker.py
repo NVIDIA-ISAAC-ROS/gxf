@@ -14,8 +14,8 @@ import subprocess
 
 packages = {
     "OS": {
-        "host": "Ubuntu 20.04.4 LTS",
-        "jetson": "Ubuntu 20.04.4 LTS",
+        "host": "Ubuntu 22.04.3 LTS",
+        "jetson": "Ubuntu 22.04.3 LTS",
         "cmd": "lsb_release -d | cut -f 2"
     },
     "Bazel": {

@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2021-2023, NVIDIA CORPORATION. All rights reserved.
+Copyright (c) 2021-2024, NVIDIA CORPORATION. All rights reserved.
 
 NVIDIA CORPORATION and its licensors retain all intellectual property
 and proprietary rights in and to this software, related documentation
@@ -14,13 +14,13 @@ license agreement from NVIDIA CORPORATION is strictly prohibited.
 #include <atomic>
 #include <cstring>
 #include <functional>
-#include <map>
 #include <memory>
 #include <mutex>
 #include <set>
 #include <shared_mutex>  // NOLINT
 #include <sstream>
 #include <string>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -31,17 +31,17 @@ license agreement from NVIDIA CORPORATION is strictly prohibited.
 #include "common/type_name.hpp"
 #include "gxf/core/component.hpp"
 #include "gxf/core/entity.hpp"
+#include "gxf/core/parameter_registrar.hpp"
+#include "gxf/core/parameter_storage.hpp"
 #include "gxf/core/registrar.hpp"
+#include "gxf/core/resource_manager.hpp"
+#include "gxf/core/resource_registrar.hpp"
+#include "gxf/core/type_registry.hpp"
 #include "gxf/std/entity_executor.hpp"
 #include "gxf/std/entity_warden.hpp"
 #include "gxf/std/extension_loader.hpp"
-#include "gxf/std/parameter_registrar.hpp"
-#include "gxf/std/parameter_storage.hpp"
 #include "gxf/std/program.hpp"
-#include "gxf/std/resource_manager.hpp"
-#include "gxf/std/resource_registrar.hpp"
 #include "gxf/std/system.hpp"
-#include "gxf/std/type_registry.hpp"
 #include "gxf/std/yaml_file_loader.hpp"
 #include "yaml-cpp/yaml.h"
 
@@ -63,9 +63,11 @@ class SharedContext {
   gxf_result_t removeComponentPointers(
       const FixedVector<gxf_uid_t, kMaxComponents>& cids);
 
+  gxf_result_t removeSingleComponentPointer(gxf_uid_t& cid);
+
   gxf_result_t addComponent(gxf_uid_t cid, void* raw_pointer);
 
-  gxf_result_t findComponentPointer(gxf_uid_t uid, void** pointer);
+  gxf_result_t findComponentPointer(gxf_context_t context, gxf_uid_t uid, void** pointer);
 
   gxf_result_t loadExtensionImpl(const std::string& filename);
 
@@ -80,7 +82,7 @@ class SharedContext {
 
   TypeRegistry type_registry_;
 
-  std::unique_ptr<ParameterStorage> parameters_;
+  std::shared_ptr<ParameterStorage> parameters_;
 
   Registrar registrar_;
 
@@ -93,7 +95,7 @@ class SharedContext {
 
   std::atomic<gxf_uid_t> next_id_{kNullUid + 1};
 
-  std::map<gxf_uid_t, void*> objects_;
+  std::unordered_map<gxf_uid_t, void*> objects_;
 
   std::mutex load_extension_mutex_;
 
@@ -114,6 +116,9 @@ class Runtime {
   gxf_result_t destroy();
 
   gxf_result_t GxfRegisterComponent(gxf_tid_t tid, const char* name, const char* base);
+
+  gxf_result_t GxfRegisterComponentInExtension(const gxf_tid_t& component_tid,
+                                               const gxf_tid_t& extension_tid);
 
   gxf_result_t GxfGetSharedContext(void** shared);
 
@@ -156,7 +161,9 @@ class Runtime {
 
   gxf_result_t GxfGraphSaveToFile(const char* filename);
 
-  gxf_result_t GxfCreateEntity(const GxfEntityCreateInfo& info, gxf_uid_t& eid);
+  gxf_result_t GxfCreateEntity(const GxfEntityCreateInfo& info,
+                               gxf_uid_t& eid,
+                               void** item_ptr = nullptr);
 
   gxf_result_t GxfCreateEntityGroup(const char* name, gxf_uid_t* gid);
 
@@ -181,13 +188,19 @@ class Runtime {
 
   gxf_result_t GxfEntityRefCountDec(gxf_uid_t eid);
 
+  gxf_result_t GxfEntityGetRefCount(gxf_uid_t eid, int64_t* count) const;
+
   gxf_result_t GxfEntityGetStatus(gxf_uid_t eid, gxf_entity_status_t* entity_status);
+
+  gxf_result_t GxfEntityGetName(gxf_uid_t eid, const char** entity_name);
 
   gxf_result_t GxfEntityGetState(gxf_uid_t eid, entity_state_t* behavior_status);
 
-  gxf_result_t GxfEntityEventNotify(gxf_uid_t eid);
+  gxf_result_t GxfEntityNotifyEventType(gxf_uid_t eid, gxf_event_t event);
 
   gxf_result_t GxfComponentTypeName(gxf_tid_t tid, const char** name);
+
+  gxf_result_t GxfComponentTypeNameFromUID(gxf_uid_t cid, const char** name);
 
   gxf_result_t GxfComponentTypeId(const char* name, gxf_tid_t* tid);
 
@@ -195,7 +208,17 @@ class Runtime {
 
   gxf_result_t GxfComponentEntity(gxf_uid_t cid, gxf_uid_t* eid);
 
-  gxf_result_t GxfComponentAdd(gxf_uid_t eid, gxf_tid_t tid, const char* name, gxf_uid_t* out_cid);
+  gxf_result_t GxfEntityGetItemPtr(gxf_uid_t eid, void** ptr);
+
+  gxf_result_t GxfComponentAddWithItem(void* item_ptr, gxf_tid_t tid, const char* name,
+                               gxf_uid_t* out_cid, void** comp_ptr);
+
+  gxf_result_t GxfComponentAdd(gxf_uid_t eid, gxf_tid_t tid, const char* name, gxf_uid_t* out_cid,
+                               void** comp_ptr);
+
+  gxf_result_t GxfComponentRemove(gxf_uid_t cid);
+
+  gxf_result_t GxfComponentRemove(gxf_uid_t eid, gxf_tid_t tid, const char * name);
 
   gxf_result_t GxfComponentAddToInterface(gxf_uid_t eid, gxf_uid_t cid,
                                           const char* name);
@@ -203,27 +226,42 @@ class Runtime {
   gxf_result_t GxfComponentFind(gxf_uid_t eid, gxf_tid_t tid, const char* name, int32_t* offset,
                                 gxf_uid_t* cid);
 
+  gxf_result_t GxfComponentFind(gxf_uid_t eid, void* item_ptr, gxf_tid_t tid, const char* name,
+                                int32_t* offset, gxf_uid_t* cid, void** ptr);
+
   gxf_result_t GxfComponentFindAll(gxf_uid_t eid, uint64_t* num_cids, gxf_uid_t* cids);
+
+  gxf_result_t GxfComponentIsBase(gxf_tid_t derived, gxf_tid_t base, bool* result);
 
   gxf_result_t GxfEntityGroupFindResources(gxf_uid_t eid, uint64_t* num_resource_cids,
                                            gxf_uid_t* resource_cids);
+
+  gxf_result_t GxfEntityGroupId(gxf_uid_t eid, gxf_uid_t* gid);
 
   gxf_result_t GxfEntityGroupName(gxf_uid_t eid, const char** name);
 
   gxf_result_t GxfEntityResourceGetHandle(gxf_uid_t eid, const char* type,
                         const char* resource_key, gxf_uid_t* resource_cid);
 
-  gxf_result_t GxfParameterSetFloat64(gxf_uid_t uid, const char* key, double value);
+  gxf_result_t GxfParameterSetInt8(gxf_uid_t uid, const char* key, int8_t value);
 
-  gxf_result_t GxfParameterSetFloat32(gxf_uid_t uid, const char* key, float value);
+  gxf_result_t GxfParameterSetInt16(gxf_uid_t uid, const char* key, int16_t value);
+
+  gxf_result_t GxfParameterSetInt32(gxf_uid_t uid, const char* key, int32_t value);
 
   gxf_result_t GxfParameterSetInt64(gxf_uid_t uid, const char* key, int64_t value);
 
-  gxf_result_t GxfParameterSetUInt64(gxf_uid_t uid, const char* key, uint64_t value);
+  gxf_result_t GxfParameterSetUInt8(gxf_uid_t uid, const char* key, uint8_t value);
+
+  gxf_result_t GxfParameterSetUInt16(gxf_uid_t uid, const char* key, uint16_t value);
 
   gxf_result_t GxfParameterSetUInt32(gxf_uid_t uid, const char* key, uint32_t value);
 
-  gxf_result_t GxfParameterSetUInt16(gxf_uid_t uid, const char* key, uint16_t value);
+  gxf_result_t GxfParameterSetUInt64(gxf_uid_t uid, const char* key, uint64_t value);
+
+  gxf_result_t GxfParameterSetFloat32(gxf_uid_t uid, const char* key, float value);
+
+  gxf_result_t GxfParameterSetFloat64(gxf_uid_t uid, const char* key, double value);
 
   gxf_result_t GxfParameterSetStr(gxf_uid_t uid, const char* key, const char* value);
 
@@ -232,8 +270,6 @@ class Runtime {
   gxf_result_t GxfParameterSetHandle(gxf_uid_t uid, const char* key, gxf_uid_t value);
 
   gxf_result_t GxfParameterSetBool(gxf_uid_t uid, const char* key, bool value);
-
-  gxf_result_t GxfParameterSetInt32(gxf_uid_t uid, const char* key, int32_t value);
 
   gxf_result_t GxfParameterSet1DVectorString(gxf_uid_t uid, const char* key, const char* value[],
                                              uint64_t length);
@@ -258,7 +294,7 @@ class Runtime {
     for (uint i = 0; i < height; i++) {
       std::vector<T> inner(width);
       if (width) {  // if width zero then value[i] could be null
-        std::memcpy(inner.data(), value[i], width * sizeof(T));
+        inner.assign(value[i], value[i] + width);
       }
       value_.push_back(inner);
     }
@@ -426,13 +462,13 @@ class Runtime {
 
   gxf_result_t GxfSetTypeRegistry(TypeRegistry* type_registry);
 
-  gxf_result_t GxfSetParameterStorage(ParameterStorage* parameters);
+  gxf_result_t GxfSetParameterStorage(std::shared_ptr<ParameterStorage> parameters);
 
   gxf_result_t GxfSetRegistrar(Registrar* registrar);
 
   gxf_result_t GxfSetParameterRegistrar(ParameterRegistrar* parameter_registrar);
 
-  gxf_result_t GxfSetResourceRegistrar(ResourceRegistrar* resource_registrar);
+  gxf_result_t GxfSetResourceRegistrar(std::shared_ptr<ResourceRegistrar> resource_registrar);
 
   gxf_result_t GxfSetResourceManager(std::shared_ptr<ResourceManager> resource_manager);
 
@@ -451,20 +487,20 @@ class Runtime {
 
   SharedContext* shared_context_;
 
-  ExtensionLoader* extension_loader_;
+  ExtensionLoader* extension_loader_{nullptr};
 
-  EntityWarden* warden_;
+  EntityWarden* warden_{nullptr};
 
-  TypeRegistry* type_registry_;
+  TypeRegistry* type_registry_{nullptr};
 
-  ParameterStorage* parameters_;
+  std::shared_ptr<ParameterStorage> parameters_;
 
-  Registrar* registrar_;
+  Registrar* registrar_{nullptr};
 
   // Stores information about parameter for query
   ParameterRegistrar* parameter_registrar_;
 
-  ResourceRegistrar* resource_registrar_;
+  std::shared_ptr<ResourceRegistrar> resource_registrar_;
 
   // have to stick to shared_ptr to avoid nullptr dereferencing risk,
   // as Codelet's Resource try_get() are lazy call
@@ -476,8 +512,6 @@ class Runtime {
 
   // Current version of gxf core runtime
   const std::string gxf_core_version_{kGxfCoreVersion};
-
-  std::recursive_mutex ref_count_mutex_;
 
   std::shared_timed_mutex mutex_;
 

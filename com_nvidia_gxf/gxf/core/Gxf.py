@@ -1,5 +1,5 @@
 '''
- SPDX-FileCopyrightText: Copyright (c) 2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  SPDX-License-Identifier: Apache-2.0
 
  Licensed under the Apache License, Version 2.0 (the "License");
@@ -35,6 +35,14 @@ from .core_pybind import component_add
 from .core_pybind import component_find
 from .core_pybind import entity_group_create
 from .core_pybind import entity_group_add
+from .core_pybind import get_extension_list
+from .core_pybind import get_extension_info
+from .core_pybind import get_component_list
+from .core_pybind import get_component_info
+from .core_pybind import get_param_list
+from .core_pybind import get_param_info
+from .core_pybind import entity_find_all
+
 # from .core_pybind import component_add_to_interface
 from .core_pybind import parameter_set_uint64
 from .core_pybind import parameter_set_int32
@@ -61,6 +69,24 @@ from collections.abc import Iterable
 import gxf.core.logger as log
 import logging
 
+import faulthandler
+import signal
+import io
+import traceback
+import sys
+from functools import wraps
+
+'''
+Enable faulthandler to automatically print tracebacks on crashes.
+0. Why: Great for catching low-level crashes that might bypass Python's exception handling.
+    It provides a Python traceback for these crashes.
+1. Performance overhead: Minimal. It's primarily active when a crash occurs.
+2. What it catches: Low-level crashes like segmentation faults, stack overflows, etc.
+3. Examples:
+    Dereferencing a null pointer in C extension code;
+    A segmentation fault in a C extension that Python's exception system doesn't catch;
+'''
+faulthandler.enable()
 
 if not log.is_inited():
     log.init_logger()
@@ -71,7 +97,7 @@ EXTENSIONS_USED = []
 
 
 def _py_log_level_to_gxf_severity(log_level):
-    # GXF_SEVERITY_NONE => loggin.NOTSET
+    # GXF_SEVERITY_NONE => logging.NOTSET
     if log_level == logging.NOTSET:
         return 0
     # GXF_SEVERITY_ERROR(1) => logging.ERROR(40)
@@ -96,6 +122,43 @@ def add_to_manifest(extension):
     if extension not in EXTENSIONS_USED:
         EXTENSIONS_USED.append(extension)
 
+'''
+The handler callback for Python signal.signal() method to get signalnum and frame info
+signal.signal(signalnum, handler)
+'''
+def crash_handler(signum, frame):
+    buffer = io.StringIO()
+    buffer.write("\n==== GXF Python Crash Handler ====\n")
+    buffer.write(f"Caught signal {signum} ({signal.Signals(signum).name})\n")
+    buffer.write("\n==== Crash Handler Backtrace ====\n")
+    # Capture the traceback content and append to the buffer
+    # instead of traceback own print
+    traceback.print_stack(frame, file=buffer)
+
+    logger.info(buffer.getvalue())
+    sys.exit(1)
+
+'''
+A decorator to handle and log python exceptions,
+in a unified pattern across all methods.
+'''
+def exception_handler(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except Exception as e:
+            buffer = io.StringIO()
+            buffer.write("\n==== GXF Python Exception Handler ====\n")
+            buffer.write(f"Caught exception in {func.__name__}: {type(e).__name__}: {str(e)}\n")
+            buffer.write("\n==== Exception Handler Backtrace ====\n")
+            # Capture the traceback content and append to the buffer
+            # instead of traceback own print
+            traceback.print_exc(file=buffer)
+
+            logger.info(buffer.getvalue())
+            sys.exit(1)
+    return wrapper
 
 class Node(ABC):
     @abstractmethod
@@ -110,7 +173,8 @@ class Node(ABC):
 class Graph(Node):
     '''Python class wrapping the nvidia::gxf::Graph'''
 
-    def __init__(self, name: str = '', is_static: bool = True):
+    def __init__(self, name: str = ''):
+        self._setup_crash_handler()
         logger.setLevel(logging.INFO)
         self._context = None
         self._name = name
@@ -122,7 +186,7 @@ class Graph(Node):
         # system entity to hold the system components such as clock, job_stats
         # entity_monitor, etc
         self._system = None
-        self._is_static = is_static
+        self._is_static = True
         self._runtime_graph_created = False
         self._is_subgraph: bool = False
         self._parent = None
@@ -130,6 +194,22 @@ class Graph(Node):
         self._severity = 3
         self._ordered_nodes = []
         self._aliases = {}
+
+    '''
+    Signal handlers, signal.signal()
+    0. Why: Allow for custom handling of specific signals.
+        Useful for more granular control over how different types of crashes are handled.
+    1. Performance overhead: Very low. Only activates when the specific signal is raised.
+    2. What it catches: Specific signals like SIGSEGV (segmentation fault) and SIGABRT (abort).
+    3. Example:
+        Calling abort() in C code or receiving a SIGABRT from the OS;
+        A SIGABRT sent by the operating system or another process;
+    '''
+    def _setup_crash_handler(self):
+        signal.signal(signal.SIGSEGV, crash_handler)
+        signal.signal(signal.SIGABRT, crash_handler)
+        # Handle segmentation faults (SIGSEGV) and aborts (SIGABRT)
+        # Add other signals as needed
 
     def _find_named_component(self, component: str):
         entity, component = component.split('/', 1)
@@ -195,12 +275,33 @@ class Graph(Node):
 
     def make_visible(self, alias: str, component):
         if alias in self.aliases:
-            raise RuntimeError("Duplicate: %s already exisits")
+            raise RuntimeError("Duplicate: %s already exists")
         self.aliases[alias] = component
 
     @property
     def is_subgraph(self):
         return self._is_subgraph
+
+    def get_extension_list(self):
+        return get_extension_list(self.context())
+
+    def get_extension_info(self, uuid):
+        return get_extension_info(self.context(), uuid)
+
+    def get_component_list(self, uuid):
+        return get_component_list(self.context(), uuid)
+
+    def get_component_info(self, uuid):
+        return get_component_info(self.context(), uuid)
+
+    def get_param_list(self, uuid):
+        return get_param_list(self.context(), uuid)
+
+    def get_param_info(self, uuid):
+        return get_param_info(self.context(), uuid)
+
+    def entity_find_all(self):
+        return entity_find_all(self.context())
 
     def as_subgraph_of(self, parent):
         if self._context:
@@ -252,6 +353,7 @@ class Graph(Node):
         else:
             raise RuntimeError(f"Cannot add {type(node)} to a Graph")
 
+    @exception_handler
     def load_extensions(self, extension_filenames:list=None,
                         manifest_files:list=None, workspace:str=''):
         """
@@ -277,6 +379,9 @@ class Graph(Node):
             workspace = os.getenv('GXF_WORKSPACE')
 
         # call the backend
+        logger.debug("load_extensions() context: %d, extension_filenames: %s, "
+                     "manifest_filenames: %s, base_directory: %s",
+                    self.context, extension_filenames, manifest_files, workspace)
         load_extensions(self.context,
                         extension_filenames=extension_filenames,
                         manifest_filenames=manifest_files,
@@ -287,31 +392,36 @@ class Graph(Node):
         logger.setLevel(log_level)
         self._severity = _py_log_level_to_gxf_severity(log_level)
 
+    @exception_handler
     def run(self):
         self.activate()
         graph_activate(self.context)
         graph_run(self.context)
 
+    @exception_handler
     def run_async(self):
         self.activate()
         graph_activate(self.context)
         graph_run_async(self.context)
 
+    @exception_handler
     def interrupt(self):
         graph_interrupt(self.context)
 
+    @exception_handler
     def wait(self):
         graph_wait(self.context)
 
+    @exception_handler
     def destroy(self):
         graph_deactivate(self.context)
         context_destroy(self.context)
 
+    @exception_handler
     def save(self, filename: str):
         self.activate()
         graph_save(self.context, filename)
         return
-
 
 class Entity(Node):
     '''Entity Class wrapping the nvidia::gxf::Entity'''

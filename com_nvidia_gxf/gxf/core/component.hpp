@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2021 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-FileCopyrightText: Copyright (c) 2021-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * SPDX-License-Identifier: Apache-2.0
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,14 +17,19 @@
 #ifndef NVIDIA_GXF_CORE_COMPONENT_HPP
 #define NVIDIA_GXF_CORE_COMPONENT_HPP
 
+#include <set>
+#include <string>
+#include <utility>
+#include <vector>
+
 #include "common/assert.hpp"
 #include "gxf/core/entity.hpp"
 #include "gxf/core/expected.hpp"
 #include "gxf/core/gxf.h"
 #include "gxf/core/handle.hpp"
 #include "gxf/core/parameter.hpp"
+#include "gxf/core/parameter_storage.hpp"
 #include "gxf/core/registrar.hpp"
-#include "gxf/std/parameter_storage.hpp"
 
 namespace nvidia {
 namespace gxf {
@@ -47,11 +52,13 @@ class Component {
   //   class Foo : public Component {
   //    public:
   //     gxf_result_t registerInterface(Registrar* registrar) override {
-  //       GXF_REGISTER_PARAMETER(count, 1);
+  //       registrar->parameter(count_, "count", 1);
   //     }
-  //     GXF_PARAMETER(int, count);
+  //     Parameter<int> count_;
   //   };
   virtual gxf_result_t registerInterface(Registrar* registrar) {
+    registrar_ = registrar;
+    parameter_storage_ = registrar_->getParameterStorage();
     registrar->registerParameterlessComponent();
     return GXF_SUCCESS;
   }
@@ -68,6 +75,8 @@ class Component {
   gxf_context_t context() const noexcept { return context_; }
   gxf_uid_t eid() const noexcept { return eid_; }
   gxf_uid_t cid() const noexcept { return cid_; }
+  gxf_tid_t tid() const noexcept { return tid_; }
+  const char* type_name() const noexcept { return typename_; }
 
   // The entity which owns this component
   Entity entity() const noexcept {
@@ -83,10 +92,74 @@ class Component {
   }
 
   // This function shall only be called by GXF and is used to setup the component.
-  void internalSetup(gxf_context_t context, gxf_uid_t eid, gxf_uid_t cid) {
+  void internalSetup(gxf_context_t context, gxf_uid_t eid, gxf_uid_t cid, Registrar* registrar) {
     context_ = context;
     eid_ = eid;
     cid_ = cid;
+    GxfComponentType(context_, cid_, &tid_);
+    GxfComponentTypeName(context_, tid_, &typename_);
+    if (registrar) {
+      registrar_ = registrar;
+      parameter_storage_ = registrar_->getParameterStorage();
+      parameter_registrar_ = registrar_->getParameterRegistrar();
+    }
+  }
+
+  // query value of component parameter "key"
+  template<typename T>
+  Expected<T> getParameter(const char* key) {
+    return parameter_storage_->get<T>(cid_, key);
+  }
+
+  // set the parameter "key" and of type T with value
+  template <typename T>
+  Expected<void> setParameter(const char* key, T value) {
+    if (!parameter_storage_) { return Unexpected{GXF_ARGUMENT_NULL}; }
+    return parameter_storage_->set<T>(cid_, key, std::move(value));
+  }
+
+  // set a parameter "key" of handle type with value
+  template <typename T>
+  Expected<void> setParameter(const char* key, Handle<T>& value) {
+    if (!parameter_storage_) { return Unexpected{GXF_ARGUMENT_NULL}; }
+    return parameter_storage_->setHandle(cid_, key, value->cid());
+  }
+
+  // set the parameter "key" with the value in yaml node
+  Expected<void> parseParameter(const char* key, const YAML::Node& node, std::string prefix = "") {
+    return parameter_storage_->parse(cid_, key, node, prefix);
+  }
+
+  // wrap the current value of the parameter "key" in a yaml node
+  Expected<YAML::Node> wrapParameter(const char* key) {
+    return parameter_storage_->wrap(cid_, key);
+  }
+
+  // query all parameters in the component of type T and return their ComponentParameterInfo struct
+  template<typename T>
+  Expected<std::vector<ParameterRegistrar::ComponentParameterInfo>> getParametersOfType() {
+    gxf_tid_t tid = GxfTidNull();
+    auto result = GxfComponentType(context_, cid_, &tid);
+    if (!isSuccessful(result)) {
+      GXF_LOG_ERROR("Failed to find component type for cid [%ld]", cid_);
+      return Unexpected{result};
+    }
+
+    return parameter_registrar_->getParametersOfType<T>(tid);
+  }
+
+  // query componentParameterInfo of parameter "key"
+  Expected<ParameterRegistrar::ComponentParameterInfo> getParameterInfo(const char* key) {
+    gxf_tid_t tid = GxfTidNull();
+    auto result = GxfComponentType(context_, cid_, &tid);
+    if (!isSuccessful(result)) {
+      GXF_LOG_ERROR("Failed to find component type for cid [%ld]", cid_);
+      return Unexpected{result};
+    }
+
+    ParameterRegistrar::ComponentParameterInfo info =
+        *(GXF_UNWRAP_OR_RETURN(parameter_registrar_->getComponentParameterInfoPtr(tid, key)));
+    return info;
   }
 
  protected:
@@ -95,6 +168,11 @@ class Component {
   gxf_context_t context_ = kNullContext;
   gxf_uid_t eid_ = kNullUid;
   gxf_uid_t cid_ = kNullUid;
+  gxf_tid_t tid_ = GxfTidNull();
+  const char* typename_ = "UNKNOWN";
+  Registrar* registrar_ = nullptr;
+  ParameterRegistrar* parameter_registrar_ = nullptr;
+  ParameterStorage* parameter_storage_ = nullptr;
 };
 
 }  // namespace gxf

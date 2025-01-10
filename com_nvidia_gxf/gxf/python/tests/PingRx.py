@@ -17,13 +17,13 @@
 from gxf.python_codelet import CodeletAdapter
 from gxf.std import Receiver
 from gxf.std import Clock
-from gxf.core import MessageEntity
+
 
 class PingRx(CodeletAdapter):
     """ Python codelet to receive a msg on tick()
 
     Python implementation of Ping Rx.
-    Receives a message on the Reciever on every tick()
+    Receives a message on the Receiver on every tick()
     """
 
     def start(self):

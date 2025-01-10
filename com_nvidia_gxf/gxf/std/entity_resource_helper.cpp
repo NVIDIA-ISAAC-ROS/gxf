@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2023, NVIDIA CORPORATION. All rights reserved.
+Copyright (c) 2023-2024, NVIDIA CORPORATION. All rights reserved.
 
 NVIDIA CORPORATION and its licensors retain all intellectual property
 and proprietary rights in and to this software, related documentation
@@ -7,11 +7,12 @@ and any modifications thereto. Any use, reproduction, disclosure or
 distribution of this software and related documentation without an express
 license agreement from NVIDIA CORPORATION is strictly prohibited.
 */
+#include <utility>
 #include <vector>
 
+#include "gxf/core/resource_manager.hpp"
 #include "gxf/std/cpu_thread.hpp"
 #include "gxf/std/entity_resource_helper.hpp"
-#include "gxf/std/resource_manager.hpp"
 #include "gxf/std/resources.hpp"
 
 namespace nvidia {
@@ -24,9 +25,9 @@ Expected<FixedVector<gxf_uid_t, kMaxComponents>>
   if (!maybe) { return ForwardError(maybe); }
   auto entity = maybe.value();
   // Find all Resources components
-  auto maybe_resources = entity.findAll<ResourceBase>();
+  auto maybe_resources = entity.findAllHeap<ResourceBase>();
   if (!maybe_resources) { return Unexpected{GXF_FAILURE}; }
-  auto resources = maybe_resources.value();
+  auto resources = std::move(maybe_resources.value());
   // look for resource components from current entity
   for (size_t i = 0; i < resources.size(); i++) {
     if (!resources.at(i)) {
@@ -48,9 +49,9 @@ Expected<Handle<ThreadPool>>
   if (!maybe) { return ForwardError(maybe); }
   auto entity = maybe.value();
   // Find all Resources components
-  auto maybe_cpu_thread = entity.findAll<CPUThread>();
+  auto maybe_cpu_thread = entity.findAllHeap<CPUThread>();
   if (!maybe_cpu_thread) { return Unexpected{GXF_FAILURE}; }
-  auto cpu_thread = maybe_cpu_thread.value();
+  auto cpu_thread = std::move(maybe_cpu_thread.value());
   if (!cpu_thread.empty()) {
     if (cpu_thread.size() > 1) {
       GXF_LOG_ERROR("More than one CPUThread (%lu) added "

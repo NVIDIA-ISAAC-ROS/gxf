@@ -1,12 +1,20 @@
 /*
-Copyright (c) 2020,2023 NVIDIA CORPORATION. All rights reserved.
+ * SPDX-FileCopyrightText: Copyright (c) 2020-2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
-NVIDIA CORPORATION and its licensors retain all intellectual property
-and proprietary rights in and to this software, related documentation
-and any modifications thereto. Any use, reproduction, disclosure or
-distribution of this software and related documentation without an express
-license agreement from NVIDIA CORPORATION is strictly prohibited.
-*/
 #ifndef NVIDIA_GXF_STD_GREEDY_SCHEDULER_HPP_
 #define NVIDIA_GXF_STD_GREEDY_SCHEDULER_HPP_
 
@@ -24,25 +32,20 @@ license agreement from NVIDIA CORPORATION is strictly prohibited.
 #include "gxf/core/entity.hpp"
 #include "gxf/core/handle.hpp"
 #include "gxf/std/clock.hpp"
-#include "gxf/std/codelet.hpp"
-#include "gxf/std/entity_executor.hpp"
 #include "gxf/std/gems/event_list/event_list.hpp"
-#include "gxf/std/receiver.hpp"
-#include "gxf/std/router.hpp"
 #include "gxf/std/scheduler.hpp"
-#include "gxf/std/scheduling_terms.hpp"
-#include "gxf/std/system.hpp"
-#include "gxf/std/transmitter.hpp"
+#include "gxf/std/scheduling_condition.hpp"
 
 namespace nvidia {
 namespace gxf {
 
-constexpr int64_t kUsToNs = 1'000l;      // Convenient constant of 1 us = 1e3 ns
+// Forward declarations
+class EntityExecutor;
 
 /// @brief A basic single-threaded scheduler which tests scheduling term greedily
 ///
 /// This scheduler is great for simple use cases and predictable execution. It evaluates
-/// scheduling terms greedily and may incure a large overhead of scheduling term execution. Thus it
+/// scheduling terms greedily and may incur a large overhead of scheduling term execution. Thus it
 /// may not be suitable for large applications.
 ///
 /// The scheduler requires a Clock to keep track of time. Based on the choice of clock the scheduler
@@ -61,7 +64,7 @@ class GreedyScheduler : public Scheduler {
   gxf_result_t runAsync_abi() override;
   gxf_result_t stop_abi() override;
   gxf_result_t wait_abi() override;
-  gxf_result_t event_notify_abi(gxf_uid_t eid) override;
+  gxf_result_t event_notify_abi(gxf_uid_t eid, gxf_event_t event) override;
 
  private:
   Parameter<Handle<Clock>> clock_;
@@ -70,7 +73,6 @@ class GreedyScheduler : public Scheduler {
   Parameter<bool> stop_on_deadlock_;
   Parameter<double> check_recession_period_ms_;
   Parameter<int64_t> stop_on_deadlock_timeout_;
-  Parameter<int64_t> check_recession_period_us_;
 
   EntityExecutor* executor_ = nullptr;
 

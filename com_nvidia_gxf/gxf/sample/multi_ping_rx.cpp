@@ -22,9 +22,9 @@ gxf_result_t MultiPingRx::registerInterface(Registrar* registrar) {
 
 gxf_result_t MultiPingRx::tick() {
   for (auto rx : receivers_.get()) {
-    if (rx.value()->size()) {
-      auto message = rx.value()->receive();
-      GXF_LOG_INFO("Message Received at [%s]", rx.value()->name());
+    if (rx->size()) {
+      auto message = rx->receive();
+      GXF_LOG_INFO("Message Received at [%s]", rx->name());
       if (!message || message.value().is_null()) {
         return GXF_CONTRACT_MESSAGE_NOT_AVAILABLE;
       }

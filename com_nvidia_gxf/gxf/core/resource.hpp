@@ -1,12 +1,20 @@
 /*
-Copyright (c) 2023, NVIDIA CORPORATION. All rights reserved.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
-NVIDIA CORPORATION and its licensors retain all intellectual property
-and proprietary rights in and to this software, related documentation
-and any modifications thereto. Any use, reproduction, disclosure or
-distribution of this software and related documentation without an express
-license agreement from NVIDIA CORPORATION is strictly prohibited.
-*/
 #ifndef NVIDIA_GXF_CORE_RESOURCE_HPP_
 #define NVIDIA_GXF_CORE_RESOURCE_HPP_
 
@@ -14,7 +22,7 @@ license agreement from NVIDIA CORPORATION is strictly prohibited.
 
 #include "gxf/core/expected.hpp"
 #include "gxf/core/handle.hpp"
-#include "gxf/std/resource_manager.hpp"
+#include "gxf/core/resource_manager.hpp"
 
 namespace nvidia {
 namespace gxf {
@@ -27,13 +35,13 @@ class Resource<Handle<T>> {
  public:
   // Tries to get the Resource value. If first time call, query ResourceManager and save
   // the value for subsequent calls.
-  // If invalid ResourceManager ptr, Handle<S>::Unspecified() keeps returning everytime
+  // If invalid ResourceManager ptr, Handle<S>::Unspecified() keeps returning every time
   // If ResourceManager cannot find the target, GXF_ENTITY_COMPONENT_NOT_FOUND
   // will be saved into value_. No repeat query.
   const Expected<Handle<T>>& try_get(const char* name = nullptr) const {
     if (value_ == Handle<T>::Unspecified()) {
       if (resource_manager_ == nullptr) {
-        GXF_LOG_WARNING("Resource [type: %s] from comonent [cid: %ld] cannot get "
+        GXF_LOG_WARNING("Resource [type: %s] from component [cid: %ld] cannot get "
                         "its value because of nullptr ResourceManager",
                         TypenameAsString<T>(), owner_cid_);
         return unspecified_handle_;
@@ -41,7 +49,7 @@ class Resource<Handle<T>> {
         Expected<Handle<T>> maybe_value =
           resource_manager_->findComponentResource<T>(owner_cid_, name);
         if (!maybe_value) {
-          GXF_LOG_INFO("Resource [type: %s] from component [cid: %ld] "
+          GXF_LOG_DEBUG("Resource [type: %s] from component [cid: %ld] "
                           "cannot find its value from ResourceManager",
                           TypenameAsString<T>(), owner_cid_);
           value_ = ForwardError(maybe_value);

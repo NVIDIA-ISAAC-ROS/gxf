@@ -1,5 +1,5 @@
 """
- SPDX-FileCopyrightText: Copyright (c) 2020 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ SPDX-FileCopyrightText: Copyright (c) 2020-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  SPDX-License-Identifier: Apache-2.0
 
  Licensed under the Apache License, Version 2.0 (the "License");
@@ -251,6 +251,10 @@ components:
   parameters:
     clock: clock
     max_duration_ms: 1000
+- type: nvidia::gxf::JobStatistics
+  parameters:
+    clock: clock
+    codelet_statistics: true
 """
 
   return header + "".join([create_rx_tx(i) for i in range(n)]) + footer

@@ -7,9 +7,11 @@ and any modifications thereto. Any use, reproduction, disclosure or
 distribution of this software and related documentation without an express
 license agreement from NVIDIA CORPORATION is strictly prohibited.
 */
+#include <cinttypes>
 
 #include "common/byte.hpp"
 #include "common/logger.hpp"
+#include "dlpack/dlpack.h"
 #include "gtest/gtest.h"
 #include "gxf/core/gxf.h"
 #include "gxf/multimedia/video.hpp"
@@ -446,7 +448,7 @@ TEST(video, wrapMemory) {
   VideoBuffer* frame = new VideoBuffer();
   static constexpr uint64_t FRAME_SIZE = 123456;
 
-  VideoBufferInfo info;
+  VideoBufferInfo info{};
   info.color_format = VideoFormat::GXF_VIDEO_FORMAT_NV12;
   frame->wrapMemory(info, FRAME_SIZE, MemoryStorageType::kDevice, pointer_, release_func);
 
@@ -542,10 +544,29 @@ TEST(video, moveToTensor) {
   ASSERT_EQ(tensor->rank(), 2);
   ASSERT_EQ(tensor->element_type(), PrimitiveType::kUnsigned8);
   ASSERT_EQ(tensor->bytes_per_element(), 3);
+  ASSERT_EQ(tensor->stride(0),
+            StrideAlign(tensor->shape().dimension(0) * tensor->bytes_per_element()));
+  // ASSERT_EQ(tensor->stride(1), tensor->bytes_per_element());
   ASSERT_EQ(tensor->storage_type(),  MemoryStorageType::kHost);
 
   ASSERT_EQ(nullptr, frame->pointer());
   ASSERT_EQ(source_ptr, tensor->pointer());
+
+  // verify that the DLPack structures have the expected values (8 bits with 3 lanes)
+  {
+    auto maybe_dl_ctx = tensor->toDLManagedTensorContext();
+    ASSERT_TRUE(maybe_dl_ctx.has_value());
+    auto dl_ctx = maybe_dl_ctx.value();
+    auto dl_managed_tensor = dl_ctx->tensor;
+    DLTensor& dl_tensor = dl_managed_tensor.dl_tensor;
+    ASSERT_EQ(dl_tensor.data, tensor->pointer());
+    ASSERT_EQ(dl_tensor.device.device_type, kDLCUDAHost);
+    ASSERT_EQ(dl_tensor.ndim, tensor->rank());
+    ASSERT_EQ(dl_tensor.dtype.code, kDLUInt);
+    ASSERT_EQ(dl_tensor.dtype.bits, 8);
+    ASSERT_EQ(dl_tensor.dtype.lanes, 3);
+    // make sure dl_ctx goes out of scope before next moveToTensor call
+  }
 
   // 16-bit image
   result = frame->resize<VideoFormat::GXF_VIDEO_FORMAT_GRAY16>(
@@ -563,9 +584,28 @@ TEST(video, moveToTensor) {
   ASSERT_EQ(tensor->element_type(), PrimitiveType::kUnsigned16);
   ASSERT_EQ(tensor->bytes_per_element(), 2);
   ASSERT_EQ(tensor->storage_type(),  MemoryStorageType::kDevice);
+  ASSERT_EQ(tensor->stride(0),
+            StrideAlign(tensor->shape().dimension(0) * tensor->bytes_per_element()));
+  // ASSERT_EQ(tensor->stride(1), tensor->bytes_per_element());
 
   ASSERT_EQ(nullptr, frame->pointer());
   ASSERT_EQ(source_ptr, tensor->pointer());
+  // verify that the DLPack structures have the expected values (16 bits with 1 lane)
+  {
+    auto maybe_dl_ctx = tensor->toDLManagedTensorContext();
+    ASSERT_TRUE(maybe_dl_ctx.has_value());
+    auto dl_ctx = maybe_dl_ctx.value();
+    auto dl_managed_tensor = dl_ctx->tensor;
+    DLTensor& dl_tensor = dl_managed_tensor.dl_tensor;
+    ASSERT_EQ(dl_tensor.data, tensor->pointer());
+    ASSERT_EQ(dl_tensor.device.device_type, kDLCUDA);
+    ASSERT_EQ(dl_tensor.device.device_id, 0);
+    ASSERT_EQ(dl_tensor.ndim, tensor->rank());
+    ASSERT_EQ(dl_tensor.dtype.code, kDLUInt);
+    ASSERT_EQ(dl_tensor.dtype.bits, 16);
+    ASSERT_EQ(dl_tensor.dtype.lanes, 1);
+    // make sure dl_ctx goes out of scope before next moveToTensor call
+  }
 
   // 32-bit image
   result = frame->resize<VideoFormat::GXF_VIDEO_FORMAT_R32_G32_B32>(
@@ -583,9 +623,33 @@ TEST(video, moveToTensor) {
   ASSERT_EQ(tensor->element_type(), PrimitiveType::kUnsigned32);
   ASSERT_EQ(tensor->bytes_per_element(), 12);
   ASSERT_EQ(tensor->storage_type(),  MemoryStorageType::kSystem);
+  ASSERT_EQ(tensor->shape().dimension(0),  100);
+  ASSERT_EQ(tensor->shape().dimension(1),  100);
+  ASSERT_EQ(tensor->shape().dimension(2),  3);
+  auto bytes_per_channel = tensor->bytes_per_element() / tensor->shape().dimension(2);
+  ASSERT_EQ(tensor->stride(0),
+           StrideAlign(tensor->shape().dimension(0) * bytes_per_channel));
+  GXF_LOG_INFO("stride(0): (%" PRIu64 ")", tensor->stride(0));
+  GXF_LOG_INFO("stride(1): (%" PRIu64 ")", tensor->stride(1));
+  GXF_LOG_INFO("stride(2): (%" PRIu64 ")", tensor->stride(2));
 
   ASSERT_EQ(nullptr, frame->pointer());
   ASSERT_EQ(source_ptr, tensor->pointer());
+  // verify that the DLPack structures have the expected values (32 bits with 3 lanes)
+  {
+    auto maybe_dl_ctx = tensor->toDLManagedTensorContext();
+    ASSERT_TRUE(maybe_dl_ctx.has_value());
+    auto dl_ctx = maybe_dl_ctx.value();
+    auto dl_managed_tensor = dl_ctx->tensor;
+    DLTensor& dl_tensor = dl_managed_tensor.dl_tensor;
+    ASSERT_EQ(dl_tensor.data, tensor->pointer());
+    ASSERT_EQ(dl_tensor.device.device_type, kDLCPU);
+    ASSERT_EQ(dl_tensor.ndim, tensor->rank());
+    ASSERT_EQ(dl_tensor.dtype.code, kDLUInt);
+    ASSERT_EQ(dl_tensor.dtype.bits, 32);
+    ASSERT_EQ(dl_tensor.dtype.lanes, 3);
+    // make sure dl_ctx goes out of scope before next moveToTensor call
+  }
 
   delete frame;
   tensor->~Tensor();
@@ -632,10 +696,10 @@ TEST(video, createFromTensor) {
   ASSERT_EQ(maybe_tensor.has_value(), true);
   auto tensor = maybe_tensor.value();
 
-  tensor->reshapeCustom(Shape({100, 100}), PrimitiveType::kUnsigned8, 1,
+  tensor->reshapeCustom(Shape({100, 100}), PrimitiveType::kUnsigned8, 3,
                         Unexpected{GXF_UNINITIALIZED_VALUE}, MemoryStorageType::kHost, allocator);
 
-  ASSERT_EQ(tensor->size(), 100 * 100);
+  ASSERT_EQ(tensor->size(), 100 * 100 * 3);
 
   VideoBuffer* frame = new VideoBuffer();
   auto result = frame->createFromTensor<VideoFormat::GXF_VIDEO_FORMAT_RGB>(
@@ -650,10 +714,10 @@ TEST(video, createFromTensor) {
   ASSERT_EQ(maybe_tensor.has_value(), true);
   tensor = maybe_tensor.value();
 
-  tensor->reshapeCustom(Shape({100, 100, 3}), PrimitiveType::kUnsigned16, 1,
+  tensor->reshapeCustom(Shape({100, 100, 3}), PrimitiveType::kUnsigned16, 2,
                         Unexpected{GXF_UNINITIALIZED_VALUE}, MemoryStorageType::kHost, allocator);
 
-  ASSERT_EQ(tensor->size(), 100 * 100 * 3);
+  ASSERT_EQ(tensor->size(), 100 * 100 * 3 * 2);
 
   frame = new VideoBuffer();
   result = frame->createFromTensor<VideoFormat::GXF_VIDEO_FORMAT_R16_G16_B16>(
@@ -668,10 +732,10 @@ TEST(video, createFromTensor) {
   ASSERT_EQ(maybe_tensor.has_value(), true);
   tensor = maybe_tensor.value();
 
-  tensor->reshapeCustom(Shape({100, 100, 4}), PrimitiveType::kUnsigned16, 1,
+  tensor->reshapeCustom(Shape({100, 100, 4}), PrimitiveType::kUnsigned16, 2,
                         Unexpected{GXF_UNINITIALIZED_VALUE}, MemoryStorageType::kHost, allocator);
 
-  ASSERT_EQ(tensor->size(), 100 * 100 * 4);
+  ASSERT_EQ(tensor->size(), 100 * 100 * 4 * 2);
 
   frame = new VideoBuffer();
   result = frame->createFromTensor<VideoFormat::GXF_VIDEO_FORMAT_R16_G16_B16>(
@@ -685,10 +749,10 @@ TEST(video, createFromTensor) {
   ASSERT_EQ(maybe_tensor.has_value(), true);
   tensor = maybe_tensor.value();
 
-  tensor->reshapeCustom(Shape({100, 100, 3, 3}), PrimitiveType::kUnsigned16, 1,
+  tensor->reshapeCustom(Shape({100, 100, 3, 3}), PrimitiveType::kUnsigned16, 2,
                         Unexpected{GXF_UNINITIALIZED_VALUE}, MemoryStorageType::kHost, allocator);
 
-  ASSERT_EQ(tensor->size(), 100 * 100 * 3 * 3);
+  ASSERT_EQ(tensor->size(), 100 * 100 * 3 * 3 * 2);
 
   frame = new VideoBuffer();
   result = frame->createFromTensor<VideoFormat::GXF_VIDEO_FORMAT_R16_G16_B16>(
@@ -702,10 +766,10 @@ TEST(video, createFromTensor) {
   ASSERT_EQ(maybe_tensor.has_value(), true);
   tensor = maybe_tensor.value();
 
-  tensor->reshapeCustom(Shape({100, 100}), PrimitiveType::kUnsigned16, 1,
+  tensor->reshapeCustom(Shape({100, 100}), PrimitiveType::kUnsigned16, 6,
                         Unexpected{GXF_UNINITIALIZED_VALUE}, MemoryStorageType::kHost, allocator);
 
-  ASSERT_EQ(tensor->size(), 100 * 100);
+  ASSERT_EQ(tensor->size(), 100 * 100 * 6);
 
   frame = new VideoBuffer();
   result = frame->createFromTensor<VideoFormat::GXF_VIDEO_FORMAT_RGB>(
@@ -719,10 +783,10 @@ TEST(video, createFromTensor) {
   ASSERT_EQ(maybe_tensor.has_value(), true);
   tensor = maybe_tensor.value();
 
-  tensor->reshapeCustom(Shape({100, 100}), PrimitiveType::kUnsigned16, 1,
+  tensor->reshapeCustom(Shape({100, 100}), PrimitiveType::kUnsigned16, 2,
                         Unexpected{GXF_UNINITIALIZED_VALUE}, MemoryStorageType::kHost, allocator);
 
-  ASSERT_EQ(tensor->size(), 100 * 100);
+  ASSERT_EQ(tensor->size(), 100 * 100 * 2);
 
   frame = new VideoBuffer();
   result = frame->createFromTensor<VideoFormat::GXF_VIDEO_FORMAT_NV12>(
@@ -732,8 +796,8 @@ TEST(video, createFromTensor) {
   delete frame;
 
   // clean up
-  tensor->~Tensor();
   ASSERT_EQ(allocator->deinitialize(), GXF_SUCCESS);
+  tensor->~Tensor();  // manually call destructor to avoid Invalid Component Pointer error
 
   ASSERT_EQ(GxfEntityDestroy(context, eid), GXF_SUCCESS);
   ASSERT_EQ(GxfContextDestroy(context), GXF_SUCCESS);

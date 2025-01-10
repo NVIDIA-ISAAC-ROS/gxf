@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
+Copyright (c) 2022-2024, NVIDIA CORPORATION. All rights reserved.
 
 NVIDIA CORPORATION and its licensors retain all intellectual property
 and proprietary rights in and to this software, related documentation
@@ -40,6 +40,7 @@ class GxfGraphLoadFileTest : public ::testing::Test {
 
     GXF_ASSERT_SUCCESS(
         GxfComponentFind(context, entities[0], GxfTidNull(), "step", nullptr, component));
+    delete[] entities;
     return GXF_SUCCESS;
   }
 

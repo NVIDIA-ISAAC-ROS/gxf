@@ -1,4 +1,4 @@
-# Copyright (c) 2020-2021, NVIDIA CORPORATION.  All rights reserved.
+# Copyright (c) 2020-2023, NVIDIA CORPORATION.  All rights reserved.
 #
 # NVIDIA CORPORATION and its licensors retain all intellectual property
 # and proprietary rights in and to this software, related documentation
@@ -7,7 +7,8 @@
 # license agreement from NVIDIA CORPORATION is strictly prohibited.
 
 packaging==20.9
-pyyaml==5.3.1
-result==0.5.0
-requests==2.18.4
+pyyaml==6.0
+result==0.10.0
+requests==2.25.1
 toml==0.10.2
+typing_extensions==4.0.1

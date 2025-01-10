@@ -1,12 +1,20 @@
 /*
-Copyright (c) 2021-2023, NVIDIA CORPORATION. All rights reserved.
+ * SPDX-FileCopyrightText: Copyright (c) 2021-2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
-NVIDIA CORPORATION and its licensors retain all intellectual property
-and proprietary rights in and to this software, related documentation
-and any modifications thereto. Any use, reproduction, disclosure or
-distribution of this software and related documentation without an express
-license agreement from NVIDIA CORPORATION is strictly prohibited.
-*/
 #ifndef NVIDIA_GXF_GXF_STD_GEMS_UTILS_TIME_HPP_
 #define NVIDIA_GXF_GXF_STD_GEMS_UTILS_TIME_HPP_
 
@@ -29,6 +37,12 @@ double TimestampToTime(int64_t timestamp);
 /// @param cid cid of component for which text is being parsed
 /// @return Period in nanoseconds if successful, or otherwise one of the GXF error codes.
 Expected<int64_t> ParseRecessPeriodString(std::string text, const gxf_uid_t& cid);
+
+inline uint64_t getCurrentTimeUs() {
+  using std::chrono::duration_cast;
+  using std::chrono::system_clock;
+  return duration_cast<std::chrono::microseconds>(system_clock::now().time_since_epoch()).count();
+}
 
 }  // namespace gxf
 }  // namespace nvidia

@@ -19,11 +19,11 @@ import sys
 
 
 '''
-This stress script generates yaml file which has 100 brodcast and gather
+This stress script generates yaml file which has 100 broadcast and gather
 components. StepCount codelet is used to validate expected number of
 count.
 '''
-def create_brodcast_gather(i, rep):
+def create_broadcast_gather(i, rep):
     return """---
 name: copier_{i}
 components:
@@ -146,7 +146,7 @@ components:
   type: nvidia::gxf::ManualClock
 """
 
-  return header + "".join([create_brodcast_gather(i, 1000) for i in range(n)]) + footer
+  return header + "".join([create_broadcast_gather(i, 1000) for i in range(n)]) + footer
 
 def save(filename, text):
   with open(filename,'w') as file:

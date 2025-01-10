@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2021-2022, NVIDIA CORPORATION. All rights reserved.
+Copyright (c) 2021-2024, NVIDIA CORPORATION. All rights reserved.
 
 NVIDIA CORPORATION and its licensors retain all intellectual property
 and proprietary rights in and to this software, related documentation
@@ -11,6 +11,7 @@ license agreement from NVIDIA CORPORATION is strictly prohibited.
 
 #include <cuda_runtime.h>
 
+#include <algorithm>
 #include <cstring>
 #include <utility>
 
@@ -230,6 +231,8 @@ Expected<size_t> StdComponentSerializer::serializeTensor(const Tensor& tensor, E
       }
       break;
     default:
+      GXF_LOG_ERROR("Invalid memory storage type %d specified for tensor storage",
+      static_cast<int>(tensor.storage_type()));
       return Unexpected{GXF_FAILURE};
   }
 
@@ -248,10 +251,21 @@ Expected<Tensor> StdComponentSerializer::deserializeTensor(Endpoint* endpoint) {
   }
 
   std::array<int32_t, Shape::kMaxRank> dims;
+  if (sizeof(header.dims) > Shape::kMaxRank * sizeof(int32_t)) {
+        GXF_LOG_ERROR("Header size exceeds limit of %lu.",
+                      Shape::kMaxRank * sizeof(int32_t));
+          return Unexpected{GXF_FAILURE};
+  }
+
   std::memcpy(dims.data(), header.dims, sizeof(header.dims));
   Tensor::stride_array_t strides;
-  std::memcpy(strides.data(), header.strides, sizeof(header.strides));
+  if (sizeof(header.strides) > Shape::kMaxRank * sizeof(int64_t)) {
+        GXF_LOG_ERROR("Header size exceeds limit of %lu.",
+                      Shape::kMaxRank * sizeof(int64_t));
+          return Unexpected{GXF_FAILURE};
+  }
 
+  std::memcpy(strides.data(), header.strides, sizeof(header.strides));
   Tensor tensor;
   auto result = tensor.reshapeCustom(Shape(dims, header.rank),
                                      header.element_type, header.bytes_per_element, strides,

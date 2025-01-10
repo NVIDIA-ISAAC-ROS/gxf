@@ -16,6 +16,10 @@ Expected<void> Extension::registerComponents(gxf_context_t context) {
   return ExpectedOrCode(registerComponents_abi(context));
 }
 
+Expected<void> Extension::hasComponent(const gxf_tid_t& tid) {
+  return ExpectedOrCode(hasComponent_abi(tid));
+}
+
 Expected<void> Extension::getComponentTypes(gxf_tid_t* pointer, size_t* size) {
   return ExpectedOrCode(getComponentTypes_abi(pointer, size));
 }

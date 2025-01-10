@@ -18,7 +18,7 @@ BINARY_NAME = "gxf_cli"
 
 def make_single_binary(root_path):
     source = os.path.join(root_path, SOURCE_NAME)
-    cmd = f"python3 -m PyInstaller --onefile -p {root_path} --clean --name {BINARY_NAME} {source}"
+    cmd = f"python3 -m PyInstaller --hidden-import pkg_resources.extern --onefile -p {root_path} --clean --name {BINARY_NAME} {source}"
     process  = subprocess.Popen(cmd, shell=True)
     process.wait()
     if process.returncode != 0:

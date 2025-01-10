@@ -1,5 +1,5 @@
 """
-Copyright (c) 2021-2023, NVIDIA CORPORATION. All rights reserved.
+Copyright (c) 2021-2024, NVIDIA CORPORATION. All rights reserved.
 
 NVIDIA CORPORATION and its licensors retain all intellectual property
 and proprietary rights in and to this software, related documentation
@@ -106,7 +106,10 @@ nv_gxf_cc_library(
     name = "logger",
     srcs = ["logger.cpp"],
     hdrs = ["logger.hpp"],
-    deps = ["singleton"],
+    deps = [
+        "singleton",
+        "//gxf/logger:gxf_logger",
+    ],
     visibility = ["//visibility:public"],
 )
 
@@ -177,6 +180,16 @@ nv_gxf_cc_library(
 )
 
 nv_gxf_cc_library(
+    name = "yaml_parser",
+    hdrs = ["yaml_parser.hpp"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "logger",
+        "@yaml-cpp",
+    ],
+)
+
+nv_gxf_cc_library(
     name = "common",
     visibility = ["//visibility:public"],
     deps = [
@@ -197,6 +210,7 @@ nv_gxf_cc_library(
         "strong_type",
         "type_name",
         "unique_index_map",
+        "yaml_parser",
     ],
 )
 
@@ -209,7 +223,7 @@ nv_gxf_pkg_library(
         "byte.hpp",
         "endian.hpp",
         "expected.hpp",
-        "fixed_map",
+        "fixed_map.hpp",
         "fixed_string.hpp",
         "fixed_vector.hpp",
         "iterator.hpp",
@@ -222,5 +236,6 @@ nv_gxf_pkg_library(
         "type_name.hpp",
         "type_name_gnuc.hpp",
         "type_utils.hpp",
+        "yaml_parser.hpp",
     ],
 )

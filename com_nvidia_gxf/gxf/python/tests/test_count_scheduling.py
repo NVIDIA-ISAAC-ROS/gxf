@@ -1,5 +1,5 @@
 """
- SPDX-FileCopyrightText: Copyright (c) 2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ SPDX-FileCopyrightText: Copyright (c) 2022-2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  SPDX-License-Identifier: Apache-2.0
 
  Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,11 +16,11 @@
 """
 import gxf.core
 import gxf.std
-import numpy as np
 import unittest
 
 APP_YAML = "gxf/python/tests/test_count_scheduling.yaml"
 MANIFEST_YAML = "gxf/python/tests/test_count_scheduling_manifest.yaml"
+
 
 class TestCountSchedulingTerm(unittest.TestCase):
     '''

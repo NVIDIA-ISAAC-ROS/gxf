@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2020-2021 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2020-2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -22,7 +22,16 @@ components:
     strings: ["Hello", "world,", "GXF"]
     my_doubles: [[4.2, -5.2, 0.0], [], [100.0]]
     segments: [[[-100.0, 0.0], [100.0, 0.0]], [[0.0, 0.0], [20.0, 2.0]]]
+    rank_1_array: [1,2]
     rank_2_array: [[1,2]]
     rank_2_vector: [[3,4],[5,6,7],[8,9,10]]
     rank_3_vector:  [[[1,2], [3,4]], [[5,6],[7,8]]]
     vector_of_float: [0.1, 0.2, -0.3, 0.4]
+    string_to_int_map:
+      hello: 1
+      world: 2
+    string_to_vector_map:
+      hello: [1, 2, 3]
+      world: [4, 5, 6, 7]
+    complex64: 2.0 + 1.5j
+    complex128: -2.102-3i

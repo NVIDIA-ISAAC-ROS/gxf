@@ -1,0 +1,43 @@
+Copyright (c) 2024, NVIDIA CORPORATION. All rights reserved.
+
+NVIDIA CORPORATION and its licensors retain all intellectual property
+and proprietary rights in and to this software, related documentation
+and any modifications thereto. Any use, reproduction, disclosure or
+distribution of this software and related documentation without an express
+license agreement from NVIDIA CORPORATION is strictly prohibited.
+---
+diff --git contrib/dockerfile_build.bzl contrib/dockerfile_build.bzl
+index fe66beb..b3459e6 100644
+--- contrib/dockerfile_build.bzl
++++ contrib/dockerfile_build.bzl
+@@ -61,6 +61,11 @@ def _impl(repository_ctx):
+         for env_var in repository_ctx.attr.vars:
+             build_args.extend(["--build-arg", "%s=%s" % (env_var, repository_ctx.os.environ.get(env_var))])
+
++    if repository_ctx.attr.docker_context:
++        build_context_path = str(repository_ctx.path(repository_ctx.attr.docker_context).dirname)
++    else:
++        build_context_path = str(dockerfile_path.dirname)
++
+     # The docker bulid command needs to run using the supplied Dockerfile
+     # because it may refer to relative paths in its ADD, COPY and WORKDIR
+     # instructions.
+@@ -72,7 +77,7 @@ def _impl(repository_ctx):
+         str(dockerfile_path),
+         "-t",
+         img_name,
+-        str(dockerfile_path.dirname),
++        build_context_path,
+     ])
+
+     if repository_ctx.attr.target:
+@@ -120,6 +125,9 @@ dockerfile_image = repository_rule(
+             mandatory = True,
+             doc = "The label for the Dockerfile to build the image from.",
+         ),
++        "docker_context": attr.label(
++            doc = "Directory context to build the image in. This points to a file in the top level directory. Defaults to same path as Dockerfile.",
++        ),
+         "vars": attr.string_list(
+             doc = "List of environment vars to include in the build.",
+         ),

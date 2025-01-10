@@ -246,6 +246,15 @@ void TestInsert(FixedVector<std::string, N>& vector) {
   ASSERT_EQ(B.value(), "B");
 }
 
+template <ssize_t N1, ssize_t N2>
+void TestAppend(FixedVector<std::string, N1>& input1, FixedVector<std::string, N2>& input2) {
+  ASSERT_TRUE(input1.capacity() >= input1.size() + input2.size());
+  ASSERT_TRUE(input1.insert(input1.end(), input2.begin(), input2.end()));
+  ASSERT_EQ(input1.at(3), input2.at(0));
+  ASSERT_EQ(input1.at(4), input2.at(1));
+  ASSERT_EQ(input1.at(5), input2.at(2));
+}
+
 template <ssize_t N>
 void TestConst(FixedVector<int, N>& vector) {
   const auto& const_vector = vector;
@@ -553,6 +562,19 @@ TEST(TestFixedVector, StackInsert) {
   TestInsert(vector);
 }
 
+TEST(TestFixedVector, StackAppend) {
+  FixedVector<std::string, 6> vector1;
+  ASSERT_TRUE(vector1.push_back("A"));
+  ASSERT_TRUE(vector1.push_back("B"));
+  ASSERT_TRUE(vector1.push_back("C"));
+
+  FixedVector<std::string, 3> vector2;
+  ASSERT_TRUE(vector2.push_back("D"));
+  ASSERT_TRUE(vector2.push_back("E"));
+  ASSERT_TRUE(vector2.push_back("F"));
+  TestAppend(vector1, vector2);
+}
+
 TEST(TestFixedVector, StackResize) {
   constexpr size_t kVectorSize = 1024;
   uint8_t data[kVectorSize];
@@ -856,6 +878,21 @@ TEST(TestFixedVector, HeapInsert) {
   FixedVector<std::string> vector;
   ASSERT_TRUE(vector.reserve(10));
   TestInsert(vector);
+}
+
+TEST(TestFixedVector, HeapAppend) {
+  FixedVector<std::string> vector1;
+  ASSERT_TRUE(vector1.reserve(6));
+  ASSERT_TRUE(vector1.push_back("A"));
+  ASSERT_TRUE(vector1.push_back("B"));
+  ASSERT_TRUE(vector1.push_back("C"));
+
+  FixedVector<std::string> vector2;
+  ASSERT_TRUE(vector2.reserve(3));
+  ASSERT_TRUE(vector2.push_back("D"));
+  ASSERT_TRUE(vector2.push_back("E"));
+  ASSERT_TRUE(vector2.push_back("F"));
+  TestAppend(vector1, vector2);
 }
 
 TEST(TestFixedVector, HeapResize) {

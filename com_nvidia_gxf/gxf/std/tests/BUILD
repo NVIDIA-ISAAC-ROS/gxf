@@ -1,5 +1,5 @@
 """
-Copyright (c) 2020-2023, NVIDIA CORPORATION. All rights reserved.
+Copyright (c) 2020-2024, NVIDIA CORPORATION. All rights reserved.
 
 NVIDIA CORPORATION and its licensors retain all intellectual property
 and proprietary rights in and to this software, related documentation
@@ -12,6 +12,8 @@ load(
     "//gxf:gxf.bzl",
     "nv_gxf_cc_library",
 )
+
+load("//gxf/python:pygxf.bzl", "nv_pygxf_test")
 
 cc_test(
     name = "memory_pool",
@@ -61,6 +63,7 @@ cc_test(
     ],
     deps = [
         "//gxf/std",
+        "//gxf/std:tensor",
         "@gtest//:main",
     ],
 )
@@ -180,5 +183,35 @@ cc_test(
     deps = [
         "//gxf/std",
         "@gtest//:main",
+    ],
+)
+
+cc_test(
+    name = "test_synchronization",
+    size = "small",
+    srcs = ["test_synchronization.cpp"],
+    data = [
+        "//gxf/std:libgxf_std.so",
+    ],
+    deps = [
+        "//gxf/std",
+        "@gtest//:main",
+    ],
+)
+
+nv_pygxf_test(
+    name = "test_compute_entity",
+    srcs = ["test_compute_entity.py"],
+    extensions = [
+        "//gxf/std",
+        "//gxf/sample",
+    ],
+    tags = [
+        "manual",
+        "pytest",
+    ],
+    deps = [
+        "//gxf/sample:sample_extension",
+        "//gxf/std:std_extension",
     ],
 )

@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2020-2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-FileCopyrightText: Copyright (c) 2020-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * SPDX-License-Identifier: Apache-2.0
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,7 +15,6 @@
  * limitations under the License.
  */
 #include "gxf/std/extension_factory_helper.hpp"
-#include "gxf/test/components/camera_message_generator.hpp"
 #include "gxf/test/components/entity_monitor.hpp"
 #include "gxf/test/components/mock_allocator.hpp"
 #include "gxf/test/components/mock_codelet.hpp"
@@ -31,7 +30,7 @@
 GXF_EXT_FACTORY_BEGIN()
   GXF_EXT_FACTORY_SET_INFO(0x1b99ffebc2504ced, 0x811762ac05969a50, "TestHelperExtension",
                            "Helper extension with components used to test std components",
-                           "NVIDIA", "2.3.0", "NVIDIA");
+                           "NVIDIA", "2.6.0", "NVIDIA");
   GXF_EXT_FACTORY_SET_DISPLAY_INFO("Test Helper Extension", "Test", "GXF Test Helper Extension");
   GXF_EXT_FACTORY_ADD(0x77d3cb561ddb4656, 0x828a3955ad78fb27,
                        nvidia::gxf::test::LoadParameterFromYamlTest, nvidia::gxf::Component,
@@ -54,6 +53,10 @@ GXF_EXT_FACTORY_BEGIN()
   GXF_EXT_FACTORY_ADD(0xc076cb7155ca4687, 0x8c84c789818f5cf7,
                        nvidia::gxf::test::StepCount, nvidia::gxf::Codelet,
                        "Tests that the codelet was stepped a certain number of times");
+  GXF_EXT_FACTORY_ADD(
+      0x947e3c3d122142d5, 0x92f1fe6c7fd95a8a, nvidia::gxf::test::StepRangeCount,
+      nvidia::gxf::Codelet,
+      "Tests that the codelet was stepped a certain number of times within a given range");
   GXF_EXT_FACTORY_ADD(0xa4f26a81a7dc4cdb, 0x8ad9c638c2de48f8,
                        nvidia::gxf::test::AsyncPingRx, nvidia::gxf::Codelet,
                        "Receives an entity at async time intervals");
@@ -130,9 +133,6 @@ GXF_EXT_FACTORY_BEGIN()
   GXF_EXT_FACTORY_ADD(0x85ed3ce306114314, 0x94dfda4f507f75a0,
                       nvidia::gxf::test::TestConfigurationSet, nvidia::gxf::Codelet,
                       "Tests that verifies the runtime parameter change");
-  GXF_EXT_FACTORY_ADD(0xab79d2a73f474f97, 0xb70533463800e379,
-                      nvidia::gxf::test::TestCameraMessage, nvidia::gxf::Codelet,
-                      "Tests that verifies consistent mechanism to pass camera images");
   GXF_EXT_FACTORY_ADD(0xa055fbf8758811ed, 0xa423331e2d38b116,
                       nvidia::gxf::test::WaitSchedulingTerm,
                       nvidia::gxf::SchedulingTerm,

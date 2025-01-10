@@ -34,7 +34,7 @@ set -e
 function generate_package () {
     local http_link=${1}
     local temp_directory=$(mktemp -d -t trt-XXXXXXXXXX)
-    echo "Using temprary directory path:" $temp_directory
+    echo "Using temporary directory path:" $temp_directory
 
     echo "Downloading TensorRT from:" $http_link
     wget -q $http_link -A "libnvinfer*" -A "libnvparsers*" -A "libnvonnxparsers*" -A "tensorrt_*" --show-progress --no-check-certificate -r -l 1 -nd -P $temp_directory

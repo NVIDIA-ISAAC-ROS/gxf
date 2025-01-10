@@ -14,11 +14,9 @@
  See the License for the specific language governing permissions and
  limitations under the License.
 """
-from gxf.core import MessageEntity
 from gxf.std import Clock
 from gxf.std import MemoryStorageType
 from gxf.std import Receiver
-from gxf.std import Shape
 from gxf.std import Tensor
 from gxf.python_codelet import CodeletAdapter
 import numpy as np
@@ -44,7 +42,7 @@ class VerifyEqual(CodeletAdapter):
     """ Python codelet to receive a msg on tick()
 
     Python implementation of Ping Rx.
-    Receives a message on the Reciever on every tick()
+    Receives a message on the Receiver on every tick()
     """
 
     def start(self):
@@ -73,7 +71,7 @@ class VerifyEqual(CodeletAdapter):
         assert(tensor0.shape() == tensor1.shape())
         assert(tensor0.element_type() == tensor1.element_type())
 
-        # if tensor0 is on device copy it to host memory for comparision
+        # if tensor0 is on device copy it to host memory for comparison
         if tensor0.storage_type() == MemoryStorageType.kDevice:
             tensor0 = get_cupy_ndarray_from_tensor(tensor0)
             tensor0 = tensor0.get()
@@ -82,7 +80,7 @@ class VerifyEqual(CodeletAdapter):
         else:
             raise RuntimeError("data neither on host or device?!")
 
-        # if tensor1 is on device copy it to host memory for comparision
+        # if tensor1 is on device copy it to host memory for comparison
         if tensor1.storage_type() == MemoryStorageType.kDevice:
             tensor1 = get_cupy_ndarray_from_tensor(tensor1)
             tensor1 = tensor1.get()

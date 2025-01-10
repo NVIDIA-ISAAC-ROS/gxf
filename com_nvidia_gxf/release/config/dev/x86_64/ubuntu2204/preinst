@@ -1,0 +1,38 @@
+################################################################################
+# Copyright (c) 2023, NVIDIA CORPORATION. All rights reserved.
+#
+# NVIDIA Corporation and its licensors retain all intellectual property
+# and proprietary rights in and to this software, related documentation
+# and any modifications thereto.  Any use, reproduction, disclosure or
+# distribution of this software and related documentation without an express
+# license agreement from NVIDIA Corporation is strictly prohibited.
+#
+################################################################################
+
+set -e
+
+. /usr/share/debconf/confmodule
+db_version 2.0
+
+if [ "$ACCEPT_NVIDIA_SOFTWARE_DEVELOPMENT_KITS_EULA" = "yes" ]; then
+    exit 0
+fi
+
+db_fset deepstream-reference-graphs/present-eula seen false
+db_set deepstream-reference-graphs/present-eula false
+
+if ! db_input critical deepstream-reference-graphs/present-eula ; then
+    echo "SOFTWARE LICENSE AGREEMENT FOR NVIDIA SOFTWARE DEVELOPMENT KITS could not be presented"
+    exit 2
+fi
+
+db_go
+
+db_get deepstream-reference-graphs/present-eula
+
+if [ $RET != "true" ]; then
+    echo "License terms not accepted. Cancelling installation"
+    exit 2
+fi
+
+exit 0

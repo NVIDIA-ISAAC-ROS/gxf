@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
+Copyright (c) 2022-2024, NVIDIA CORPORATION. All rights reserved.
 
 NVIDIA CORPORATION and its licensors retain all intellectual property
 and proprietary rights in and to this software, related documentation
@@ -20,8 +20,6 @@ namespace {
 
 constexpr const char* kStdExtensionFilename = "gxf/std/libgxf_std.so";
 constexpr const char* kGxeManifestFilename = "gxf/gxe/manifest.yaml";
-
-}  // namespace
 
 void activateEntities(gxf_context_t context, std::vector<std::string> entities)
 {
@@ -68,6 +66,8 @@ void deactivateEntities_with_null_uid(gxf_context_t context, std::vector<std::st
     ASSERT_EQ(GxfEntityDeactivate(context,kNullUid),GXF_ENTITY_NOT_FOUND);
   }
 }
+
+}  // namespace
 
 TEST(GxfEntityDeactivate,deactiving_the_non_activated_entities)
 {

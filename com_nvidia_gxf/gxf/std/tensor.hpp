@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2021-2022 NVIDIA CORPORATION & AFFILIATES.
+ * SPDX-FileCopyrightText: Copyright (c) 2021-2024 NVIDIA CORPORATION & AFFILIATES.
  * All rights reserved.
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -17,17 +17,22 @@
  */
 #pragma once
 
+#include <cuda_fp16.h>
+
 #include <array>
 #include <cstdint>
+#include <memory>
 #include <string>
 #include <utility>
 #include <vector>
 
 #include "common/byte.hpp"
+#include "dlpack/dlpack.h"
 #include "gxf/core/component.hpp"
 #include "gxf/core/expected.hpp"
 #include "gxf/std/allocator.hpp"
 #include "gxf/std/complex.hpp"
+#include "gxf/std/dlpack_utils.hpp"
 #include "gxf/std/memory_buffer.hpp"
 
 namespace nvidia {
@@ -48,6 +53,7 @@ enum class PrimitiveType : int32_t {
   kFloat64,
   kComplex64,
   kComplex128,
+  kFloat16,
 };
 
 // Returns the size of each element of specific PrimitiveType as number of bytes.
@@ -71,6 +77,7 @@ GXF_PRIMITIVE_TYPE_TRAITS(int32_t, kInt32);
 GXF_PRIMITIVE_TYPE_TRAITS(uint32_t, kUnsigned32);
 GXF_PRIMITIVE_TYPE_TRAITS(int64_t, kInt64);
 GXF_PRIMITIVE_TYPE_TRAITS(uint64_t, kUnsigned64);
+GXF_PRIMITIVE_TYPE_TRAITS(__half, kFloat16);
 GXF_PRIMITIVE_TYPE_TRAITS(float, kFloat32);
 GXF_PRIMITIVE_TYPE_TRAITS(double, kFloat64);
 GXF_PRIMITIVE_TYPE_TRAITS(complex64, kComplex64);
@@ -82,7 +89,7 @@ class Shape {
   // The maximum possible rank of the tensor.
   static constexpr uint32_t kMaxRank = 8;
 
-  // Intializes an empty rank-0 tensor.
+  // Initializes an empty rank-0 tensor.
   Shape() : rank_(0) {}
 
   // Initializes a shape object with the given dimensions.
@@ -173,6 +180,53 @@ class Shape {
   std::array<int32_t, kMaxRank> dimensions_;
 };
 
+/**
+ * @brief Class that wraps a DLManagedTensor with a memory data reference.
+ *
+ * This class is used to wrap a DLManagedTensor (`tensor`) with a shared pointer to the memory
+ * data (`memory_ref`). This class also holds shape and strides data in the integer type needed by
+ * the DLTensor object since this does not exist as contiguous int64_t on the Tensor object
+ * itself. It should also be noted that DLPack `dl_strides` stored here are in number of elements
+ * while those returned by `Tensor::stride` are in bytes rather than elements.
+ *
+ * The DLPack protocol is designed so that the producer (GXF in the case of `toDLPack` or
+ * `toDLManagedTensorContext`) continues to own the data. When the borrowing framework no longer
+ * needs the tensor, it should call the deleter to notify the producer that the resource is no
+ * longer needed.
+ *
+ * See: https://dmlc.github.io/dlpack/latest/c_api.html#_CPPv415DLManagedTensor
+ */
+struct DLManagedTensorContext {
+  DLManagedTensor tensor;            ///< The DLManagedTensor to wrap.
+  std::shared_ptr<void> memory_ref;  ///< The memory data reference.
+
+  std::vector<int64_t> dl_shape;    ///< Shape of the DLTensor.
+  std::vector<int64_t> dl_strides;  ///< Strides of the DLTensor.
+};
+
+/**
+ * @brief Class to wrap the deleter of a DLManagedTensor.
+ *
+ * This class is used with DLManagedTensorContext class to wrap the DLManagedTensor.
+ *
+ * A shared pointer to this class in DLManagedTensorContext class is used as the deleter of the
+ * DLManagedTensorContext::memory_ref.
+ *
+ * When the last reference to the DLManagedTensorContext object is released,
+ * DLManagedTensorContext::memory_ref will also be destroyed, which will call the deleter function
+ * of the DLManagedTensor object. This allows setting release_func to nullptr when calling
+ * wrapTensor within fromDLPack.
+ *
+ */
+class DLManagedMemoryBuffer {
+ public:
+  explicit DLManagedMemoryBuffer(DLManagedTensor* self);
+  ~DLManagedMemoryBuffer();
+
+ private:
+  DLManagedTensor* self_ = nullptr;
+};
+
 // A component which holds a single tensor. Multiple tensors can be added to one
 // entity to create a map of tensors. The component name can be used as key.
 class Tensor {
@@ -183,6 +237,7 @@ class Tensor {
 
   ~Tensor() {
     memory_buffer_.freeBuffer();  // FIXME(V2) error code?
+    dl_ctx_.reset();
     element_count_ = 0;
     shape_ = Shape();
   }
@@ -193,6 +248,12 @@ class Tensor {
     *this = std::move(other);
   }
 
+  // zero-copy initialization from an existing DLPack DLManagedTensor (C API struct)
+  explicit Tensor(const DLManagedTensor* dl_managed_tensor_ptr);
+
+  // zero-copy initialization from an existing DLManagedTensorContext (C++-style DLPack wrapper)
+  explicit Tensor(std::shared_ptr<DLManagedTensorContext> dl_ctx);
+
   Tensor& operator=(const Tensor&) = delete;
 
   Tensor& operator=(Tensor&& other) {
@@ -202,6 +263,7 @@ class Tensor {
     bytes_per_element_ = other.bytes_per_element_;
     strides_ = std::move(other.strides_);
     memory_buffer_ = std::move(other.memory_buffer_);
+    dl_ctx_ = std::move(other.dl_ctx_);
 
     return *this;
   }
@@ -279,7 +341,7 @@ class Tensor {
                             PrimitiveType element_type, uint64_t bytes_per_element,
                             Expected<stride_array_t> strides,
                             MemoryStorageType storage_type, void* pointer,
-                            release_function_t release_func);
+                            release_function_t release_func, bool reset_dlpack = true);
 
   // Wraps an existing memory buffer element into the current tensor
   Expected<void> wrapMemoryBuffer(const Shape& shape,
@@ -321,6 +383,40 @@ class Tensor {
     return strides_[index];
   }
 
+  // Get a new DLManagedTensor* corresponding to the Tensor data.
+  // An alternative is to use toDLManagedTensorContext instead which returns a shared pointer
+  // that will automatically clean up resources once its reference count goes to zero.
+  Expected<DLManagedTensor*> toDLPack();
+
+  /**
+   * @brief Get the internal DLManagedTensorContext of the Tensor.
+   *
+   * @return A shared pointer to the Tensor's DLManagedTensorContext.
+   */
+  Expected<std::shared_ptr<DLManagedTensorContext>&> toDLManagedTensorContext() {
+    if (dl_ctx_ == nullptr) {
+      auto status = initializeDLContext();
+      if (!status) {
+        GXF_LOG_ERROR(
+            "Failed to initialize DLManagedTensorContext with code: %s, returning nullptr",
+            GxfResultStr(status.error()));
+        ForwardError(status);
+      }
+    }
+    return dl_ctx_;
+  }
+
+  // Wrap an existing DLPack managed tensor as a Tensor.
+  Expected<void> fromDLPack(const DLManagedTensor* dl_managed_tensor_ptr);
+
+  // Wrap an existing shared C++ DLManagedTensorContext as a Tensor.
+  Expected<void> fromDLPack(std::shared_ptr<DLManagedTensorContext> dl_ctx);
+
+ protected:
+  // This member will be populated when memory_buffer_ is initialized or updated, allowing it to
+  // be used to provide the DLPack interface.
+  std::shared_ptr<DLManagedTensorContext> dl_ctx_;  ///< The DLManagedTensorContext object.
+
  private:
   Shape shape_;
   uint64_t element_count_ = 0;
@@ -328,6 +424,23 @@ class Tensor {
   uint64_t bytes_per_element_ = 1;
   stride_array_t strides_;
   MemoryBuffer memory_buffer_;
+
+  /**
+   * @brief Get DLDevice object from the GXF Tensor.
+   *
+   * @return DLDevice object.
+   */
+  Expected<DLDevice> device() const;
+
+  // populate DLPack data structures corresponding to the current Tensor
+  Expected<void> initializeDLContext();
+
+  // If dl_ctx_ has already been initialized, reset it and initialize a new one
+  Expected<void> updateDLContext();
+
+  // call wrapTensor using data from an existing DLManagedTensor
+  Expected<void> wrapDLPack(const DLManagedTensor* dl_managed_tensor_ptr,
+                            MemoryBuffer::release_function_t release_func = nullptr);
 };
 
 // Helper function to compute strides from Tensor shape, element size and non-trivial
@@ -358,6 +471,22 @@ struct TensorDescription {
 Expected<Entity> CreateTensorMap(gxf_context_t context, Handle<Allocator> pool,
                                  std::initializer_list<TensorDescription> descriptions,
                                  bool activate = true);
+
+// Determine tensor shape from a DLTensor struct
+Expected<Shape> ShapeFromDLTensor(const DLTensor* dl_tensor);
+
+// Determine tensor strides from a DLTensor struct
+Expected<Tensor::stride_array_t> StridesFromDLTensor(const DLTensor* dl_tensor);
+
+// Determine the tensor memory storage type from a DLTensor struct
+Expected<MemoryStorageType> MemoryStorageTypeFromDLTensor(const DLTensor* dl_tensor);
+
+// Determine the tensor primitive data type from a DLDataType struct
+Expected<PrimitiveType> PrimitiveTypeFromDLDataType(const DLDataType& dtype);
+
+// Convert PrimitiveType to its corresponding DLDataType
+Expected<DLDataType> PrimitiveTypeToDLDataType(const PrimitiveType& element_type,
+                                               uint16_t lanes = 1);
 
 }  // namespace gxf
 }  // namespace nvidia

@@ -17,12 +17,8 @@
 from gxf.core import MessageEntity
 from gxf.std import Allocator
 from gxf.std import Clock
-from gxf.std import TensorDescription
 from gxf.std import Tensor
 from gxf.std import Transmitter
-from gxf.std import MemoryStorageType
-from gxf.std import Shape
-from gxf.std import PrimitiveType
 from gxf.python_codelet import CodeletAdapter
 
 import numpy as np

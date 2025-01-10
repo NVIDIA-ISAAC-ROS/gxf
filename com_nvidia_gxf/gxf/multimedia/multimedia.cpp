@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2021-2023, NVIDIA CORPORATION. All rights reserved.
+Copyright (c) 2021-2024, NVIDIA CORPORATION. All rights reserved.
 
 NVIDIA CORPORATION and its licensors retain all intellectual property
 and proprietary rights in and to this software, related documentation
@@ -16,7 +16,7 @@ license agreement from NVIDIA CORPORATION is strictly prohibited.
 GXF_EXT_FACTORY_BEGIN()
   GXF_EXT_FACTORY_SET_INFO(0x6f2d1afc1057481a, 0x9da6a5f61fed178e, "MultimediaExtension",
                            "Multimedia related data types, interfaces and components in Gxf Core",
-                           "NVIDIA", "2.3.0", "NVIDIA");
+                           "NVIDIA", "2.6.0", "NVIDIA");
   GXF_EXT_FACTORY_SET_DISPLAY_INFO("Multimedia Extension", "Multimedia",
                                    "GXF Multimedia Extension");
   GXF_EXT_FACTORY_ADD_0(0xa914cac65f19449d, 0x9ade8c5cdcebe7c3,

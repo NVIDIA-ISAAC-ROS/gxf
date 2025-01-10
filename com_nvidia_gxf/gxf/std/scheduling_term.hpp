@@ -44,7 +44,7 @@ class SchedulingTerm : public Component {
 
   Expected<SchedulingCondition> check(int64_t timestamp) {
     SchedulingConditionType status;
-    int64_t target_timestamp;
+    int64_t target_timestamp = 0;
     gxf_result_t result = update_state_abi(timestamp);
     if (result != GXF_SUCCESS) { return Unexpected{result}; }
     const gxf_result_t error = check_abi(timestamp, &status, &target_timestamp);

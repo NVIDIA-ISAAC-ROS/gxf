@@ -1,16 +1,19 @@
-# Copyright (C) 2018 Google Inc.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#      http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+"""
+ SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ SPDX-License-Identifier: Apache-2.0
+
+ Licensed under the Apache License, Version 2.0 (the "License");
+ you may not use this file except in compliance with the License.
+ You may obtain a copy of the License at
+
+ http://www.apache.org/licenses/LICENSE-2.0
+
+ Unless required by applicable law or agreed to in writing, software
+ distributed under the License is distributed on an "AS IS" BASIS,
+ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ See the License for the specific language governing permissions and
+ limitations under the License.
+"""
 
 cc_library(
     name = "breakpad",
@@ -25,6 +28,7 @@ cc_library(
         "src/client/linux/minidump_writer/linux_dumper.cc",
         "src/client/linux/minidump_writer/linux_ptrace_dumper.cc",
         "src/client/linux/minidump_writer/minidump_writer.cc",
+        "src/client/linux/minidump_writer/pe_file.cc",
         "src/client/minidump_file_writer.cc",
         "src/common/convert_UTF.cc",
         "src/common/convert_UTF.h",
@@ -39,7 +43,11 @@ cc_library(
         "src/common/string_conversion.cc",
     ],
     hdrs = glob(["src/**/*.h"]),
-    copts = ["-Wno-maybe-uninitialized"],
+    copts = [
+        "-Wno-maybe-uninitialized",
+        "-Wno-array-bounds",
+        "-DHAVE_GETCONTEXT",
+    ],
     strip_include_prefix = "src",
     visibility = ["//visibility:public"],
     deps = ["@lss"],
@@ -47,7 +55,7 @@ cc_library(
 
 cc_library(
     name = "dump_syms-lib",
-    srcs = glob([
+    srcs = [
         "src/common/dwarf/bytereader.cc",
         "src/common/dwarf/dwarf2diehandler.cc",
         "src/common/dwarf/dwarf2reader.cc",
@@ -71,7 +79,7 @@ cc_library(
         "src/common/linux/memory_mapped_file.cc",
         "src/common/linux/safe_readlink.cc",
         "src/tools/linux/dump_syms/dump_syms.cc",
-    ]),
+    ],
     hdrs = glob(["src/**/*.h"]),
     copts = [
         #https://en.wikipedia.org/wiki/Stabs
@@ -81,7 +89,10 @@ cc_library(
         "-Wno-switch",
     ],
     strip_include_prefix = "src",
-    deps = ["@lss"],
+    deps = [
+        "@lss",
+        "@zlib",
+    ],
 )
 
 cc_binary(
@@ -110,6 +121,7 @@ cc_library(
         "src/processor/cfi_frame_info.cc",
         "src/processor/convert_old_arm64_context.cc",
         "src/processor/disassembler_x86.cc",
+        "src/processor/disassembler_objdump.cc",
         "src/processor/dump_context.cc",
         "src/processor/dump_object.cc",
         "src/processor/exploitability.cc",
@@ -134,16 +146,18 @@ cc_library(
         "src/processor/stackwalker_mips.cc",
         "src/processor/stackwalker_ppc.cc",
         "src/processor/stackwalker_ppc64.cc",
+        "src/processor/stackwalker_riscv.cc",
+        "src/processor/stackwalker_riscv64.cc",
         "src/processor/stackwalker_sparc.cc",
         "src/processor/stackwalker_x86.cc",
         "src/processor/symbolic_constants_win.cc",
         "src/processor/tokenize.cc",
     ],
-    hdrs = glob([
+    hdrs = ["src/third_party/libdisasm/libdis.h",] +
+        glob([
         "src/processor/*.h",
         "src/google_breakpad/processor/*.h",
         "src/google_breakpad/common/*.h",
-        "src/third_party/libdisasm/libdis.h",
     ]),
     strip_include_prefix = "src",
     deps = [

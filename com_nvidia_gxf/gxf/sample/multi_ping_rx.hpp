@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * SPDX-License-Identifier: Apache-2.0
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,6 +17,9 @@
 #ifndef NVIDIA_GXF_SAMPLE_MULTI_PING_RX_HPP_
 #define NVIDIA_GXF_SAMPLE_MULTI_PING_RX_HPP_
 
+#include <vector>
+
+#include "gxf/core/parameter_parser_std.hpp"
 #include "gxf/std/codelet.hpp"
 #include "gxf/std/receiver.hpp"
 
@@ -28,12 +31,10 @@ class MultiPingRx : public Codelet {
  public:
   virtual ~MultiPingRx() = default;
   gxf_result_t registerInterface(Registrar* registrar) override;
-  gxf_result_t start() override { return GXF_SUCCESS; }
   gxf_result_t tick() override;
-  gxf_result_t stop() override { return GXF_SUCCESS; }
 
  private:
-  Parameter<FixedVector<Handle<Receiver>, kMaxComponents>> receivers_;
+  Parameter<std::vector<Handle<Receiver>>> receivers_;
 };
 
 }  // namespace gxf

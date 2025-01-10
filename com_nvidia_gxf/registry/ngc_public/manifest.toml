@@ -172,3 +172,23 @@ name = "HttpExtension"
 [[extension]]
 eid = "62e7335c-c555-47c9-a2d2-21991b7fd250"
 name = "GrpcExtension"
+
+[[extension]]
+eid = "525f8a1a-dfb5-426b-8ddb-00c3ac839994"
+name = "UcxExtension"
+
+[[extension]]
+eid = "edc99001-73bd-435c-af0c-e013dcda3439"
+name = "VideoDecoderExtension"
+
+[[extension]]
+eid = "45081ccb-982e-4946-96f9-0d684f2cfbd0"
+name = "VideoDecoderIOExtension"
+
+[[extension]]
+eid = "ea5c44e4-15db-4448-a3a6-f32004303338"
+name = "VideoEncoderExtension"
+
+[[extension]]
+eid = "1a0a562d-378c-4618-bb5e-d3f70825aed2"
+name = "VideoEncoderIOExtension"

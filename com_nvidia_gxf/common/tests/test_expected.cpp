@@ -637,7 +637,7 @@ TEST(Expected, ExpectedRefValue) {
 
   auto wrap_ref = [](int& x) { return nvidia::Expected<int&, std::string>{x}; };
 
-  // test rvalue assigment
+  // test rvalue assignment
   wrap_ref(x).value() = 8;
   EXPECT_EQ(x, 8);
 

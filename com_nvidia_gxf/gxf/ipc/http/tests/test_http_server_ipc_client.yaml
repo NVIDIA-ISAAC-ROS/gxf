@@ -1,0 +1,52 @@
+%YAML 1.2
+# Copyright (c) 2024, NVIDIA CORPORATION.  All rights reserved.
+#
+# NVIDIA CORPORATION and its licensors retain all intellectual property
+# and proprietary rights in and to this software, related documentation
+# and any modifications thereto.  Any use, reproduction, disclosure or
+# distribution of this software and related documentation without an express
+# license agreement from NVIDIA CORPORATION is strictly prohibited.
+---
+name: scheduler
+components:
+- name: clock
+  type: nvidia::gxf::RealtimeClock
+- type: nvidia::gxf::GreedyScheduler
+  parameters:
+    max_duration_ms: 10000
+    clock: clock
+---
+name: test_http_client
+components:
+- name: http_client
+  type: nvidia::gxf::HttpIPCClient
+  parameters:
+    server_ip_address: localhost
+    port: 8082
+    use_https: false
+- type: nvidia::gxf::MockHttpIPCClient
+  parameters:
+    client: test_http_client/http_client
+- type: nvidia::gxf::PeriodicSchedulingTerm
+  parameters:
+    recess_period: 1s
+---
+name: test_http_service
+components:
+- name: http_server
+  type: nvidia::gxf::HttpServer
+  parameters:
+    port: 8082
+- type: nvidia::gxf::MockHttpService
+  parameters:
+    server: test_http_service/http_server
+---
+name: test_http_service_2
+components:
+- name: http_server
+  type: nvidia::gxf::HttpServer
+  parameters:
+    port: 8083
+- type: nvidia::gxf::MockHttpService
+  parameters:
+    server: test_http_service_2/http_server

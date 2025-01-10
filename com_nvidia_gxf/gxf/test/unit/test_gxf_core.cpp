@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2020-2022, NVIDIA CORPORATION. All rights reserved.
+Copyright (c) 2020-2024, NVIDIA CORPORATION. All rights reserved.
 
 NVIDIA CORPORATION and its licensors retain all intellectual property
 and proprietary rights in and to this software, related documentation
@@ -120,6 +120,96 @@ TEST(Entity, LoadExtensionFromPointer) {
   delete extension;
 }
 
+TEST(Entity, AddDuplicateTid_ShouldFail) {
+ // Create Context
+  gxf_context_t context;
+  GXF_ASSERT_SUCCESS(GxfContextCreate(&context));
+
+  // Load default extensions
+  const GxfLoadExtensionsInfo info{&kStdExtensionFilename, 1, nullptr, 0, nullptr};
+  GXF_ASSERT_SUCCESS(GxfLoadExtensions(context, &info));
+
+  // GXF_EXT_FACTORY_BEGIN()
+  auto factory = std::make_unique<nvidia::gxf::DefaultExtension>();
+  GXF_ASSERT(factory, "Failed to create factory");
+
+  GXF_ASSERT(
+      factory->setInfo({(0x51188a5b4bac4fb9), (0xa68012d305ae799c)},
+                       "GXF Test GxfLoadExtensionFromPointer",
+                       "Test extension to demonstrate the use of GxfLoadExtensionFromPointer",
+                       "NVIDIA", "1.0.0", "NVIDIA"),
+      "Failed to set extension info");
+
+  GXF_ASSERT(
+    (factory->add<nvidia::gxf::test::LoadExtensionFromPointerTest, nvidia::gxf::Codelet>(
+        {(0x95858651ea2a4a34), (0xae670db3bec4cbbf)},
+        "Test codelet to demonstrate the use of GxfLoadExtensionFromPointer")),
+    "Failed to add codelet");
+
+  //Add duplicate tid
+  const  auto invalidExtAdd = factory->add<nvidia::gxf::test::LoadExtensionFromPointerTest, nvidia::gxf::Codelet>(
+        {(0x95858651ea2a4a34), (0xae670db3bec4cbbf)},
+        "Test codelet to demonstrate the use of GxfLoadExtensionFromPointer");
+  GXF_ASSERT_FALSE(invalidExtAdd.has_value());
+
+  // Destroy Context
+  GXF_ASSERT_SUCCESS(GxfContextDestroy(context));
+}
+
+TEST(Entity, AddInvalidExtensionInFactory) {
+  // Create Context
+  gxf_context_t context;
+  GXF_ASSERT_SUCCESS(GxfContextCreate(&context));
+
+  // Load default extensions
+  const GxfLoadExtensionsInfo info{&kStdExtensionFilename, 1, nullptr, 0, nullptr};
+  GXF_ASSERT_SUCCESS(GxfLoadExtensions(context, &info));
+
+  // GXF_EXT_FACTORY_BEGIN()
+  auto factory = std::make_unique<nvidia::gxf::DefaultExtension>();
+  GXF_ASSERT(factory, "Failed to create factory");
+
+  GXF_ASSERT(
+      factory->setInfo({(0x51188a5b4bac4fb9), (0xa68012d305ae799c)},
+                       "GXF Test GxfLoadExtensionFromPointer",
+                       "Test extension to demonstrate the use of GxfLoadExtensionFromPointer",
+                       "NVIDIA", "1.0.0", "NVIDIA"),
+      "Failed to set extension info");
+
+  // Add display name more than 50 characters
+  const auto invalidExtAdd1 =
+      factory->add<nvidia::gxf::test::LoadExtensionFromPointerTest, nvidia::gxf::Codelet>(
+          {(0x93338651ea2a4a34), (0xae333db3bec4cbbf)},
+          "Test codelet to demonstrate the use of GxfLoadExtensionFromPointer",
+          "very very long string for the component name exceeding fifty characters");
+  GXF_ASSERT_FALSE(invalidExtAdd1.has_value());
+
+  // Add display name, descrition and brief of more than 50 characters
+  const auto invalidExtAdd2 =
+      factory->add<nvidia::gxf::test::LoadExtensionFromPointerTest, nvidia::gxf::Codelet>(
+          {(0x93338651ea2a4a34), (0xae333db3bec4cbbf)},
+          "Test codelet to demonstrate the use of GxfLoadExtensionFromPointer",
+          "Valid Display name for Dummy Ext",
+          "very very long string for the component desc exceeding fifty characters;very very long "
+          "string for the component desc exceeding fifty characters;very very long string for the "
+          "component desc exceeding fifty characters;very very long string for the component desc "
+          "exceeding fifty characters;very very long string for the component desc exceeding fifty "
+          "characters;very very long string for the component desc exceeding fifty characters;");
+  GXF_ASSERT_FALSE(invalidExtAdd2.has_value());
+
+  GXF_ASSERT((factory->add<nvidia::gxf::test::LoadExtensionFromPointerTest, nvidia::gxf::Codelet>(
+                 {(0x95858651ea2a4a34), (0xae670db3bec4cbbf)},
+                 "Test codelet to demonstrate the use of GxfLoadExtensionFromPointer")),
+             "Failed to add codelet");
+
+  // Add duplicate tid
+  const auto invalidExtAdd =
+      factory->add<nvidia::gxf::test::LoadExtensionFromPointerTest, nvidia::gxf::Codelet>(
+          {(0x95858651ea2a4a34), (0xae670db3bec4cbbf)},
+          "Test codelet to demonstrate the use of GxfLoadExtensionFromPointer");
+  GXF_ASSERT_FALSE(invalidExtAdd.has_value());
+}
+
 TEST(Entity, GxfRun) {
   gxf_context_t context;
   GXF_ASSERT_SUCCESS(GxfContextCreate(&context));
@@ -157,7 +247,7 @@ constexpr const char* kExtensions[] = {
   GXF_ASSERT_SUCCESS(GxfGetSharedContext(context1, &shared_context));
 
   gxf_context_t context2;
-  GXF_ASSERT_SUCCESS(GxfContextCreate1(shared_context, &context2));
+  GXF_ASSERT_SUCCESS(GxfContextCreateShared(shared_context, &context2));
 
   GXF_ASSERT_SUCCESS(GxfLoadExtensions(context1, &load_extension_info));
 
@@ -180,6 +270,78 @@ constexpr const char* kExtensions[] = {
   GXF_ASSERT_SUCCESS(GxfContextDestroy(context1));
 }
 
+TEST(Entity, RunMultipleGraphsInSameContext) {
+constexpr const char* kExtensions[] = {
+    "gxf/std/libgxf_std.so",
+    "gxf/sample/libgxf_sample.so",
+    "gxf/serialization/libgxf_serialization.so",
+    "gxf/network/libgxf_network.so",
+    "gxf/test/extensions/libgxf_test.so",
+  };
+  const GxfLoadExtensionsInfo load_extension_info{kExtensions, 5, nullptr, 0, nullptr};
+  gxf_context_t context1;
+
+  GXF_ASSERT_SUCCESS(GxfContextCreate(&context1));
+
+  GXF_ASSERT_SUCCESS(GxfLoadExtensions(context1, &load_extension_info));
+
+  const auto appName = "gxf/test/apps/test_ping_unnamed_entities.yaml";
+  const auto appNamewithoutSchduler =
+      "gxf/test/apps/test_ping_unnamed_entities_without_scheduler.yaml";
+
+  GXF_ASSERT_SUCCESS(GxfGraphLoadFileExtended(context1, appName, "shared_ctx"));
+  GXF_ASSERT_SUCCESS(GxfGraphLoadFileExtended(context1, appNamewithoutSchduler, "shared_ctx_1"));
+  GXF_ASSERT_SUCCESS(GxfGraphLoadFileExtended(context1, appNamewithoutSchduler, "shared_ctx_2"));
+  GXF_ASSERT_SUCCESS(GxfGraphLoadFileExtended(context1, appNamewithoutSchduler, "shared_ctx_3"));
+  GXF_ASSERT_SUCCESS(GxfGraphWait(context1));
+  GXF_ASSERT_SUCCESS(GxfGraphActivate(context1));
+
+  GXF_ASSERT_SUCCESS(GxfGraphRun(context1));
+  GXF_ASSERT_SUCCESS(GxfGraphWait(context1));
+
+  GXF_ASSERT_SUCCESS(GxfGraphDeactivate(context1));
+  GXF_ASSERT_SUCCESS(GxfContextDestroy(context1));
+}
+
+TEST(Entity, RunMultipleGraphsInSequenceWithSharedContext) {
+constexpr const char* kExtensions[] = {
+    "gxf/std/libgxf_std.so",
+    "gxf/sample/libgxf_sample.so",
+    "gxf/serialization/libgxf_serialization.so",
+    "gxf/network/libgxf_network.so",
+    "gxf/test/extensions/libgxf_test.so",
+  };
+  const GxfLoadExtensionsInfo load_extension_info{kExtensions, 5, nullptr, 0, nullptr};
+  gxf_context_t context1;
+  gxf_context_t shared_context;
+
+  GXF_ASSERT_SUCCESS(GxfContextCreate(&context1));
+  GXF_ASSERT_SUCCESS(GxfGetSharedContext(context1, &shared_context));
+
+  gxf_context_t context2;
+  GXF_ASSERT_SUCCESS(GxfContextCreateShared(shared_context, &context2));
+
+  GXF_ASSERT_SUCCESS(GxfLoadExtensions(context1, &load_extension_info));
+
+  const auto appName = "gxf/test/apps/test_ping_unnamed_entities.yaml";
+  GXF_ASSERT_SUCCESS(GxfGraphLoadFileExtended (context1, appName, "main_ctx"));
+  GXF_ASSERT_SUCCESS(GxfGraphActivate(context1));
+  GXF_ASSERT_SUCCESS(GxfGraphRunAsync(context1));
+
+  GXF_ASSERT_SUCCESS(GxfGraphLoadFileExtended(context2, appName, "shared_ctx"));
+  GXF_ASSERT_SUCCESS(GxfGraphActivate(context2));
+  GXF_ASSERT_SUCCESS(GxfGraphRunAsync(context2));
+
+  GXF_ASSERT_SUCCESS(GxfGraphWait(context1));
+  GXF_ASSERT_SUCCESS(GxfGraphWait(context2));
+
+  GXF_ASSERT_SUCCESS(GxfGraphDeactivate(context1));
+  GXF_ASSERT_SUCCESS(GxfGraphDeactivate(context2));
+
+  GXF_ASSERT_SUCCESS(GxfContextDestroy(context2));
+  GXF_ASSERT_SUCCESS(GxfContextDestroy(context1));
+}
+
 TEST(Entity, EntityRefCount) {
   gxf_context_t context;
   GXF_ASSERT_SUCCESS(GxfContextCreate(&context));
@@ -188,10 +350,17 @@ TEST(Entity, EntityRefCount) {
   const GxfEntityCreateInfo entity_create_info = {0};
   GXF_ASSERT_SUCCESS(GxfCreateEntity(context, &entity_create_info, &eid));
 
+  int64_t ref_count = 0;
   GXF_ASSERT_EQ(GxfEntityRefCountDec(context, eid), GXF_REF_COUNT_NEGATIVE);
+  GXF_ASSERT_EQ(GxfEntityGetRefCount(context, eid, &ref_count), GXF_PARAMETER_NOT_FOUND);
+  GXF_ASSERT_EQ(GxfEntityGetRefCount(context, -1, &ref_count), GXF_PARAMETER_NOT_FOUND);
+  GXF_ASSERT_EQ(GxfEntityGetRefCount(context, -1, nullptr), GXF_ARGUMENT_NULL);
+  GXF_ASSERT_EQ(GxfEntityGetRefCount(nullptr, eid, &ref_count), GXF_CONTEXT_INVALID);
   GXF_ASSERT_SUCCESS(GxfEntityRefCountInc(context, eid));
   GXF_ASSERT_SUCCESS(GxfEntityRefCountInc(context, eid));
   GXF_ASSERT_SUCCESS(GxfEntityRefCountDec(context, eid));
+  GXF_ASSERT_SUCCESS(GxfEntityGetRefCount(context, eid, &ref_count));
+  GXF_ASSERT_EQ(ref_count, 1);
 
   GXF_ASSERT_SUCCESS(GxfContextDestroy(context));
 }
@@ -201,10 +370,15 @@ TEST(Entity, GxfEntityActivate) {
   // of the components are not set
   gxf_context_t context;
   GXF_ASSERT_SUCCESS(GxfContextCreate(&context));
-  GXF_ASSERT_SUCCESS(GxfLoadExtension(context, "gxf/std/libgxf_std.so"));
-  GXF_ASSERT_SUCCESS(GxfLoadExtension(context, "gxf/test/extensions/libgxf_test.so"));
+  constexpr const char* kExtensions[] = {
+    "gxf/std/libgxf_std.so",
+    "gxf/test/extensions/libgxf_test.so",
+  };
+  const GxfLoadExtensionsInfo info{kExtensions, 2, nullptr, 0, nullptr};
+  GXF_ASSERT_SUCCESS(GxfLoadExtensions(context, &info));
   gxf_uid_t eid = kNullUid;
-  GXF_ASSERT_SUCCESS(GxfEntityCreate(context, &eid));
+  const GxfEntityCreateInfo entity_create_info = {0};
+  GXF_ASSERT_SUCCESS(GxfCreateEntity(context, &entity_create_info, &eid));
   gxf_tid_t rpi_tid{0xe9234c1ad5f8445c, 0xae9118bcda197032};  // RegisterParameterInterfaceTest
   gxf_uid_t rpi_uid = kNullUid;
   GXF_ASSERT_SUCCESS(GxfComponentAdd(context, eid, rpi_tid, "rpi", &rpi_uid));
@@ -280,11 +454,12 @@ TEST(Entity, ComponentFindAll) {
 TEST(Entity, GxfRegisterComponent) {
   gxf_context_t context;
   GXF_ASSERT_SUCCESS(GxfContextCreate(&context));
-  gxf_tid_t tid;
+  gxf_tid_t tid = GxfTidNull();
   GXF_ASSERT_SUCCESS(GxfRegisterComponent(context, tid, "nvidia::gxf::NewComponent", ""));
-  gxf_tid_t tid1;
+  gxf_tid_t tid1 = {1UL, 1UL};
   GXF_ASSERT_EQ(GxfRegisterComponent(context, tid1, "nvidia::gxf::Component", ""),
                 GXF_FACTORY_DUPLICATE_TID);
+  tid = {0UL, 1UL};
   GXF_ASSERT_EQ(
       GxfRegisterComponent(context, tid, "nvidia::gxf::NewComponent2", "Not_Registered_Base"),
       GXF_FACTORY_UNKNOWN_CLASS_NAME);

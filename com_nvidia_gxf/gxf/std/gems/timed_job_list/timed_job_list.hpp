@@ -1,12 +1,20 @@
 /*
-Copyright (c) 2021, NVIDIA CORPORATION. All rights reserved.
+ * SPDX-FileCopyrightText: Copyright (c) 2021 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
-NVIDIA CORPORATION and its licensors retain all intellectual property
-and proprietary rights in and to this software, related documentation
-and any modifications thereto. Any use, reproduction, disclosure or
-distribution of this software and related documentation without an express
-license agreement from NVIDIA CORPORATION is strictly prohibited.
-*/
 #ifndef NVIDIA_GXF_STD_GEMS_TIMED_JOB_LIST_TIMED_JOB_LIST_HPP_
 #define NVIDIA_GXF_STD_GEMS_TIMED_JOB_LIST_TIMED_JOB_LIST_HPP_
 
@@ -15,8 +23,10 @@ license agreement from NVIDIA CORPORATION is strictly prohibited.
 #include <list>
 #include <mutex>
 #include <queue>
+#include <set>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -38,8 +48,15 @@ class TimedJobList {
   // Number of queued jobs. This should only be used for logging purposes as it is not acquiring
   // a lock.
   size_t sizeUnsafe() const { return queue_.size(); }
+
+  // thread-safe implementation to find number of queued jobs
+  size_t size() const {
+    std::unique_lock<std::mutex> lock(queue_cv_mutex_);
+    return items_.size();
+  }
+
   // Adds a job to the queue to be executed at the given target time. O(log(n))
-  void insert(JobT job, int64_t target_time, int64_t slack, int priority);
+  bool insert(JobT job, int64_t target_time, int64_t slack, int priority);
   // Notify that a job has completed.
   void notifyDone(JobT job);
   // This is a blocking call which will wait for an job.
@@ -87,6 +104,7 @@ class TimedJobList {
 
     Item result = queue_.top();
     queue_.pop();
+    items_.erase(result.job);
     return result.job;
   }
 
@@ -98,7 +116,8 @@ class TimedJobList {
 
  private:
   // We allow a small tolerance when executing jobs
-  static constexpr int64_t kTimeFudge = 100'000;  // 0.1 ms
+// static constexpr int64_t kTimeFudge = 100'000;  // 0.1 ms
+  static constexpr int64_t kTimeFudge = 1;  // 100 ns
 
   // Helper class used to store jobs with additional information
   struct Item {
@@ -137,8 +156,12 @@ class TimedJobList {
   mutable std::mutex queue_cv_mutex_;
   std::condition_variable queue_cv_;
 
-  // List of futur events sorted by their scheduled execution time.
+  // List of future events sorted by their scheduled execution time.
   std::priority_queue<Item, std::vector<Item>, ItemPriorityCmp> queue_;
+
+  // Item lookup to avoid duplicates
+  std::unordered_set<JobT> items_;
+
   // List of events overdue, we have passed their scheduled execution time but have not been able to
   // run yet.
   std::list<Item> pending_;
@@ -147,12 +170,15 @@ class TimedJobList {
 // -------------------------------------------------------------------------------------------------
 
 template <typename JobT>
-void TimedJobList<JobT>::insert(JobT job, int64_t target_time, int64_t slack, int priority) {
+bool TimedJobList<JobT>::insert(JobT job, int64_t target_time, int64_t slack, int priority) {
   {
     std::unique_lock<std::mutex> lock(queue_cv_mutex_);
+    if (items_.find(job) != items_.end()) { return false; }
+    items_.insert(job);
     queue_.push(Item{std::move(job), target_time, slack, priority});
   }
   queue_cv_.notify_one();
+  return true;
 }
 
 template <typename JobT>
@@ -164,7 +190,7 @@ void TimedJobList<JobT>::notifyDone(JobT job) {
 template <typename JobT>
 void TimedJobList<JobT>::waitForJob(JobT& job) {
   while (is_running_) {
-    // Aquire the lock to check for a job
+    // Acquire the lock to check for a job
     std::unique_lock<std::mutex> lock(queue_cv_mutex_);
     // Double check the running status as a stop could have been invoked.
     if (!is_running_) {
@@ -191,6 +217,7 @@ void TimedJobList<JobT>::waitForJob(JobT& job) {
       job = pending_job->job;
       pending_job->target_time = now;
       pending_.erase(pending_job);
+      items_.erase(job);
       return;
     }
     // Wait for a new job or until time is up (the lock is released while waiting)

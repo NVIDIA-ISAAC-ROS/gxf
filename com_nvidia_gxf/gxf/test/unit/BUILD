@@ -1,5 +1,5 @@
 """
-Copyright (c) 2020-2023, NVIDIA CORPORATION. All rights reserved.
+Copyright (c) 2020-2024, NVIDIA CORPORATION. All rights reserved.
 
 NVIDIA CORPORATION and its licensors retain all intellectual property
 and proprietary rights in and to this software, related documentation
@@ -8,6 +8,13 @@ distribution of this software and related documentation without an express
 license agreement from NVIDIA CORPORATION is strictly prohibited.
 """
 
+# https://docs.bazel.build/versions/master/be/c-cpp.html#cc_library
+cc_library(
+    name = "test_load_extension",
+    # srcs = ["source files"],
+    hdrs = ["test_load_extension.hpp"],
+    visibility = ["//visibility:public"],
+)
 cc_test(
     name = "test_gxf_core",
     srcs = [
@@ -23,6 +30,9 @@ cc_test(
         "//gxf/test/apps:test_ping_graph.yaml",
         "//gxf/test/apps:test_ping.yaml",
         "//gxf/test/apps:test_ping_multi_thread_start_order.yaml",
+        "//gxf/test/apps:test_metric.yaml",
+        "//gxf/test/apps:test_ping_unnamed_entities.yaml",
+        "//gxf/test/apps:test_ping_unnamed_entities_without_scheduler.yaml"
     ],
     deps = [
         "//gxf/core:gxf",
@@ -102,6 +112,23 @@ cc_test(
     ],
 )
 
+cc_test(
+    name = "test_entity_thread_safe",
+    srcs = [
+        "test_entity_thread_safe.cpp",
+    ],
+    data = [
+        "//gxf/gxe:manifest",
+        "//gxf/std",
+        "//gxf/test/extensions:test",
+    ],
+    deps = [
+        "//gxf/core:gxf",
+        "//gxf/std",
+        "@gtest//:main",
+    ],
+)
+
 # Adding test extension registration hook here since //gxf/test/extensions/BUILD file
 # is also used in release package while the test extension itself is not included in the
 # release package
@@ -113,7 +140,7 @@ register_extension(
     name = "register_test_ext",
     extension = "//gxf/test/extensions:test",
     uuid = "1b99ffeb-c250-4ced-8117-62ac05969a50",
-    version = "2.3.0",
+    version = "2.6.0",
     license_file = "//gxf/test/extensions:LICENSE",
     url = "www.nvidia.com",
     labels = ["gxf"],

@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2021-2022, NVIDIA CORPORATION. All rights reserved.
+Copyright (c) 2021-2024, NVIDIA CORPORATION. All rights reserved.
 
 NVIDIA CORPORATION and its licensors retain all intellectual property
 and proprietary rights in and to this software, related documentation
@@ -53,7 +53,7 @@ gxf_result_t TensorCopier::tick() {
   if (!entity) {
     return ToResultCode(entity);
   }
-  auto tensors = entity->findAll<Tensor>();
+  auto tensors = entity->findAllHeap<Tensor>();
   if (!tensors) {
     return ToResultCode(tensors);
   }

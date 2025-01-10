@@ -1,5 +1,5 @@
 #! /usr/env/python
-# Copyright (c) 2020-2023, NVIDIA CORPORATION.  All rights reserved.
+# Copyright (c) 2020-2024, NVIDIA CORPORATION.  All rights reserved.
 #
 # NVIDIA CORPORATION and its licensors retain all intellectual property
 # and proprietary rights in and to this software, related documentation
@@ -7,6 +7,7 @@
 # distribution of this software and related documentation without an express
 # license agreement from NVIDIA CORPORATION is strictly prohibited.
 
+import argparse
 import os
 import pathlib
 import shutil
@@ -15,6 +16,7 @@ import sys
 import tarfile
 import tempfile
 import yaml
+import distro
 
 LICENSE = """
 # SPDX-FileCopyrightText: Copyright (c) 2021-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
@@ -46,6 +48,7 @@ exports_files(["{name}"])
 """
 
 class Platform:
+    """Describes a target platform architecture"""
     def __init__(self, content):
         self.platform = content["platform"]
         self.define = content["define"]
@@ -56,6 +59,7 @@ class Platform:
         self.disable_cxx11_abi = content["disable_cxx11_abi"] if "disable_cxx11_abi" in content else None
 
 class Target:
+    """Data and methods related to a Bazel target output"""
     def __init__(self, content, gxf_root, yaml_content, platform_dict):
         lib_path = content.split("/")
 
@@ -68,6 +72,7 @@ class Target:
         self._platform_dict = platform_dict
 
     def copy_all_libs(self, lib_path, lib_out):
+        """Copy target output to release directory"""
         root_lib = os.path.join(self._gxf_root, lib_path)
         dst = ''.join(self.dst)
         dst_dir = os.path.join(self._release_dir, lib_out, '/'.join(dst.split("/")[:-1]))
@@ -93,6 +98,7 @@ def write_to_file(path, content):
         f.write(content)
 
 def copy_files_for_platform(target_list, platform):
+    """Build targets for one platform with Bazel and copy binaries to release folder"""
     bazel_opt = platform.bazel_config
     cmd = f"bazel build ... --config={bazel_opt}"
     if platform.cxx_config:
@@ -123,6 +129,7 @@ def bazel_clean():
 
 
 def write_lib_files(release_dir, target_list, platform_dict):
+    """Build library files and copy to release folder"""
     all_libs_str = {}
 
     for target in target_list:
@@ -130,6 +137,7 @@ def write_lib_files(release_dir, target_list, platform_dict):
         all_libs_str[target.dst] = f"{tmp_all_libs}"
 
     bazel_clean()
+
     for platform in platform_dict.values():
         if not copy_files_for_platform(target_list, platform):
             print(f"Could not copy files for {platform.platform}")
@@ -148,7 +156,16 @@ def write_lib_files(release_dir, target_list, platform_dict):
     return True
 
 
-def copy_files(release_dir, tocopy_list):
+def copy_files(release_dir:str, tocopy_list:list[dict]) -> bool:
+    """
+    Copy files from source or build directory to the installation directory.
+
+    :param release_dir: The relative path to the installation directory
+    :param tocopy_list: List of dictionaries where each element has the keys:
+        - src: The origin filepath in the source or build directory
+        - dst: The output filepath relative to the installation directory
+    :return: "False" if the source file is not found, else "True"
+    """
     for elm in tocopy_list:
         src = elm["src"]
         dst = elm["dst"]
@@ -173,7 +190,7 @@ def generate_code_coverage_report(release_dir):
         print(f"Code coverage report generation failed: {e}")
         return False
 
-    staging_path =  tempfile.mkdtemp(prefix="/tmp/nvgraph.")
+    staging_path =  tempfile.mkdtemp(prefix="/tmp/gxf.")
     html_cmd = f"genhtml bazel-out/_coverage/_coverage_report.dat --o {staging_path}"
     try:
         print("Generating Code Coverage HTML Report:", html_cmd)
@@ -192,16 +209,47 @@ def generate_code_coverage_report(release_dir):
     shutil.rmtree(staging_path)
     return True
 
-def make_tarball_release(root_gxf, yaml_content):
+def match_distro_platform(distro_name_ubuntu, platform_name):
+    if bool(distro_name_ubuntu):
+        if "rhel" not in platform_name:
+            print("Valid: distro - {0}, platform - {1}".format(distro.name(), platform_name))
+            return True
+        else:
+            print("Invalid: distro - {0}, platform - {1}".format(distro.name(), platform_name))
+            return False
+    else:
+        if "rhel" in platform_name:
+            print("Valid: distro - {0}, platform - {1}".format(distro.name(), platform_name))
+            return True
+        else:
+            print("Invalid: distro - {0}, platform - {1}".format(distro.name(), platform_name))
+            return False
+
+def make_tarball_release(root_gxf, yaml_content, single_platform:str=''):
+    """Build and package the release tarball"""
     release_dir = yaml_content["tarball_release_folder"]
     if os.path.exists(release_dir):
         shutil.rmtree(release_dir)
 
     pathlib.Path(release_dir).mkdir(parents=True, exist_ok=True)
 
+    distro_name_ubuntu = True if (distro.name().find("Ubuntu") != -1) else False
     platform_dict = {}
+    platform_found = False
     for name, content in yaml_content["platforms"].items():
-        platform_dict[name] = Platform(content)
+        if single_platform:
+            if single_platform == name and match_distro_platform(distro_name_ubuntu, name) == True:
+                platform_dict[name] = Platform(content)
+                platform_found = True
+                break
+        else:
+            if match_distro_platform(distro_name_ubuntu, name) == True:
+                platform_dict[name] = Platform(content)
+                platform_found = True
+
+    if platform_found == False:
+        print("Incorrect platform specified, tarball will not be built!")
+        return False
 
     target_list = []
     for content in yaml_content["targets"]:
@@ -211,15 +259,21 @@ def make_tarball_release(root_gxf, yaml_content):
         print("Error while writing library files, tarball will not be built!")
         return False
 
+    for platform in platform_dict.values():
+        platform_release_dir = os.path.join(release_dir, platform.dst_lib)
+        if not copy_files(platform_release_dir, yaml_content["files_to_copy_per_platform"]):
+            return False
+
     if not copy_files(release_dir, yaml_content["files_to_copy_release"]):
         return False
     copy_as_is = [{"src": elm, "dst": elm} for elm in yaml_content["files_to_copy_test_as_is"]]
     if not copy_files(release_dir, copy_as_is):
         return False
 
-    if bool(os.getenv('ENABLE_CODE_COVERAGE') or yaml_content["enable_code_coverage"]) \
-        and not generate_code_coverage_report(release_dir):
-        return False
+    # Code coverage report is now enabled in Jenkins CI
+    # if bool(os.getenv('ENABLE_CODE_COVERAGE') or yaml_content["enable_code_coverage"]) \
+    #     and not generate_code_coverage_report(release_dir):
+    #     return False
 
     # Create a dummy coverity function file that gets loaded from gxf.bzl
     pathlib.Path(release_dir+"/coverity/bazel/").mkdir(parents=True, exist_ok=True)
@@ -266,8 +320,16 @@ def make_tarball_release(root_gxf, yaml_content):
 
 
 def check_keys(yaml_content):
-    keys = ["tarball_release_name", "tarball_release_folder", "workspace_name_release",
-            "platforms", "targets", "files_to_copy_release", "enable_code_coverage", "manifest",]
+    """Validate that manifest contains required keys"""
+    keys = ["tarball_release_name",
+            "tarball_release_folder",
+            "workspace_name_release",
+            "platforms",
+            "targets",
+            "files_to_copy_per_platform",
+            "files_to_copy_release",
+            "enable_code_coverage",
+            "manifest"]
     is_ok = True
     for key in keys:
         if key not in yaml_content:
@@ -276,34 +338,47 @@ def check_keys(yaml_content):
     return is_ok
 
 def main():
-    args = sys.argv
-    if len(args) != 4:
-        return 1
-    dir_script = os.path.dirname(args[0])
-    yaml_file = args[1]
-    if not os.path.isfile(yaml_file):
-        print("<tarball_config.yaml> must be a file")
-        return 1
-    out_tarball_name = args[2]
-    out_folder_name = args[3]
+    parser = argparse.ArgumentParser(
+        description='Builds and packages a GXF release tarball'
+    )
+    parser.add_argument('yaml_file',
+                        metavar='tarball_config.yaml',
+                        type=str,
+                        help='Manifest file describing release platform and file targets')
+    parser.add_argument('tarball_release_name',
+                        type=str,
+                        help='Output tarball name')
+    parser.add_argument('tarball_release_folder',
+                        type=str,
+                        help='Output tarball path to create')
+    parser.add_argument('--single_platform',
+                        type=str,
+                        default='',
+                        required=False,
+                        help='Target platform string matching a known, named Platform specification')
+    args = parser.parse_args()
 
-    with open(yaml_file) as f:
+    if not os.path.isfile(args.yaml_file):
+        parser.print_help()
+        print("<tarball_config.yaml> must be a file")
+        sys.exit(1)
+    with open(args.yaml_file) as f:
         yaml_str = f.read()
     yaml_obj = yaml.safe_load(yaml_str)
-    yaml_obj["tarball_release_name"] = out_tarball_name
-    yaml_obj["tarball_release_folder"] = out_folder_name
+    yaml_obj["tarball_release_name"] = args.tarball_release_name
+    yaml_obj["tarball_release_folder"] = args.tarball_release_folder
     if not check_keys(yaml_obj):
-        return 2
+        parser.print_help()
+        sys.exit(2)
+
+    dir_script = os.path.dirname(__file__)
     root_gxf = os.path.abspath(os.path.join(os.path.curdir, dir_script, ".."))
-    res = make_tarball_release(root_gxf, yaml_obj)
+    res = make_tarball_release(root_gxf, yaml_obj, args.single_platform)
     if not res:
         print("Could not create tarball")
-        return 3
-    return 0
+        parser.print_help()
+        sys.exit(3)
 
 
 if __name__ == '__main__':
-    res = main()
-    if res == 1:
-        print(f"Usage: {sys.argv[0]} <tarball_config.yaml> <out_tarball_name> <out_folder_name>")
-    sys.exit(res)
+    main()

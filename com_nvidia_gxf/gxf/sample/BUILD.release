@@ -1,5 +1,5 @@
 """
- SPDX-FileCopyrightText: Copyright (c) 2021-2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ SPDX-FileCopyrightText: Copyright (c) 2021-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  SPDX-License-Identifier: Apache-2.0
 
  Licensed under the Apache License, Version 2.0 (the "License");
@@ -30,12 +30,13 @@ alias(
     name = "libgxf_sample.so",
     tags = ["manual"],
     actual = select({
-        "@com_nvidia_gxf//engine/build:platform_x86_64_cuda_11_8": "//gxf_x86_64_cuda_11_8/sample:libgxf_sample.so_release",
-        "@com_nvidia_gxf//engine/build:platform_x86_64_cuda_12_1": "//gxf_x86_64_cuda_12_1/sample:libgxf_sample.so_release",
-        "@com_nvidia_gxf//engine/build:platform_hp11_sbsa": "//gxf_hp11_sbsa/sample:libgxf_sample.so_release",
-        "@com_nvidia_gxf//engine/build:platform_hp20_sbsa": "//gxf_hp20_sbsa/sample:libgxf_sample.so_release",
+        "@com_nvidia_gxf//engine/build:platform_x86_64_cuda_12_2": "//gxf_x86_64_cuda_12_2/sample:libgxf_sample.so_release",
+        "@com_nvidia_gxf//engine/build:platform_x86_64_cuda_12_6": "//gxf_x86_64_cuda_12_6/sample:libgxf_sample.so_release",
+        "@com_nvidia_gxf//engine/build:platform_x86_64_rhel9_cuda_12_2": "//gxf_x86_64_rhel9_cuda_12_2/sample:libgxf_sample.so_release",
         "@com_nvidia_gxf//engine/build:platform_hp21ea_sbsa": "//gxf_hp21ea_sbsa/sample:libgxf_sample.so_release",
-        "@com_nvidia_gxf//engine/build:platform_jetpack51": "//gxf_jetpack51/sample:libgxf_sample.so_release",
+        "@com_nvidia_gxf//engine/build:platform_hp21ga_sbsa": "//gxf_hp21ga_sbsa/sample:libgxf_sample.so_release",
+        "@com_nvidia_gxf//engine/build:platform_jetpack60": "//gxf_jetpack60/sample:libgxf_sample.so_release",
+        "@com_nvidia_gxf//engine/build:platform_jetpack61": "//gxf_jetpack61/sample:libgxf_sample.so_release",
     }),
     visibility = ["//visibility:public"],
 )
@@ -46,7 +47,9 @@ cc_import(
     shared_library = ":libgxf_sample.so",
     hdrs = [
         "ping_rx.hpp",
+        "ping_rx_async.hpp",
         "ping_tx.hpp",
+        "ping_tx_async.hpp",
         "ping_batch_rx.hpp",
         "hello_world.hpp",
     ],

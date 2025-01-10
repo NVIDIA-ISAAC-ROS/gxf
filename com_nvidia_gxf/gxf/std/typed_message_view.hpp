@@ -94,7 +94,7 @@ get_ele(TypedMessageViewInternal<T, Ts...> element) {
 }
 
 // get_name_rt is the runtime version of getting information, other methods are
-// at compile time, which cant be used in the add_component_name scenario
+// at compile time, which can't be used in the add_component_name scenario
 template <typename T, typename... Ts>
 const char*& get_name_rt(TypedMessageViewInternal<T, Ts...>& t, int k) {
   if (k > 1) {
@@ -123,7 +123,7 @@ const char*& get_name_rt_final(TypedMessageViewInternal<Ts...>& t, int k) {
 }
 
 // add_component_helper recurses the TypedMessageView at compile time to add each saved type and
-// cooresponding name to the Entity
+// corresponding name to the Entity
 template<int N, typename T>
 struct add_component_helper {
 static Expected<void> f(T& t, Entity& entity) {

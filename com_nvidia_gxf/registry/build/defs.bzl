@@ -1,5 +1,5 @@
 """
-Copyright (c) 2023, NVIDIA CORPORATION. All rights reserved.
+Copyright (c) 2023-2024, NVIDIA CORPORATION. All rights reserved.
 
 NVIDIA CORPORATION and its licensors retain all intellectual property
 and proprietary rights in and to this software, related documentation
@@ -32,33 +32,37 @@ def get_platform_os():
 
 def get_platform_os_distribution():
     distribution = selects.with_or({
-       "//conditions:default": "ubuntu_20.04",
+       "//conditions:default": "ubuntu_22.04",
+       "@com_nvidia_gxf//engine/build:host_ubuntu_22_04": "ubuntu_22.04",
+       "@com_nvidia_gxf//engine/build:host_rhel9": "rhel9",
     })
 
     return distribution
 
 def get_cuda_version():
     cuda = select({
-      "//conditions:default": "11.8",
-      "@com_nvidia_gxf//engine/build:platform_x86_64_cuda_11_8": "11.8",
-      "@com_nvidia_gxf//engine/build:platform_x86_64_cuda_12_1": "12.1",
-      "@com_nvidia_gxf//engine/build:platform_hp11_sbsa": "11.6",
-      "@com_nvidia_gxf//engine/build:platform_hp20_sbsa": "11.8",
-      "@com_nvidia_gxf//engine/build:platform_hp21ea_sbsa": "12.1",
-      "@com_nvidia_gxf//engine/build:platform_jetpack51": "11.4",
+      "//conditions:default": "12.6",
+      "@com_nvidia_gxf//engine/build:platform_x86_64_cuda_12_2": "12.2",
+      "@com_nvidia_gxf//engine/build:platform_x86_64_cuda_12_6": "12.6",
+      "@com_nvidia_gxf//engine/build:platform_x86_64_rhel9_cuda_12_2": "12.2",
+      "@com_nvidia_gxf//engine/build:platform_hp21ea_sbsa": "12.2",
+      "@com_nvidia_gxf//engine/build:platform_hp21ga_sbsa": "12.6",
+      "@com_nvidia_gxf//engine/build:platform_jetpack60": "12.2",
+      "@com_nvidia_gxf//engine/build:platform_jetpack61": "12.6",
     })
 
     return cuda
 
 def get_cudnn_version():
     cudnn = select({
-      "//conditions:default": "8.2.2.26",
-      "@com_nvidia_gxf//engine/build:platform_x86_64_cuda_11_8": "8.6.0",
-      "@com_nvidia_gxf//engine/build:platform_x86_64_cuda_12_1": "8.8.1",
-      "@com_nvidia_gxf//engine/build:platform_hp11_sbsa": "8.3.3",
-      "@com_nvidia_gxf//engine/build:platform_hp20_sbsa": "8.6.0",
+      "//conditions:default": "9.3.0",
+      "@com_nvidia_gxf//engine/build:platform_x86_64_cuda_12_2": "8.9.2",
+      "@com_nvidia_gxf//engine/build:platform_x86_64_cuda_12_6": "9.3.0",
+      "@com_nvidia_gxf//engine/build:platform_x86_64_rhel9_cuda_12_2": "8.9.2",
       "@com_nvidia_gxf//engine/build:platform_hp21ea_sbsa": "8.9.2",
-      "@com_nvidia_gxf//engine/build:platform_jetpack51": "8.6.0",
+      "@com_nvidia_gxf//engine/build:platform_hp21ga_sbsa": "9.3.0",
+      "@com_nvidia_gxf//engine/build:platform_jetpack60": "8.9.2",
+      "@com_nvidia_gxf//engine/build:platform_jetpack61": "9.3.0",
     })
 
     return cudnn
@@ -66,12 +70,13 @@ def get_cudnn_version():
 def get_tensorrt_version():
     tensorrt = select({
       "//conditions:default": None,
-      "@com_nvidia_gxf//engine/build:platform_x86_64_cuda_11_8": "8.5.1",
-      "@com_nvidia_gxf//engine/build:platform_x86_64_cuda_12_1": "8.5.3",
-      "@com_nvidia_gxf//engine/build:platform_hp11_sbsa": "8.2.3",
-      "@com_nvidia_gxf//engine/build:platform_hp20_sbsa": "8.5.1",
-      "@com_nvidia_gxf//engine/build:platform_hp21ea_sbsa": "8.6.1",
-      "@com_nvidia_gxf//engine/build:platform_jetpack51": "8.5.2",
+      "@com_nvidia_gxf//engine/build:platform_x86_64_cuda_12_2": "8.6.1",
+      "@com_nvidia_gxf//engine/build:platform_x86_64_cuda_12_6": "10.3.0",
+      "@com_nvidia_gxf//engine/build:platform_x86_64_rhel9_cuda_12_2": "8.6.1",
+      "@com_nvidia_gxf//engine/build:platform_hp21ea_sbsa": "8.6.2",
+      "@com_nvidia_gxf//engine/build:platform_hp21ga_sbsa": "10.3.0",
+      "@com_nvidia_gxf//engine/build:platform_jetpack60": "8.6.2",
+      "@com_nvidia_gxf//engine/build:platform_jetpack61": "10.3.0",
     })
 
     return tensorrt
@@ -79,12 +84,13 @@ def get_tensorrt_version():
 def get_deepstream_version():
     deepstream = select({
       "//conditions:default": None,
-      "@com_nvidia_gxf//engine/build:platform_x86_64_cuda_11_8": "6.2",
-      "@com_nvidia_gxf//engine/build:platform_x86_64_cuda_12_1": "6.2.1",
-      "@com_nvidia_gxf//engine/build:platform_hp11_sbsa": "6.1.1",
-      "@com_nvidia_gxf//engine/build:platform_hp20_sbsa": "6.2.1",
-      "@com_nvidia_gxf//engine/build:platform_hp21ea_sbsa": "6.2.1",
-      "@com_nvidia_gxf//engine/build:platform_jetpack51": "6.2",
+      "@com_nvidia_gxf//engine/build:platform_x86_64_cuda_12_2": "7.1",
+      "@com_nvidia_gxf//engine/build:platform_x86_64_cuda_12_6": "7.1",
+      "@com_nvidia_gxf//engine/build:platform_x86_64_rhel9_cuda_12_2": "7.1",
+      "@com_nvidia_gxf//engine/build:platform_hp21ea_sbsa": "7.1",
+      "@com_nvidia_gxf//engine/build:platform_hp21ga_sbsa": "7.1",
+      "@com_nvidia_gxf//engine/build:platform_jetpack60": "7.1",
+      "@com_nvidia_gxf//engine/build:platform_jetpack61": "7.1",
       })
 
     return deepstream
@@ -92,12 +98,13 @@ def get_deepstream_version():
 def get_triton_version():
     triton = select({
       "//conditions:default": None,
-      "@com_nvidia_gxf//engine/build:platform_x86_64_cuda_11_8": "2.26.0",
-      "@com_nvidia_gxf//engine/build:platform_x86_64_cuda_12_1": "2.32.0",
-      "@com_nvidia_gxf//engine/build:platform_hp11_sbsa": "2.24.0",
-      "@com_nvidia_gxf//engine/build:platform_hp20_sbsa": "2.27.0",
+      "@com_nvidia_gxf//engine/build:platform_x86_64_cuda_12_2": "2.39.0",
+      "@com_nvidia_gxf//engine/build:platform_x86_64_cuda_12_6": "2.49.0",
+      "@com_nvidia_gxf//engine/build:platform_x86_64_rhel9_cuda_12_2": "2.39.0",
       "@com_nvidia_gxf//engine/build:platform_hp21ea_sbsa": "2.27.0",
-      "@com_nvidia_gxf//engine/build:platform_jetpack51": "2.30.0",
+      "@com_nvidia_gxf//engine/build:platform_hp21ga_sbsa": "2.49.0",
+      "@com_nvidia_gxf//engine/build:platform_jetpack60": "2.40.0",
+      "@com_nvidia_gxf//engine/build:platform_jetpack61": "2.49.0",
       })
 
     return triton
@@ -105,12 +112,13 @@ def get_triton_version():
 def get_vpi_version():
     vpi = select({
       "//conditions:default": None,
-      "@com_nvidia_gxf//engine/build:platform_x86_64_cuda_11_8": "2.1.6",
-      "@com_nvidia_gxf//engine/build:platform_x86_64_cuda_12_1": "2.3.1",
-      "@com_nvidia_gxf//engine/build:platform_hp11_sbsa": "2.1.5",
-      "@com_nvidia_gxf//engine/build:platform_hp20_sbsa": "2.2.4",
+      "@com_nvidia_gxf//engine/build:platform_x86_64_cuda_12_2": "3.0.10",
+      "@com_nvidia_gxf//engine/build:platform_x86_64_cuda_12_6": "3.0.10",
+      "@com_nvidia_gxf//engine/build:platform_x86_64_rhel9_cuda_12_2": "3.0.10",
       "@com_nvidia_gxf//engine/build:platform_hp21ea_sbsa": "2.2.4",
-      "@com_nvidia_gxf//engine/build:platform_jetpack51": "2.1.6",
+      "@com_nvidia_gxf//engine/build:platform_hp21ga_sbsa": "3.0.10",
+      "@com_nvidia_gxf//engine/build:platform_jetpack60": "3.0.10",
+      "@com_nvidia_gxf//engine/build:platform_jetpack61": "3.0.10",
       })
 
     return vpi

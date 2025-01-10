@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2020-2023, NVIDIA CORPORATION. All rights reserved.
+Copyright (c) 2020-2024, NVIDIA CORPORATION. All rights reserved.
 
 NVIDIA CORPORATION and its licensors retain all intellectual property
 and proprietary rights in and to this software, related documentation
@@ -7,6 +7,8 @@ and any modifications thereto. Any use, reproduction, disclosure or
 distribution of this software and related documentation without an express
 license agreement from NVIDIA CORPORATION is strictly prohibited.
 */
+#include "gxf/std/async_buffer_receiver.hpp"
+#include "gxf/std/async_buffer_transmitter.hpp"
 #include "gxf/std/block_memory_pool.hpp"
 #include "gxf/std/broadcast.hpp"
 #include "gxf/std/clock.hpp"
@@ -20,10 +22,14 @@ license agreement from NVIDIA CORPORATION is strictly prohibited.
 #include "gxf/std/entity_executor.hpp"
 #include "gxf/std/eos.hpp"
 #include "gxf/std/epoch_scheduler.hpp"
+#include "gxf/std/event_based_scheduler.hpp"
 #include "gxf/std/extension_factory_helper.hpp"
 #include "gxf/std/forward.hpp"
 #include "gxf/std/gather.hpp"
+#include "gxf/std/graph_driver.hpp"
+#include "gxf/std/graph_worker.hpp"
 #include "gxf/std/greedy_scheduler.hpp"
+#include "gxf/std/ipc_client.hpp"
 #include "gxf/std/ipc_server.hpp"
 #include "gxf/std/job_statistics.hpp"
 #include "gxf/std/message_router.hpp"
@@ -39,6 +45,7 @@ license agreement from NVIDIA CORPORATION is strictly prohibited.
 #include "gxf/std/router_group.hpp"
 #include "gxf/std/scheduler.hpp"
 #include "gxf/std/scheduling_term.hpp"
+#include "gxf/std/scheduling_term_combiner.hpp"
 #include "gxf/std/scheduling_terms.hpp"
 #include "gxf/std/subgraph.hpp"
 #include "gxf/std/synchronization.hpp"
@@ -49,6 +56,7 @@ license agreement from NVIDIA CORPORATION is strictly prohibited.
 #include "gxf/std/tensor_copier.hpp"
 #include "gxf/std/timed_throttler.hpp"
 #include "gxf/std/timestamp.hpp"
+#include "gxf/std/topic.hpp"
 #include "gxf/std/transmitter.hpp"
 #include "gxf/std/unbounded_allocator.hpp"
 #include "gxf/std/vault.hpp"
@@ -56,7 +64,7 @@ license agreement from NVIDIA CORPORATION is strictly prohibited.
 GXF_EXT_FACTORY_BEGIN()
   GXF_EXT_FACTORY_SET_INFO(0x8ec2d5d6b5df48bf, 0x8dee0252606fdd7e, "StandardExtension",
                            "Most commonly used interfaces and components in Gxf Core",
-                           "NVIDIA", "2.3.0", "NVIDIA");
+                           "NVIDIA", "2.6.0", "NVIDIA");
   GXF_EXT_FACTORY_SET_DISPLAY_INFO("Standard Extension", "Standard", "GXF Standard Extension");
   GXF_EXT_FACTORY_ADD(0x5c6166fa6eed41e7, 0xbbf0bd48cd6e1014,
                       nvidia::gxf::Codelet, nvidia::gxf::Component,
@@ -86,7 +94,7 @@ GXF_EXT_FACTORY_BEGIN()
                       "A group of systems");
   GXF_EXT_FACTORY_ADD(0x792151bf31384603, 0xa9125ca91828dea8,
                       nvidia::gxf::Queue, nvidia::gxf::Component,
-                      "Interface for storing entities in a queue");
+                      "Component interface for storing entities in a queue");
 
   GXF_EXT_FACTORY_ADD_0(0x8b317aadf55c4c07, 0x85208f66db92a19e,
                       nvidia::gxf::Router,
@@ -203,6 +211,9 @@ GXF_EXT_FACTORY_BEGIN()
   GXF_EXT_FACTORY_ADD(0xde5e06467fa511eb, 0xa5c4330ebfa81bbf,
                       nvidia::gxf::MultiThreadScheduler, nvidia::gxf::Scheduler,
                       "A multi thread scheduler that executes codelets for maximum throughput.");
+  GXF_EXT_FACTORY_ADD(0x99bef5a848bc11ee, 0xbe560242ac120002,
+                      nvidia::gxf::EventBasedScheduler, nvidia::gxf::Scheduler,
+                      "An event based scheduler that executes codelets based on their event.");
   GXF_EXT_FACTORY_ADD_0(0x377501d69abf447c, 0xa6170114d4f33ab8,
                         nvidia::gxf::Tensor,
                         "A component which holds a single tensor");
@@ -264,8 +275,34 @@ GXF_EXT_FACTORY_BEGIN()
                       nvidia::gxf::SyntheticClock, nvidia::gxf::Clock,
                       "A synthetic clock used to inject simulated time");
   GXF_EXT_FACTORY_ADD(0x97cee5438fb54541, 0x8ff7589318187ec0,
-                       nvidia::gxf::Forward, nvidia::gxf::Codelet,
-                       "Forwards incoming messages at the receiver to the transmitter");
+                      nvidia::gxf::Forward, nvidia::gxf::Codelet,
+                      "Forwards incoming messages at the receiver to the transmitter");
+  GXF_EXT_FACTORY_ADD(0x705294948bca49ef, 0x51bf44b08ecf460b,
+                      nvidia::gxf::Topic, nvidia::gxf::Component,
+                      "Adds transmitters/receivers to a topic");
+  GXF_EXT_FACTORY_ADD(0x6f3cf830762849a6, 0xb925f94171b019da,
+                      nvidia::gxf::IPCClient, nvidia::gxf::Component,
+                      "Interface for a component which works as a API client to send "
+                      "remote requests. It's the counterpart to IPCServer");
+  GXF_EXT_FACTORY_ADD(0x54b885292c91436b, 0x83b67f5c10369354,
+                      nvidia::gxf::GraphWorker, nvidia::gxf::System,
+                      "An async runnable System component that runs "
+                      "target gxf graphs, coordinating with GraphDriver "
+                      "in local or remote process using IPC requests");
+  GXF_EXT_FACTORY_ADD(0x76ca3719fcd14ae3, 0x8e068ce161b0f881,
+                      nvidia::gxf::GraphDriver, nvidia::gxf::System,
+                      "An async runnable System component that coordinates all "
+                      "GraphWorkers in remote or local process using IPC requests");
+  GXF_EXT_FACTORY_ADD(0x784f5837ffc94605, 0x86ffc448875673e4, nvidia::gxf::AsyncBufferTransmitter,
+                      nvidia::gxf::Transmitter, "A transmitter which uses a lock-free buffer");
+  GXF_EXT_FACTORY_ADD(0xf518ff98c3604223, 0xb93f5d485d7eb17c, nvidia::gxf::AsyncBufferReceiver,
+                      nvidia::gxf::Receiver, "A receiver which uses a lock-free buffer");
+  GXF_EXT_FACTORY_ADD(0x4c3f39b042ed11ef, 0xa7d5dbe22043a6f1,
+                      nvidia::gxf::SchedulingTermCombiner, nvidia::gxf::Component,
+                      "An interface to define scheduling term combinations");
+  GXF_EXT_FACTORY_ADD(0xdf28988e42ed11ef, 0xa09acbbf54a5a986, nvidia::gxf::OrSchedulingTermCombiner,
+                      nvidia::gxf::SchedulingTermCombiner, "A scheduling term combiner that OR's"
+                      " two scheduling conditions");
 
   GXF_EXT_FACTORY_ADD_0_LITE(0x83905c6aca344f40, 0xb474cf2cde8274de, int8_t);
   GXF_EXT_FACTORY_ADD_0_LITE(0xd4299e150006d0bf, 0x8cbd9b743575e155, uint8_t);

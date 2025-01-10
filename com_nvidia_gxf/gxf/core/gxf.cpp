@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2020-2023, NVIDIA CORPORATION. All rights reserved.
+Copyright (c) 2020-2024, NVIDIA CORPORATION. All rights reserved.
 
 NVIDIA CORPORATION and its licensors retain all intellectual property
 and proprietary rights in and to this software, related documentation
@@ -44,6 +44,10 @@ Runtime* FromContext(gxf_context_t context) {
 
 extern "C" {
 
+bool isSuccessful(gxf_result_t result) {
+  return result == GXF_SUCCESS ? true : false;
+}
+
 #define GXF_STR_HELP(X) \
   case X:               \
     return #X;
@@ -75,6 +79,7 @@ const char* GxfResultStr(gxf_result_t result) {
     GXF_STR_HELP(GXF_FACTORY_INCOMPATIBLE)
     GXF_STR_HELP(GXF_ENTITY_NOT_FOUND)
     GXF_STR_HELP(GXF_ENTITY_COMPONENT_NOT_FOUND)
+    GXF_STR_HELP(GXF_ENTITY_COMPONENT_NAME_EXCEEDS_LIMIT)
     GXF_STR_HELP(GXF_ENTITY_CAN_NOT_ADD_COMPONENT_AFTER_INITIALIZATION)
     GXF_STR_HELP(GXF_PARAMETER_NOT_FOUND)
     GXF_STR_HELP(GXF_PARAMETER_ALREADY_REGISTERED)
@@ -127,6 +132,8 @@ const char* GxfParameterTypeStr(gxf_parameter_type_t param_type) {
     GXF_STR_HELP(GXF_PARAMETER_TYPE_UINT16);
     GXF_STR_HELP(GXF_PARAMETER_TYPE_UINT32);
     GXF_STR_HELP(GXF_PARAMETER_TYPE_FLOAT32);
+    GXF_STR_HELP(GXF_PARAMETER_TYPE_COMPLEX64);
+    GXF_STR_HELP(GXF_PARAMETER_TYPE_COMPLEX128);
     default:
       return "N/A";
   }
@@ -142,6 +149,33 @@ const char* GxfParameterFlagTypeStr(gxf_parameter_flags_t_ flag_type) {
   }
 }
 
+const char* GxfEntityStatusStr(gxf_entity_status_t status) {
+  switch (status) {
+    GXF_ENUM_TO_STR(GXF_ENTITY_STATUS_NOT_STARTED, NotStarted)
+    GXF_ENUM_TO_STR(GXF_ENTITY_STATUS_START_PENDING, StartPending)
+    GXF_ENUM_TO_STR(GXF_ENTITY_STATUS_STARTED, Started)
+    GXF_ENUM_TO_STR(GXF_ENTITY_STATUS_TICK_PENDING, TickPending)
+    GXF_ENUM_TO_STR(GXF_ENTITY_STATUS_TICKING, Ticking)
+    GXF_ENUM_TO_STR(GXF_ENTITY_STATUS_IDLE, Idle)
+    GXF_ENUM_TO_STR(GXF_ENTITY_STATUS_STOP_PENDING, StopPending)
+    default:
+      return "N/A";
+  }
+}
+
+const char* GxfEventStr(gxf_event_t event) {
+  switch (event) {
+    GXF_ENUM_TO_STR(GXF_EVENT_CUSTOM, Custom)
+    GXF_ENUM_TO_STR(GXF_EVENT_EXTERNAL, External)
+    GXF_ENUM_TO_STR(GXF_EVENT_MEMORY_FREE, MemoryFree)
+    GXF_ENUM_TO_STR(GXF_EVENT_MESSAGE_SYNC, MessageSync)
+    GXF_ENUM_TO_STR(GXF_EVENT_TIME_UPDATE, TimeUpdate)
+    GXF_ENUM_TO_STR(GXF_EVENT_STATE_UPDATE, StateUpdate)
+    default:
+      return "N/A";
+  }
+}
+
 #undef GXF_STR_HELP
 
 gxf_result_t GxfContextCreate(gxf_context_t* context) {
@@ -152,7 +186,7 @@ gxf_result_t GxfContextCreate(gxf_context_t* context) {
   return ptr->create();
 }
 
-gxf_result_t GxfContextCreate1(gxf_context_t shared, gxf_context_t* context) {
+gxf_result_t GxfContextCreateShared(gxf_context_t shared, gxf_context_t* context) {
   if (context == nullptr || shared == nullptr) return GXF_ARGUMENT_NULL;
   nvidia::gxf::Runtime* ptr = new nvidia::gxf::Runtime();
   if (ptr == nullptr) return GXF_OUT_OF_MEMORY;
@@ -180,14 +214,11 @@ gxf_result_t GxfRegisterComponent(gxf_context_t context, gxf_tid_t tid, const ch
   return nvidia::gxf::FromContext(context)->GxfRegisterComponent(tid, name, base_name);
 }
 
-gxf_result_t GxfLoadExtension(gxf_context_t context, const char* filename) {
-  const GxfLoadExtensionsInfo info{&filename, 1, nullptr, 0, nullptr};
-  return GxfLoadExtensions(context, &info);
-}
-
-gxf_result_t GxfLoadExtensionManifest(gxf_context_t context, const char* manifest_filename) {
-  const GxfLoadExtensionsInfo info{nullptr, 0, &manifest_filename, 1, nullptr};
-  return GxfLoadExtensions(context, &info);
+gxf_result_t GxfRegisterComponentInExtension(gxf_context_t context, gxf_tid_t component_tid,
+                                             gxf_tid_t extension_tid) {
+  if (context == nullptr) return GXF_CONTEXT_INVALID;
+  return nvidia::gxf::FromContext(context)->GxfRegisterComponentInExtension(component_tid,
+                                                                            extension_tid);
 }
 
 gxf_result_t GxfLoadExtensions(gxf_context_t context, const GxfLoadExtensionsInfo* info) {
@@ -246,11 +277,6 @@ gxf_result_t GxfGraphSaveToFile(gxf_context_t context, const char* filename) {
   return nvidia::gxf::FromContext(context)->GxfGraphSaveToFile(filename);
 }
 
-gxf_result_t GxfEntityCreate(gxf_context_t context, gxf_uid_t* eid) {
-  const GxfEntityCreateInfo info = {0};
-  return GxfCreateEntity(context, &info, eid);
-}
-
 gxf_result_t GxfEntityActivate(gxf_context_t context, gxf_uid_t eid) {
   if (context == nullptr) return GXF_CONTEXT_INVALID;
   return nvidia::gxf::FromContext(context)->GxfEntityActivate(eid);
@@ -286,10 +312,21 @@ gxf_result_t GxfEntityRefCountDec(gxf_context_t context, gxf_uid_t eid) {
   return nvidia::gxf::FromContext(context)->GxfEntityRefCountDec(eid);
 }
 
+gxf_result_t GxfEntityGetRefCount(gxf_context_t context, gxf_uid_t eid, int64_t* count) {
+  if (context == nullptr) return GXF_CONTEXT_INVALID;
+  return nvidia::gxf::FromContext(context)->GxfEntityGetRefCount(eid, count);
+}
+
 gxf_result_t GxfEntityGetStatus(gxf_context_t context, gxf_uid_t eid,
                               gxf_entity_status_t* entity_status) {
   if (context == nullptr) return GXF_CONTEXT_INVALID;
   return nvidia::gxf::FromContext(context)->GxfEntityGetStatus(eid, entity_status);
+}
+
+gxf_result_t GxfEntityGetName(gxf_context_t context, gxf_uid_t eid,
+                              const char** entity_name) {
+  if (context == nullptr) return GXF_CONTEXT_INVALID;
+  return nvidia::gxf::FromContext(context)->GxfEntityGetName(eid, entity_name);
 }
 
 gxf_result_t GxfEntityGetState(gxf_context_t context, gxf_uid_t eid,
@@ -302,7 +339,14 @@ gxf_result_t GxfEntityEventNotify(gxf_context_t context, gxf_uid_t eid) {
   if (context == nullptr) {
     return GXF_CONTEXT_INVALID;
   }
-  return nvidia::gxf::FromContext(context)->GxfEntityEventNotify(eid);
+  return nvidia::gxf::FromContext(context)->GxfEntityNotifyEventType(eid, GXF_EVENT_EXTERNAL);
+}
+
+gxf_result_t GxfEntityNotifyEventType(gxf_context_t context, gxf_uid_t eid, gxf_event_t event) {
+  if (context == nullptr) {
+    return GXF_CONTEXT_INVALID;
+  }
+  return nvidia::gxf::FromContext(context)->GxfEntityNotifyEventType(eid, event);
 }
 
 gxf_result_t GxfComponentTypeId(gxf_context_t context, const char* name, gxf_tid_t* tid) {
@@ -315,6 +359,11 @@ gxf_result_t GxfComponentTypeName(gxf_context_t context, gxf_tid_t tid, const ch
   return nvidia::gxf::FromContext(context)->GxfComponentTypeName(tid, name);
 }
 
+gxf_result_t GxfComponentTypeNameFromUID(gxf_context_t context, gxf_uid_t cid, const char** name) {
+  if (context == nullptr) return GXF_CONTEXT_INVALID;
+  return nvidia::gxf::FromContext(context)->GxfComponentTypeNameFromUID(cid, name);
+}
+
 gxf_result_t GxfComponentName(gxf_context_t context, gxf_uid_t cid, const char** name) {
   if (context == nullptr) return GXF_CONTEXT_INVALID;
   return nvidia::gxf::FromContext(context)->GxfComponentName(cid, name);
@@ -325,10 +374,38 @@ gxf_result_t GxfComponentEntity(gxf_context_t context, gxf_uid_t cid, gxf_uid_t*
   return nvidia::gxf::FromContext(context)->GxfComponentEntity(cid, eid);
 }
 
+gxf_result_t GxfEntityGetItemPtr(gxf_context_t context, gxf_uid_t eid, void** ptr) {
+  if (context == nullptr) return GXF_CONTEXT_INVALID;
+  if (ptr == nullptr) return GXF_ARGUMENT_NULL;
+  if (*ptr != nullptr) return GXF_ARGUMENT_INVALID;
+  return nvidia::gxf::FromContext(context)->GxfEntityGetItemPtr(eid, ptr);
+}
+
 gxf_result_t GxfComponentAdd(gxf_context_t context, gxf_uid_t eid, gxf_tid_t tid, const char* name,
                              gxf_uid_t* cid) {
   if (context == nullptr) return GXF_CONTEXT_INVALID;
-  return nvidia::gxf::FromContext(context)->GxfComponentAdd(eid, tid, name, cid);
+  void* tmp;
+  return nvidia::gxf::FromContext(context)->GxfComponentAdd(eid, tid, name, cid, &tmp);
+}
+
+gxf_result_t GxfComponentAddAndGetPtr(gxf_context_t context, void* item_ptr, gxf_tid_t tid,
+   const char* name, gxf_uid_t* out_cid, void ** comp_ptr) {
+  if (context == nullptr) { return GXF_CONTEXT_INVALID; }
+  if ((comp_ptr == nullptr) || (item_ptr == nullptr)) { return GXF_ARGUMENT_NULL; }
+  if (*comp_ptr != nullptr) {  return GXF_ARGUMENT_INVALID; }
+  return nvidia::gxf::FromContext(context)->GxfComponentAddWithItem(item_ptr, tid, name, out_cid,
+                                                            comp_ptr);
+}
+
+gxf_result_t GxfComponentRemoveWithUID(gxf_context_t context, gxf_uid_t cid) {
+  if (context == nullptr) return GXF_CONTEXT_INVALID;
+  return nvidia::gxf::FromContext(context)->GxfComponentRemove(cid);
+}
+
+gxf_result_t GxfComponentRemove(gxf_context_t context, gxf_uid_t eid, gxf_tid_t tid,
+ const char * name) {
+  if (context == nullptr) return GXF_CONTEXT_INVALID;
+  return nvidia::gxf::FromContext(context)->GxfComponentRemove(eid, tid, name);
 }
 
 gxf_result_t GxfComponentAddToInterface(gxf_context_t context, gxf_uid_t eid,
@@ -341,6 +418,15 @@ gxf_result_t GxfComponentFind(gxf_context_t context, gxf_uid_t eid, gxf_tid_t ti
                               int32_t* offset, gxf_uid_t* cid) {
   if (context == nullptr) return GXF_CONTEXT_INVALID;
   return nvidia::gxf::FromContext(context)->GxfComponentFind(eid, tid, name, offset, cid);
+}
+
+gxf_result_t GxfComponentFindAndGetPtr(gxf_context_t context, gxf_uid_t eid,  void* item_ptr,
+                     gxf_tid_t tid, const char* name, int32_t* offset, gxf_uid_t* cid, void** ptr) {
+  if (context == nullptr) { return GXF_CONTEXT_INVALID; }
+  if ((ptr == nullptr) || (item_ptr == nullptr)) { return GXF_ARGUMENT_NULL; }
+  if (*ptr != nullptr) {  return GXF_ARGUMENT_INVALID; }
+  return nvidia::gxf::FromContext(context)->GxfComponentFind(eid, item_ptr, tid, name,
+   offset, cid, ptr);
 }
 
 gxf_result_t GxfComponentFindAll(gxf_context_t context, gxf_uid_t eid, uint64_t* num_cids,
@@ -356,21 +442,32 @@ gxf_result_t GxfEntityGroupFindResources(gxf_context_t context, gxf_uid_t eid,
                                                                         resource_cids);
 }
 
+gxf_result_t GxfEntityGroupId(gxf_context_t context, gxf_uid_t eid, gxf_uid_t* gid) {
+  if (context == nullptr) return GXF_CONTEXT_INVALID;
+  return nvidia::gxf::FromContext(context)->GxfEntityGroupId(eid, gid);
+}
+
 gxf_result_t GxfEntityGroupName(gxf_context_t context, gxf_uid_t eid, const char** name) {
   if (context == nullptr) return GXF_CONTEXT_INVALID;
   return nvidia::gxf::FromContext(context)->GxfEntityGroupName(eid, name);
 }
 
-gxf_result_t GxfParameterSetFloat64(gxf_context_t context, gxf_uid_t uid, const char* key,
-                                    double value) {
+gxf_result_t GxfParameterSetInt8(gxf_context_t context, gxf_uid_t uid, const char* key,
+                                  int8_t value) {
   if (context == nullptr) return GXF_CONTEXT_INVALID;
-  return nvidia::gxf::FromContext(context)->GxfParameterSetFloat64(uid, key, value);
+  return nvidia::gxf::FromContext(context)->GxfParameterSetInt8(uid, key, value);
 }
 
-gxf_result_t GxfParameterSetFloat32(gxf_context_t context, gxf_uid_t uid, const char* key,
-                                    float value) {
+gxf_result_t GxfParameterSetInt16(gxf_context_t context, gxf_uid_t uid, const char* key,
+                                  int16_t value) {
   if (context == nullptr) return GXF_CONTEXT_INVALID;
-  return nvidia::gxf::FromContext(context)->GxfParameterSetFloat32(uid, key, value);
+  return nvidia::gxf::FromContext(context)->GxfParameterSetInt16(uid, key, value);
+}
+
+gxf_result_t GxfParameterSetInt32(gxf_context_t context, gxf_uid_t uid, const char* key,
+                                  int32_t value) {
+  if (context == nullptr) return GXF_CONTEXT_INVALID;
+  return nvidia::gxf::FromContext(context)->GxfParameterSetInt32(uid, key, value);
 }
 
 gxf_result_t GxfParameterSetInt64(gxf_context_t context, gxf_uid_t uid, const char* key,
@@ -379,10 +476,16 @@ gxf_result_t GxfParameterSetInt64(gxf_context_t context, gxf_uid_t uid, const ch
   return nvidia::gxf::FromContext(context)->GxfParameterSetInt64(uid, key, value);
 }
 
-gxf_result_t GxfParameterSetUInt64(gxf_context_t context, gxf_uid_t uid, const char* key,
-                                   uint64_t value) {
+gxf_result_t GxfParameterSetUInt8(gxf_context_t context, gxf_uid_t uid, const char* key,
+                                  uint8_t value) {
   if (context == nullptr) return GXF_CONTEXT_INVALID;
-  return nvidia::gxf::FromContext(context)->GxfParameterSetUInt64(uid, key, value);
+  return nvidia::gxf::FromContext(context)->GxfParameterSetUInt8(uid, key, value);
+}
+
+gxf_result_t GxfParameterSetUInt16(gxf_context_t context, gxf_uid_t uid, const char* key,
+                                   uint16_t value) {
+  if (context == nullptr) return GXF_CONTEXT_INVALID;
+  return nvidia::gxf::FromContext(context)->GxfParameterSetUInt16(uid, key, value);
 }
 
 gxf_result_t GxfParameterSetUInt32(gxf_context_t context, gxf_uid_t uid, const char* key,
@@ -391,10 +494,22 @@ gxf_result_t GxfParameterSetUInt32(gxf_context_t context, gxf_uid_t uid, const c
   return nvidia::gxf::FromContext(context)->GxfParameterSetUInt32(uid, key, value);
 }
 
-gxf_result_t GxfParameterSetUInt16(gxf_context_t context, gxf_uid_t uid, const char* key,
-                                   uint16_t value) {
+gxf_result_t GxfParameterSetUInt64(gxf_context_t context, gxf_uid_t uid, const char* key,
+                                   uint64_t value) {
   if (context == nullptr) return GXF_CONTEXT_INVALID;
-  return nvidia::gxf::FromContext(context)->GxfParameterSetUInt16(uid, key, value);
+  return nvidia::gxf::FromContext(context)->GxfParameterSetUInt64(uid, key, value);
+}
+
+gxf_result_t GxfParameterSetFloat32(gxf_context_t context, gxf_uid_t uid, const char* key,
+                                    float value) {
+  if (context == nullptr) return GXF_CONTEXT_INVALID;
+  return nvidia::gxf::FromContext(context)->GxfParameterSetFloat32(uid, key, value);
+}
+
+gxf_result_t GxfParameterSetFloat64(gxf_context_t context, gxf_uid_t uid, const char* key,
+                                    double value) {
+  if (context == nullptr) return GXF_CONTEXT_INVALID;
+  return nvidia::gxf::FromContext(context)->GxfParameterSetFloat64(uid, key, value);
 }
 
 gxf_result_t GxfParameterSetStr(gxf_context_t context, gxf_uid_t uid, const char* key,
@@ -413,12 +528,6 @@ gxf_result_t GxfParameterSetBool(gxf_context_t context, gxf_uid_t uid, const cha
                                  bool value) {
   if (context == nullptr) return GXF_CONTEXT_INVALID;
   return nvidia::gxf::FromContext(context)->GxfParameterSetBool(uid, key, value);
-}
-
-gxf_result_t GxfParameterSetInt32(gxf_context_t context, gxf_uid_t uid, const char* key,
-                                  int32_t value) {
-  if (context == nullptr) return GXF_CONTEXT_INVALID;
-  return nvidia::gxf::FromContext(context)->GxfParameterSetInt32(uid, key, value);
 }
 
 gxf_result_t GxfParameterSet1DStrVector(gxf_context_t context, gxf_uid_t uid, const char* key,
@@ -695,6 +804,12 @@ gxf_result_t GxfComponentPointer(gxf_context_t context, gxf_uid_t uid, gxf_tid_t
   return nvidia::gxf::FromContext(context)->GxfComponentPointer(uid, tid, result);
 }
 
+gxf_result_t GxfComponentIsBase(gxf_context_t context, gxf_tid_t derived, gxf_tid_t base,
+                                bool* result) {
+  if (context == nullptr) return GXF_CONTEXT_INVALID;
+  return nvidia::gxf::FromContext(context)->GxfComponentIsBase(derived, base, result);
+}
+
 gxf_result_t GxfGraphActivate(gxf_context_t context) {
   if (context == nullptr) return GXF_CONTEXT_INVALID;
   return nvidia::gxf::FromContext(context)->GxfGraphActivate();
@@ -750,6 +865,14 @@ gxf_result_t GxfGetParameterInfo(gxf_context_t context, gxf_tid_t cid, const cha
                               gxf_parameter_info_t* info) {
   if (context == nullptr) return GXF_CONTEXT_INVALID;
   return nvidia::gxf::FromContext(context)->GxfGetParameterInfo(cid, key, info);
+}
+
+gxf_result_t GxfCreateEntityAndGetItem(gxf_context_t context, const GxfEntityCreateInfo* info,
+                             gxf_uid_t* eid, void** item_ptr) {
+  if (context == nullptr) { return GXF_CONTEXT_INVALID; }
+  if ((info == nullptr) || (eid == nullptr) || (item_ptr == nullptr)) { return GXF_ARGUMENT_NULL; }
+  if (*item_ptr != nullptr) { return GXF_ARGUMENT_INVALID; }
+  return nvidia::gxf::FromContext(context)->GxfCreateEntity(*info, *eid, item_ptr);
 }
 
 gxf_result_t GxfCreateEntity(gxf_context_t context, const GxfEntityCreateInfo* info,

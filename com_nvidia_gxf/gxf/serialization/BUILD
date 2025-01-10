@@ -1,5 +1,5 @@
 """
-Copyright (c) 2021-2023, NVIDIA CORPORATION. All rights reserved.
+Copyright (c) 2021-2024, NVIDIA CORPORATION. All rights reserved.
 
 NVIDIA CORPORATION and its licensors retain all intellectual property
 and proprietary rights in and to this software, related documentation
@@ -25,6 +25,7 @@ py_library(
     srcs = [
         "//gxf/serialization/bindings:__init__.py",
         "//gxf/serialization/bindings:cask.py",
+        "//gxf/serialization:__init__.py",
         "//gxf/serialization:Components.py",
     ],
     visibility = ["//visibility:public"],
@@ -120,6 +121,7 @@ nv_gxf_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         "component_serializer",
+        "//gxf/cuda:cuda_common",
         "//gxf/std:allocator",
         "//gxf/std:tensor",
         "//gxf/std:timestamp",
@@ -198,7 +200,7 @@ register_extension(
     name = "register_serialization_ext",
     extension = "serialization",
     uuid = "bc573c2f-89b3-d4b0-8061-2da8b11fe79a",
-    version = "2.3.0",
+    version = "2.6.0",
     headers = [
         "BUILD.public",
         "component_serializer.hpp",

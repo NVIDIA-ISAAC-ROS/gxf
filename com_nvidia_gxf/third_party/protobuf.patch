@@ -1,0 +1,30 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+diff --git a/BUILD.bazel b/BUILD.bazel
+index 0f6e41e..da8f6c2 100644
+--- a/BUILD.bazel
++++ b/BUILD.bazel
+@@ -65,7 +65,10 @@ cc_library(
+         "src/google/protobuf/**/*.h",
+         "src/google/protobuf/**/*.inc",
+     ]),
+-    copts = COPTS,
++    copts = COPTS + [
++        "-Wno-stringop-overflow",
++        "-Wno-sign-compare",
++    ],
+     includes = ["src/"],
+     linkopts = LINK_OPTS,
+     visibility = ["//visibility:public"],

@@ -1,5 +1,5 @@
 """
-Copyright (c) 2020-2023, NVIDIA CORPORATION. All rights reserved.
+Copyright (c) 2020-2024, NVIDIA CORPORATION. All rights reserved.
 
 NVIDIA CORPORATION and its licensors retain all intellectual property
 and proprietary rights in and to this software, related documentation
@@ -12,6 +12,7 @@ load(
     "//gxf:gxf.bzl",
     "nv_gxf_c_library",
     "nv_gxf_cc_library",
+    "nv_gxf_cc_binary"
 )
 
 load("//gxf:pybind.bzl", "pybind_library")
@@ -31,10 +32,9 @@ nv_gxf_cc_library(
         "gxf_c_api",
         "handle",
         "parameter",
+        "parameter_storage",
         "registrar",
-        "registry",
         "//common",
-        "//gxf/std:parameter_storage",
     ],
 )
 
@@ -45,23 +45,47 @@ nv_gxf_cc_library(
     ],
     visibility = ["//visibility:public"],
     deps = [
+        "entity_item",
         "expected",
         "gxf_c_api",
         "handle",
-        "registry",
         "//common",
+    ],
+)
+
+nv_gxf_cc_library(
+    name = "entity_item",
+    hdrs = [
+        "entity_item.hpp"
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//common",
+        "gxf_c_api",
     ],
 )
 
 nv_gxf_cc_library(
     name = "expected",
     hdrs = [
+        "common_expected_macro.hpp",
         "expected.hpp",
+        "expected_macro.hpp"
     ],
     visibility = ["//visibility:public"],
     deps = [
         "gxf_c_api",
         "//common",
+        "@magic_enum",
+    ],
+)
+
+nv_gxf_cc_library(
+    name = "filepath",
+    hdrs = ["filepath.hpp"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "@yaml-cpp",
     ],
 )
 
@@ -83,7 +107,6 @@ nv_gxf_cc_library(
     deps = [
         "expected",
         "gxf_c_api",
-        "registry",
         "//common",
     ],
 )
@@ -98,9 +121,77 @@ nv_gxf_cc_library(
         "expected",
         "gxf_c_api",
         "handle",
+        "parameter_parser",
+        "parameter_wrapper",
         "//common",
-        "//gxf/std:parameter_parser",
-        "//gxf/std:parameter_wrapper",
+        "@yaml-cpp",
+    ],
+)
+
+nv_gxf_cc_library(
+    name = "parameter_parser",
+    hdrs = [
+        "parameter_parser.hpp",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//common",
+        "expected",
+        "filepath",
+        "gxf_c_api",
+        "handle",
+        "@yaml-cpp",
+    ],
+)
+
+nv_gxf_cc_library(
+    name = "parameter_parser_std",
+    hdrs = ["parameter_parser_std.hpp"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "expected",
+        "gxf_c_api",
+        "handle",
+        "@yaml-cpp",
+    ],
+)
+
+nv_gxf_cc_library(
+    name = "parameter_registrar",
+    srcs = ["parameter_registrar.cpp"],
+    hdrs = ["parameter_registrar.hpp"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//common",
+        "expected",
+        "gxf_c_api",
+        "parameter_storage",
+        "type_registry",
+    ],
+)
+
+nv_gxf_cc_library(
+    name = "parameter_storage",
+    srcs = ["parameter_storage.cpp"],
+    hdrs = ["parameter_storage.hpp"],
+    need_multithread = True,
+    visibility = ["//visibility:public"],
+    deps = [
+        "parameter",
+    ],
+)
+
+nv_gxf_cc_library(
+    name = "parameter_wrapper",
+    hdrs = [
+        "parameter_wrapper.hpp",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//common",
+        "expected",
+        "gxf_c_api",
+        "handle",
         "@yaml-cpp",
     ],
 )
@@ -118,15 +209,6 @@ nv_gxf_cc_library(
 )
 
 nv_gxf_cc_library(
-    name = "registry",
-    hdrs = ["registry.hpp"],
-    visibility = ["//visibility:public"],
-    deps = [
-        "//common:type_name",
-    ],
-)
-
-nv_gxf_cc_library(
     name = "registrar",
     hdrs = [
         "registrar.hpp",
@@ -135,12 +217,46 @@ nv_gxf_cc_library(
     deps = [
         "expected",
         "gxf_c_api",
+        "parameter_registrar",
+        "parameter_storage",
         "resource",
+        "resource_manager",
+        "resource_registrar",
         "//common",
-        "//gxf/std:parameter_registrar",
-        "//gxf/std:parameter_storage",
-        "//gxf/std:resource_manager",
-        "//gxf/std:resource_registrar",
+    ],
+)
+
+nv_gxf_cc_library(
+    name = "resource_manager",
+    srcs = ["resource_manager.cpp"],
+    hdrs = ["resource_manager.hpp"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "expected",
+        "gxf_c_api",
+        "handle",
+    ],
+)
+
+nv_gxf_cc_library(
+    name = "resource_registrar",
+    hdrs = ["resource_registrar.hpp"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//common",
+        "gxf_c_api",
+    ],
+)
+
+nv_gxf_cc_library(
+    name = "type_registry",
+    srcs = ["type_registry.cpp"],
+    hdrs = ["type_registry.hpp"],
+    need_multithread = True,
+    visibility = ["//visibility:public"],
+    deps = [
+        "expected",
+        "@yaml-cpp",
     ],
 )
 
@@ -151,10 +267,18 @@ nv_gxf_cc_library(
         "component",
         "entity",
         "expected",
+        "filepath",
         "gxf_c_api",
         "handle",
         "parameter",
-        "registry",
+        "parameter_parser",
+        "parameter_parser_std",
+        "parameter_registrar",
+        "parameter_storage",
+        "parameter_wrapper",
+        "resource_manager",
+        "resource_registrar",
+        "type_registry",
         "//common",
     ],
 )
@@ -173,16 +297,16 @@ nv_gxf_cc_library(
     deps = [
         "gxf_c_api",
         "gxf_cpp_api",
+        "parameter_storage",
+        "resource_manager",
+        "resource_registrar",
+        "type_registry",
         "//common",
         "//gxf/std:entity_executor",
         "//gxf/std:entity_warden",
         "//gxf/std:extension_loader",
-        "//gxf/std:parameter_storage",
         "//gxf/std:program",
-        "//gxf/std:resource_manager",
-        "//gxf/std:resource_registrar",
         "//gxf/std:system",
-        "//gxf/std:type_registry",
         "//gxf/std:yaml_file_loader",
         "@yaml-cpp",
     ],
@@ -219,14 +343,15 @@ pybind_library(
     ],
 )
 
-cc_binary(
+nv_gxf_cc_binary(
     name = "libgxf_core.so",
     linkshared = True,
     visibility = ["//visibility:public"],
     deps = ["gxf"],
     linkopts = [
         "-Wl,--exclude-libs,libyaml_file_loader.lo",
-        "-Wl,--exclude-libs,libyaml-cpp.a"
+        "-Wl,--exclude-libs,libyaml-cpp.a",
+        "-Wl,-soname,libgxf_core.so",
     ],
 )
 
@@ -247,11 +372,19 @@ nv_gxf_pkg_library(
         "component.hpp",
         "entity.hpp",
         "expected.hpp",
+        "filepath.hpp",
         "gxf.h",
         "gxf_ext.h",
         "handle.hpp",
         "parameter.hpp",
+        "parameter_parser.hpp",
+        "parameter_parser_std.hpp",
+        "parameter_storage.hpp",
+        "parameter_wrapper.hpp",
         "registrar.hpp",
+        "resource_manager.hpp",
+        "resource_registrar.hpp",
+        "type_registry.hpp",
     ],
     binaries = [
     ":core_pybind.so",

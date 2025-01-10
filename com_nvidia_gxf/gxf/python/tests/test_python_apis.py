@@ -15,8 +15,6 @@
  limitations under the License.
 """
 import unittest
-import numpy as np
-import os
 
 from gxf.core import EntityGroup
 from gxf.core import Graph
@@ -43,18 +41,17 @@ from gxf.sample import PingBatchRx
 from gxf.sample import PingTx
 from gxf.sample import PingRx
 from gxf.std import Subgraph
+from gxf.std import StandardGraph
 from gxf.python_codelet import CodeletAdapter
 from gxf.core import MessageEntity
 from gxf.std import Transmitter
 from gxf.python_codelet import PyCodeletV0
 
 
-from gxf.core import parameter_get_str
 import logging
 
 APP_YAML = "gxf/python/tests/test_python_apis.yaml"
 MANIFEST_YAML = "gxf/python/tests/test_python_apis_manifest.yaml"
-
 
 class PyPingTx(CodeletAdapter):
     """ Python codelet to send a msg on tick()
@@ -110,7 +107,7 @@ class TestCore(unittest.TestCase):
                                                   transmitter=ptx.dbt,
                                                   min_size=1))
         ptx.add(PingTx(name='pingtx', signal=ptx.dbt, clock=clock))
-        ptx.add(CountSchedulingTerm(name='cst', count=5))
+        ptx.add(CountSchedulingTerm(name='cst', count=500))
 
         prx = g.add(Entity("PingRx"))
         prx.add(DoubleBufferReceiver(name='dbr'))
@@ -123,7 +120,8 @@ class TestCore(unittest.TestCase):
             max_duration_ms=1000000, clock=clock))
 
         g.load_extensions()
-        g.run()
+        g.run_async()
+        g.wait()
         g.destroy()
 
     def test_python_entity_impl(self):
@@ -418,30 +416,118 @@ class TestCore(unittest.TestCase):
 
     def test_python_graph_python_codelet(self):
 
-        g = Graph()
-        clock = std.set_clock(g, RealtimeClock(name='clock'))
-        ptx = g.add(Entity("PingTx"))
-        ptx.add(DoubleBufferTransmitter(name='dbt'))
-        ptx.add(DownstreamReceptiveSchedulingTerm(name='drst',
-                                                  transmitter=ptx.dbt,
-                                                  min_size=1))
-        ptx.add(PyCodeletV0(name='pingtx', codelet=PyPingTx, transmitter= ptx.dbt))
-        ptx.add(CountSchedulingTerm(name='cst', count=5))
+        class PythonCodeletTest(Graph):
+            def compose(self, *args, **kwargs):
+                clock = std.set_clock(self, RealtimeClock(name='clock'))
+                ptx = self.add(Entity("PingTx"))
+                ptx.add(DoubleBufferTransmitter(name='dbt'))
+                ptx.add(DownstreamReceptiveSchedulingTerm(name='drst',
+                                                        transmitter=ptx.dbt,
+                                                        min_size=1))
+                ptx.add(PyCodeletV0(name='pingtx', codelet=PyPingTx, transmitter= ptx.dbt))
+                ptx.add(CountSchedulingTerm(name='cst', count=5))
 
-        prx = g.add(Entity("PingRx"))
-        prx.add(DoubleBufferReceiver(name='dbr'))
-        prx.add(MessageAvailableSchedulingTerm(
-            name='mast', receiver=prx.dbr, min_size=1))
-        prx.add(PingRx(name='pingrx', signal=prx.dbr))
-        std.connect(g.PingTx.dbt, prx.dbr)
-        std.enable_job_statistics(g, clock=clock)
-        std.set_scheduler(g, GreedyScheduler(
-            max_duration_ms=1000000, clock=clock))
+                prx = self.add(Entity("PingRx"))
+                prx.add(DoubleBufferReceiver(name='dbr'))
+                prx.add(MessageAvailableSchedulingTerm(
+                    name='mast', receiver=prx.dbr, min_size=1))
+                prx.add(PingRx(name='pingrx', signal=prx.dbr))
+                std.connect(self.PingTx.dbt, prx.dbr)
+                std.enable_job_statistics(self, clock=clock)
+                std.set_scheduler(self, GreedyScheduler(
+                    max_duration_ms=1000000, clock=clock))
+                return
 
+        g = PythonCodeletTest()
+        g.compose()
         g.load_extensions()
         g.run()
         g.destroy()
 
+
+    def test_standard_graph(self):
+
+        class StandardGraphTest(StandardGraph):
+            def __init__(self, name):
+                super().__init__(name)
+                tx = self.add_codelet(PingTx(clock=self.get_clock()), count=5)
+                rx = self.add_codelet(PingRx())
+                self.connect(tx.signal, rx.signal)
+                return
+
+        g = StandardGraphTest("std_graph")
+        g.load_extensions()
+        g.run()
+        g.destroy()
+
+
+    def test_python_class_subgraph_multi_level(self):
+        class ForwardSubgraph(Graph):
+            """Forward Subgraph"""
+            def __init__(self, name, monitored_rx, buffer_term_min_size=1000):
+                super().__init__(name)
+                self.monitored_rx = monitored_rx
+                self.add(ComputeEntity("block1")).add_codelet(Forward())
+                self.add(ComputeEntity("block2")).add_codelet(Forward(),
+                                                        min_message_available=buffer_term_min_size)
+                self.add(ComputeEntity("block3")).add_codelet(Forward())
+                std.connect(self.block1.out, getattr(self.block2, "in"))
+                std.connect(self.block2.out, getattr(self.block3, "in"))
+                self.make_visible("receiver", getattr(self.block1, "in"))
+                self.make_visible("transmitter", self.block3.out)
+                self.make_visible("buffer_term", self.block2.mast)
+
+        class GatherSubgraph(Graph):
+            """Gather Subgraph"""
+            def __init__(self, name, monitored_rx, output_capacity):
+                super().__init__(name)
+                self.monitored_rx = monitored_rx
+                self.add(ComputeEntity("i1")).add_codelet(Forward())
+                self.add(ComputeEntity("i2")).add_codelet(Forward())
+                self.add(ForwardSubgraph("forward_subgraph_1", self.monitored_rx))
+                self.add(ForwardSubgraph("forward_subgraph_2", self.monitored_rx, 1))
+                self.add(ComputeEntity("gather")).add_codelet(Gather())
+                self.gather.add(DoubleBufferReceiver(name="input1"))
+                self.gather.add(DoubleBufferReceiver(name="input2"))
+                self.gather.add(MessageAvailableSchedulingTerm(name="mast1", receiver=self.gather.input1, min_size=1))
+                self.gather.add(MessageAvailableSchedulingTerm(name="mast2", receiver=self.gather.input2, min_size=1))
+                std.connect(self.i1.out, self.forward_subgraph_1.get("receiver"), self)
+                std.connect(self.i2.out, self.forward_subgraph_2.get("receiver"), self)
+                std.connect(self.forward_subgraph_1.get("transmitter"), self.gather.input1, self)
+                std.connect(self.forward_subgraph_2.get("transmitter"), self.gather.input2, self)
+                self.gather.sink.set_param("capacity", output_capacity)
+                self.make_visible("input1", getattr(self.i1, "in"))
+                self.make_visible("input2", getattr(self.i2, "in"))
+                self.make_visible("output", self.gather.sink)
+                self.make_visible("forward1_buf_term", self.forward_subgraph_1.get("buffer_term"))
+
+        class PythonSubgraphMultiLevel(Graph):
+            """Python Subgraph Multi-level example"""
+            def __init__(self, name: str = ''):
+                super().__init__(name)
+                self.set_severity(logging.WARN)
+                self.clock = std.set_clock(self, RealtimeClock(name='clock'))
+                std.enable_job_statistics(self, clock=self.clock)
+                std.set_scheduler(self, GreedyScheduler(
+                    max_duration_ms=1000000, clock=self.clock))
+                self.add(ComputeEntity("tx1", count=10)).add_codelet(PingTx(clock=self.clock))
+                self.add(ComputeEntity("tx2", count=10)).add_codelet(PingTx(clock=self.clock))
+                self.add(ComputeEntity("rx")).add_codelet(PingBatchRx(
+                    name="codelet", batch_size=2), min_message_available=1, rx_capacity=2)
+                gather = self.add(GatherSubgraph("gather_subgraph", monitored_rx=self.rx.signal, output_capacity=2))
+                gather.get("forward1_buf_term").set_param("min_size", 1)
+                std.connect(self.tx1.signal, gather.get("input1"), self)
+                std.connect(self.tx2.signal, gather.get("input2"), self)
+                std.connect(gather.get("output"), self.rx.signal, self)
+
+            def load_extensions(self):
+                super().load_extensions(extension_filenames=['gxf/std/libgxf_std.so'])
+                super().load_extensions(extension_filenames=['sample/libgxf_sample.so'], workspace='gxf')
+
+        g = PythonSubgraphMultiLevel('mygraph')
+        g.load_extensions()
+        g.run()
+        g.destroy()
 
 if __name__ == '__main__':
     unittest.main()

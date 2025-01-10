@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2021 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-FileCopyrightText: Copyright (c) 2021-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * SPDX-License-Identifier: Apache-2.0
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -29,6 +29,7 @@ gxf_result_t EntityMonitor::on_execute_abi(gxf_uid_t eid, uint64_t timestamp, gx
 
   // Convert timestamp from nanoseconds to milliseconds
   const double time_ms = static_cast<double>(timestamp) * 1e-6;
+  (void)time_ms;  // avoid unused variable warning
 
   // Log entity status to console
   GXF_LOG_INFO("[t = %0.1fms] %s: %s", time_ms, entity->name(), GxfResultStr(code));

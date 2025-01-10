@@ -30,13 +30,7 @@ class LoadExtensionFromPointerTest : public Codelet {
     result &= registrar->parameter(value_, "value");
     return ToResultCode(result);
   }
-  gxf_result_t start() override {
-    return GXF_SUCCESS;
-  }
   gxf_result_t tick() override {
-    return GXF_SUCCESS;
-  }
-  gxf_result_t stop() override {
     return GXF_SUCCESS;
   }
 

@@ -30,10 +30,10 @@ load("@com_nvidia_gxf//registry/build:defs.bzl",
 # dependencies:
 # - extension: StandardExtension
 #   uuid: 8ec2d5d6-b5df-48bf-8dee-0252606fdd7e
-#   version: 2.3.0
+#   version: 2.4.0
 # - extension: TestHelperExtension
 #   uuid: 1b99ffeb-c250-4ced-8117-62ac05969a50
-#   version: 2.3.0
+#   version: 2.4.0
 # - extension: SampleExtension
 #   uuid: a6ad78b6-1682-11ec-9621-0242ac130002
 #   version: 1.3.0
@@ -190,13 +190,13 @@ gxf_registry_app_rule = rule(
             providers = [GraphCollector],
             allow_files = True),
     "arch": attr.string(
-            doc = "deployment plaform arch",
+            doc = "deployment platform arch",
             mandatory = True),
     "os": attr.string(
-            doc = "deployment plaform os",
+            doc = "deployment platform os",
             mandatory = True),
     "distribution": attr.string(
-            doc = "deployment plaform distribution",
+            doc = "deployment platform distribution",
             mandatory = True),
     "cuda": attr.string(
             doc = "cuda compute stack version"),

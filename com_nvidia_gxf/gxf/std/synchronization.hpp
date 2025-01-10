@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2021-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-FileCopyrightText: Copyright (c) 2021-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * SPDX-License-Identifier: Apache-2.0
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -27,26 +27,31 @@
 #include "common/type_name.hpp"
 #include "gxf/core/component.hpp"
 #include "gxf/core/handle.hpp"
+#include "gxf/core/parameter_parser_std.hpp"
 #include "gxf/std/codelet.hpp"
-#include "gxf/std/parameter_parser_std.hpp"
 #include "gxf/std/receiver.hpp"
 #include "gxf/std/transmitter.hpp"
 
 namespace nvidia {
 namespace gxf {
 
+// A codelet to synchronize incoming messages from multiple receivers and
+// publish them on to multiple transmitters. The number of receivers and transmitters
+// must be equal in number and incoming messages must have a valid nvidia::gxf::Timestamp
+// component in them. Only one message per transmitter is published per tick of the codelet.
+
 class Synchronization : public Codelet {
  public:
   gxf_result_t registerInterface(Registrar* registrar) override;
   gxf_result_t start() override;
   gxf_result_t tick() override;
-  gxf_result_t stop() override;
 
  private:
   Parameter<std::vector<Handle<Receiver>>> inputs_;
   Parameter<std::vector<Handle<Transmitter>>> outputs_;
   Parameter<int64_t> sync_threshold_;
 };
+
 }  // namespace  gxf
 }  // namespace nvidia
 

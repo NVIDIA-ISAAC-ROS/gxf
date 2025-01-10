@@ -21,6 +21,8 @@ extensions.
 Extensions (shared libraries) built using this project will include the following
 software. Check LICENSE.txt for the corresponding licenses.
 - yaml-cpp
+- magic_enum
+- PyYAML
 
 This project requires that the Graph Composer package be installed on the system.
 

@@ -1,5 +1,5 @@
 """
-Copyright (c) 2022-2023, NVIDIA CORPORATION. All rights reserved.
+Copyright (c) 2022-2024, NVIDIA CORPORATION. All rights reserved.
 
 NVIDIA CORPORATION and its licensors retain all intellectual property
 and proprietary rights in and to this software, related documentation
@@ -41,7 +41,10 @@ nv_gxf_cc_test_group(
         "//gxf/test/extensions:test",
     ],
     manifest_path_hack = "gxf/stream/tests/",
-    deps = ["//gxf/test:test_main"],
+    deps = [
+        "//gxf/test:test_main",
+        "//third_party:nvscisync",
+    ],
 )
 
 nv_gxf_cc_extension(
@@ -49,6 +52,10 @@ nv_gxf_cc_extension(
     srcs = ["test_stream_sync_cuda_ext.cpp"],
     deps = [
         "test_stream_sync_cuda_helper",
+        "//gxf/std:tensor",
+        "//gxf/std:extension_factory_helper",
+        "//gxf/stream:stream_nvsci",
+        "//gxf/stream",
     ],
     ext_deps = [
         "//gxf/std",

@@ -18,7 +18,7 @@
 cc_library(
     name = "nlohmann-json",
     hdrs = glob(["single_include/nlohmann/json.hpp"]),
-    include_prefix = "nlohmann-json",
+    include_prefix = "nlohmann",
     strip_include_prefix = "single_include/nlohmann",
     visibility = ["//visibility:public"],
 )

@@ -14,32 +14,14 @@
  See the License for the specific language governing permissions and
  limitations under the License.
 """
-
-from gxf.core import MessageEntity
-from gxf.std import MemoryStorageType
-from gxf.std import Receiver
-from gxf.std import Shape
-from gxf.std import Tensor
-from gxf.python_codelet import CodeletAdapter
-import ctypes
-import cupy
+import cupy as cp
 import numpy as np
 
+from gxf.std import MemoryStorageType
+from gxf.std import Receiver
+from gxf.std import Tensor
+from gxf.python_codelet import CodeletAdapter
 
-def get_cupy_ndarray_from_tensor(tensor):
-    if tensor.storage_type() != MemoryStorageType.kDevice:
-        raise RuntimeError(
-            "The tensor should be on device and not on host!")
-    data_ptr, data_size, data_type, _, shape, strides = tensor.get_tensor_info()
-    ctypes.pythonapi.PyCapsule_GetPointer.restype = ctypes.c_void_p
-    ctypes.pythonapi.PyCapsule_GetPointer.argtypes = [
-        ctypes.py_object, ctypes.c_char_p]
-    unowned_mem_ptr = cupy.cuda.UnownedMemory(
-        ctypes.pythonapi.PyCapsule_GetPointer(data_ptr, None), data_size, None)
-    mem_ptr = cupy.cuda.MemoryPointer(unowned_mem_ptr, 0)
-    cupy_array = cupy.ndarray(
-        shape=shape, dtype=data_type, memptr=mem_ptr, strides=strides, order='C')
-    return cupy_array
 
 class VerifyTensor(CodeletAdapter):
     """ Python codelet to receive a msg on tick()
@@ -50,7 +32,7 @@ class VerifyTensor(CodeletAdapter):
 
     def start(self):
         self.params = self.get_params()
-        self.rx = Receiver.get(self.context(), self.cid(), self.params[f"receiver0"])
+        self.rx = Receiver.get(self.context(), self.cid(), self.params["receiver0"])
 
     def tick(self):
         in0 = self.rx.receive()
@@ -65,7 +47,6 @@ class VerifyTensor(CodeletAdapter):
         SHAPE_RANK=1
         BYTES_PER_ELEMENT=8
 
-
         # The values are from CreateTensor.py, should be same as host_tensor
         assert(tensor0.get_tensor_description().shape.size()==SHAPE_SIZE)
         assert(tensor0.get_tensor_description().shape.rank()==SHAPE_RANK)
@@ -73,15 +54,14 @@ class VerifyTensor(CodeletAdapter):
 
         # if tensor0 is on device copy it to host memory for comparison
         if tensor0.storage_type() == MemoryStorageType.kDevice:
-            tensor0 = get_cupy_ndarray_from_tensor(tensor0)
-            tensor0 = tensor0.get()
+            tensor0 = cp.asarray(tensor0)
         elif tensor0.storage_type() == MemoryStorageType.kHost:
-            tensor0 = np.array(tensor0)
+            tensor0 = np.asarray(tensor0)
         else:
             raise RuntimeError("data neither on host or device?!")
 
-        print("received complex tensor: ", tensor0)
-
+        print("received complex tensor type: ", tensor0.dtype)
+        print("First 10 elements of received complex tensor: ", tensor0[:10])
         return
 
     def stop(self):

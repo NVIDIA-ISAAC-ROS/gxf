@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2021,2023, NVIDIA CORPORATION. All rights reserved.
+Copyright (c) 2021-2024, NVIDIA CORPORATION. All rights reserved.
 
 NVIDIA CORPORATION and its licensors retain all intellectual property
 and proprietary rights in and to this software, related documentation
@@ -101,10 +101,6 @@ gxf_result_t Vault::tick() {
   // Notify potentially waiting storage requests about the new messages.
   condition_variable_.notify_one();
 
-  return GXF_SUCCESS;
-}
-
-gxf_result_t Vault::stop() {
   return GXF_SUCCESS;
 }
 

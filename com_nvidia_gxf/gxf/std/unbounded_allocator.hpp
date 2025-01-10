@@ -26,7 +26,7 @@
 namespace nvidia {
 namespace gxf {
 
-// An allocater which uses cudaMalloc/cudaMallocHost dynamically without a pool. Does not provide
+// An allocator which uses cudaMalloc/cudaMallocHost dynamically without a pool. Does not provide
 // bounded execution times.
 class UnboundedAllocator : public Allocator {
  public:

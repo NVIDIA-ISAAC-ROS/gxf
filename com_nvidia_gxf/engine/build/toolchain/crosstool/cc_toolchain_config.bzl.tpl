@@ -1,5 +1,5 @@
 """
- SPDX-FileCopyrightText: Copyright (c) 2019 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ SPDX-FileCopyrightText: Copyright (c) 2019-2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  SPDX-License-Identifier: Apache-2.0
 
  Licensed under the Apache License, Version 2.0 (the "License");
@@ -65,17 +65,6 @@ def _impl(ctx):
             path = ctx.attr.strip,
         ),
     ]
-
-    cxx14_feature = feature(
-        name = "c++14",
-        enabled = True,
-        flag_sets = [
-            flag_set(
-                actions = [ACTION_NAMES.cpp_compile],
-                flag_groups = [flag_group(flags = ["-std=c++14"])],
-            ),
-        ],
-    )
 
     cxx17_feature = feature(
         name = "c++17",
@@ -202,50 +191,51 @@ def _impl(ctx):
         ],
     )
 
-    include_directories_feature = feature(
-        name = "toolchain_include_directories",
-        enabled = True,
-        flag_sets = [
-            flag_set(
-                actions = [
-                    ACTION_NAMES.assemble,
-                    ACTION_NAMES.preprocess_assemble,
-                    ACTION_NAMES.linkstamp_compile,
-                    ACTION_NAMES.c_compile,
-                    ACTION_NAMES.cpp_compile,
-                    ACTION_NAMES.cpp_header_parsing,
-                    ACTION_NAMES.cpp_module_compile,
-                    ACTION_NAMES.cpp_module_codegen,
-                    ACTION_NAMES.lto_backend,
-                    ACTION_NAMES.clif_match,
-                ],
-                flag_groups = [
-                    flag_group(
-                        flags = [
-                            "-isystem",
-                            "external/gcc_9_3_aarch64_linux_gnu/aarch64-buildroot-linux-gnu/include/c++/9.3.0/",
-                            "-isystem",
-                            "external/gcc_9_3_aarch64_linux_gnu/aarch64-buildroot-linux-gnu/include/c++/9.3.0/aarch64-buildroot-linux-gnu/",
-                            "-isystem",
-                            "external/gcc_9_3_aarch64_linux_gnu/aarch64-buildroot-linux-gnu/lib",
-                            "-isystem",
-                            "external/gcc_9_3_aarch64_linux_gnu/aarch64-buildroot-linux-gnu/lib64",
-                            "-isystem",
-                            "external/gcc_9_3_aarch64_linux_gnu/aarch64-buildroot-linux-gnu/bin",
-                            "-isystem",
-                            "external/gcc_9_3_aarch64_linux_gnu/aarch64-buildroot-linux-gnu/sysroot/usr/include/",
-                            "-isystem",
-                            "external/gcc_9_3_aarch64_linux_gnu/lib/gcc/aarch64-buildroot-linux-gnu/9.3.0/include/",
-                            "-isystem",
-                            "external/gcc_9_3_aarch64_linux_gnu/lib/gcc/aarch64-buildroot-linux-gnu/9.3.0/include-fixed/",
-                        ],
-                    ),
-                ],
-            ),
-        ],
-    )
-
+    if ctx.attr.enable_aarch64_gcc_11_includes:
+        include_directories_feature = feature(
+            name = "toolchain_include_directories",
+            enabled = True,
+            flag_sets = [
+                flag_set(
+                    actions = [
+                        ACTION_NAMES.assemble,
+                        ACTION_NAMES.preprocess_assemble,
+                        ACTION_NAMES.linkstamp_compile,
+                        ACTION_NAMES.c_compile,
+                        ACTION_NAMES.cpp_compile,
+                        ACTION_NAMES.cpp_header_parsing,
+                        ACTION_NAMES.cpp_module_compile,
+                        ACTION_NAMES.cpp_module_codegen,
+                        ACTION_NAMES.lto_backend,
+                        ACTION_NAMES.clif_match,
+                    ],
+                    flag_groups = [
+                        flag_group(
+                            flags = [
+                                "-isystem",
+                                "external/gcc_11_3_aarch64_linux_gnu/aarch64-buildroot-linux-gnu/include/c++/11.3.0/",
+                                "-isystem",
+                                "external/gcc_11_3_aarch64_linux_gnu/aarch64-buildroot-linux-gnu/include/c++/11.3.0/aarch64-buildroot-linux-gnu/",
+                                "-isystem",
+                                "external/gcc_11_3_aarch64_linux_gnu/aarch64-buildroot-linux-gnu/lib",
+                                "-isystem",
+                                "external/gcc_11_3_aarch64_linux_gnu/aarch64-buildroot-linux-gnu/lib64",
+                                "-isystem",
+                                "external/gcc_11_3_aarch64_linux_gnu/aarch64-buildroot-linux-gnu/bin",
+                                "-isystem",
+                                "external/gcc_11_3_aarch64_linux_gnu/aarch64-buildroot-linux-gnu/sysroot/usr/include/",
+                                "-isystem",
+                                "external/gcc_11_3_aarch64_linux_gnu/lib/gcc/aarch64-buildroot-linux-gnu/11.3.0/include/",
+                                "-isystem",
+                                "external/gcc_11_3_aarch64_linux_gnu/lib/gcc/aarch64-buildroot-linux-gnu/11.3.0/include-fixed/",
+                            ],
+                        ),
+                    ],
+                ),
+            ],
+        )
     features = [
+           cxx17_feature,
            cxx_compile_opts_feature,
            opt_feature,
            dbg_feature,
@@ -253,13 +243,8 @@ def _impl(ctx):
            linker_opts_feature,
           ]
 
-    if ctx.attr.enable_aarch64_gcc_9_includes:
+    if ctx.attr.enable_aarch64_gcc_11_includes:
         features.append(include_directories_feature)
-
-    if ctx.attr.enable_cxx_17_feature:
-        features.append(cxx17_feature)
-    else:
-        features.append(cxx14_feature)
 
     if ctx.attr.disable_cxx11_abi_feature:
         features.append(disable_cxx11_abi_feature)
@@ -292,8 +277,7 @@ cc_toolchain_config = rule(
         "nm": attr.string(default = "/usr/bin/nm"),
         "objdump": attr.string(default = "/usr/bin/objdump"),
         "strip": attr.string(default = "/usr/bin/strip"),
-        "enable_aarch64_gcc_9_includes": attr.bool(default = False),
-        "enable_cxx_17_feature": attr.bool(default = False),
+        "enable_aarch64_gcc_11_includes": attr.bool(default = False),
         "disable_cxx11_abi_feature": attr.bool(default = False),
     },
     provides = [CcToolchainConfigInfo],

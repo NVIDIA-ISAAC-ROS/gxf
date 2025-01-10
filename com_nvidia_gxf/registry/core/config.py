@@ -1,4 +1,4 @@
-# Copyright (c) 2020-2021, NVIDIA CORPORATION.  All rights reserved.
+# Copyright (c) 2020-2024, NVIDIA CORPORATION.  All rights reserved.
 #
 # NVIDIA CORPORATION and its licensors retain all intellectual property
 # and proprietary rights in and to this software, related documentation
@@ -18,17 +18,19 @@ import pathlib
 import registry.core.logger as log
 
 logger = log.get_logger("Registry")
-DEFAULT_ROOT_PATH = str(path.join(pathlib.Path.home(), ""))
-DEFAULT_CONFIG_PATH = str(path.join(pathlib.Path.home(),".config","nvgraph",""))
-DEFAULT_WORKSPACE_ROOT = str(path.join(pathlib.Path.home(),".cache","nvgraph_workspace",""))
+
+DEFAULT_ROOT_PATH = str(path.join(os.getenv('TEMP', 'C:\\Temp'), 'gxf')) if os.name == 'nt' else str(path.join('/var/tmp/gxf/', ''))
+DEFAULT_CONFIG_PATH = str(path.join(DEFAULT_ROOT_PATH,'.config','gxf',''))
+DEFAULT_WORKSPACE_ROOT = str(path.join(DEFAULT_ROOT_PATH,'.cache','gxf_workspace',''))
 
 GXF_CORE_PYBIND_PATH="/opt/nvidia/graph-composer/core"
 X86_TARGET_CONFIG_FILE="/opt/nvidia/graph-composer/config/target_x86_64.yaml"
 AARCH64_TARGET_CONFIG_FILE="/opt/nvidia/graph-composer/config/target_aarch64.yaml"
+GRAPH_TARGETS_CONFIG = abspath(expanduser("/opt/nvidia/graph-composer/graph_targets.yaml"))
 
-ENV_VAR_ROOT_PATH = "NVGRAPH_REGISTRY_ROOT"
-ENV_VAR_CONFIG_PATH = "NVGRAPH_CONFIG_ROOT"
-ENV_VAR_WORKSPACE_ROOT = "NVGRAPH_WORKSPACE_ROOT"
+ENV_VAR_ROOT_PATH = "GXF_REGISTRY_ROOT"
+ENV_VAR_CONFIG_PATH = "GXF_CONFIG_ROOT"
+ENV_VAR_WORKSPACE_ROOT = "GXF_WORKSPACE_ROOT"
 
 NGC_NO_API_KEY = "no-apikey"
 NGC_NO_ORG = "no-org"
@@ -114,11 +116,11 @@ class RegistryConfig:
         root = self._get_default_path(ENV_VAR_ROOT_PATH, DEFAULT_ROOT_PATH)
 
         self._config["workspace_root"] = self._get_default_path(ENV_VAR_WORKSPACE_ROOT, DEFAULT_WORKSPACE_ROOT)
-        self._config["cache"] = self._clean_path(f"{root}/.cache/nvgraph_registry")
+        self._config["cache"] = self._clean_path(f"{root}/.cache/gxf_registry")
         self._config["repositories"].append(
                             {"name": "default",
                              "type": "local",
-                             "directory": self._clean_path(f"{root}/.nvgraph_local_repo"),
+                             "directory": self._clean_path(f"{root}/default_repo"),
                              "username": "",
                              "password": "",
                              "apikey": NGC_NO_API_KEY,

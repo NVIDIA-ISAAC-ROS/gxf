@@ -1,6 +1,6 @@
 #!/bin/bash
 #####################################################################################
-# SPDX-FileCopyrightText: Copyright (c) 2020-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2020-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -51,7 +51,6 @@ print_help_message() {
   printf "  --update:          Only deploy files that have changed.\n"
   printf "  --remote_user:     Username on target device.\n"
   printf "  --deploy_path:     Destination on target device.\n"
-  printf "  --cxx17:          Enable C++17 build config.\n"
   printf "  --help:            Display this message.\n"
 }
 # reverses an array
@@ -127,7 +126,6 @@ REMOTE_USER=nvidia
 REMOTE_USER_SET=false
 CACHE_SERVER_ARG=""
 BAZEL=auto
-ENABLE_CXX17=false
 BAZEL_CONFIGS=""
 
 # print help and exit if no command line arguments
@@ -179,8 +177,8 @@ while [ $# -gt 0 ]; do
       shift
       continue
       ;;
-    --cxx17)
-      ENABLE_CXX17=true
+    --debug)
+      ENABLE_DEBUG=true
       shift
       continue
       ;;
@@ -207,7 +205,7 @@ if [ -z "$HOST" ]; then
 fi
 
 if [ -z "$DEVICE" ]; then
-  error_and_exit "Desired target device must be specified with -d DEVICE. Valid choices: 'hp11_sbsa', 'hp21ea_sbsa', 'jetpack51', 'x86_64'"
+  error_and_exit "Desired target device must be specified with -d DEVICE. Valid choices: 'hp21ea_sbsa' 'hp21ga_sbsa' 'jetpack60' 'jetpack61' 'x86_64'"
 fi
 
 if [[ $BAZEL != bazel && $BAZEL != dazel && $BAZEL != auto ]]; then
@@ -228,8 +226,8 @@ if [[ $DEVICE == driveqnx602 ]]; then
   fi
 fi
 
-if [ "$ENABLE_CXX17" = true ]; then
-    BAZEL_CONFIGS=" --config=cxx17 "
+if [ "$ENABLE_DEBUG" = true ]; then
+    BAZEL_CONFIGS=" --config=debug "
 fi
 
 # Check bazel version before building.

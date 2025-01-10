@@ -70,5 +70,30 @@ TEST(SchedulerExit, MultithreadRunAsync) {
   GXF_ASSERT_SUCCESS(GxfContextDestroy(context));
 }
 
+TEST(SchedulerExit, EventBasedScheduler) {
+  gxf_context_t context;
+  GXF_ASSERT_SUCCESS(GxfContextCreate(&context));
+  const GxfLoadExtensionsInfo info{kExtensions, 2, nullptr, 0, nullptr};
+  GXF_ASSERT_SUCCESS(GxfLoadExtensions(context, &info));
+  GXF_ASSERT_SUCCESS(GxfGraphLoadFile(context, "gxf/std/tests/apps/test_scheduler_exit.yaml"));
+  GXF_ASSERT_SUCCESS(GxfGraphLoadFile(context, "gxf/std/tests/apps/test_ebs_param.yaml"));
+  GXF_ASSERT_SUCCESS(GxfGraphActivate(context));
+  ASSERT_EQ(GxfGraphRun(context), GXF_FAILURE);
+  GXF_ASSERT_SUCCESS(GxfContextDestroy(context));
+}
+
+TEST(SchedulerExit, EventBasedSchedulerRunAsync) {
+  gxf_context_t context;
+  GXF_ASSERT_SUCCESS(GxfContextCreate(&context));
+  const GxfLoadExtensionsInfo info{kExtensions, 2, nullptr, 0, nullptr};
+  GXF_ASSERT_SUCCESS(GxfLoadExtensions(context, &info));
+  GXF_ASSERT_SUCCESS(GxfGraphLoadFile(context, "gxf/std/tests/apps/test_scheduler_exit.yaml"));
+  GXF_ASSERT_SUCCESS(GxfGraphLoadFile(context, "gxf/std/tests/apps/test_ebs_param.yaml"));
+  GXF_ASSERT_SUCCESS(GxfGraphActivate(context));
+  GXF_ASSERT_SUCCESS(GxfGraphRunAsync(context));
+  GXF_ASSERT_EQ(GxfGraphWait(context), GXF_FAILURE);
+  GXF_ASSERT_SUCCESS(GxfContextDestroy(context));
+}
+
 }  // namespace gxf
 }  // namespace nvidia

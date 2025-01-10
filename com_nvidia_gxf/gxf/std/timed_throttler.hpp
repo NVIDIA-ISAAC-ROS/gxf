@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2021, NVIDIA CORPORATION. All rights reserved.
+Copyright (c) 2021-2024, NVIDIA CORPORATION. All rights reserved.
 
 NVIDIA CORPORATION and its licensors retain all intellectual property
 and proprietary rights in and to this software, related documentation
@@ -31,7 +31,6 @@ class TimedThrottler : public Codelet {
  public:
   gxf_result_t registerInterface(Registrar* registrar) override;
   gxf_result_t initialize() override;
-  gxf_result_t start() override { return GXF_SUCCESS; }
   gxf_result_t tick() override;
   gxf_result_t stop() override;
 

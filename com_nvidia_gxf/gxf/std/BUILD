@@ -1,5 +1,5 @@
 """
-Copyright (c) 2020-2023, NVIDIA CORPORATION. All rights reserved.
+Copyright (c) 2020-2024, NVIDIA CORPORATION. All rights reserved.
 
 NVIDIA CORPORATION and its licensors retain all intellectual property
 and proprietary rights in and to this software, related documentation
@@ -12,12 +12,20 @@ load(
     "//gxf:gxf.bzl",
     "nv_gxf_cc_extension",
     "nv_gxf_cc_library",
+    # "nv_gxf_components_pyclass_gen"
 )
 load("//gxf:pybind.bzl", "pybind_library")
 
 exports_files([
     "__init__.py",
 ])
+
+# nv_gxf_components_pyclass_gen(
+#     name = "comp_gen",
+#     extensions = [
+#         "//gxf/std",
+#     ],
+# )
 
 pybind_library(
     name = "vault_pybind",
@@ -97,6 +105,17 @@ pybind_library(
 )
 
 pybind_library(
+    name = "eos_pybind",
+    cc_deps = [
+        "//gxf/core:gxf",
+        "//gxf/std",
+    ],
+    cc_srcs = [
+        "bindings/eos.cpp",
+    ],
+)
+
+pybind_library(
     name = "transmitter_pybind",
     cc_deps = [
         "//gxf/core:gxf",
@@ -122,6 +141,9 @@ py_library(
     name = "std_extension",
     srcs = [
         "__init__.py",
+        "standard_graph.py",
+        "standard_methods.py",
+        "compute_entity.py",
         "Components.py",
     ],
     visibility = ["//visibility:public"],
@@ -129,6 +151,7 @@ py_library(
         "//gxf/core:core_pybind",
         "//gxf/std:allocator_pybind",
         "//gxf/std:clock_pybind",
+        "//gxf/std:eos_pybind",
         "//gxf/std:receiver_pybind",
         "//gxf/std:scheduling_condition_pybind",
         "//gxf/std:scheduling_terms_pybind",
@@ -145,10 +168,13 @@ nv_gxf_cc_library(
         "epoch_scheduler.hpp",
         "greedy_scheduler.hpp",
         "scheduling_term.hpp",
+        "scheduling_term_combiner.hpp",
         "scheduling_terms.hpp",
     ],
     deps = [
         "allocator",
+        "async_buffer_receiver",
+        "async_buffer_transmitter",
         "block_memory_pool",
         "broadcast",
         "clock",
@@ -171,24 +197,25 @@ nv_gxf_cc_library(
         "extension_loader",
         "forward",
         "gather",
+        "graph_driver",
+        "graph_worker",
         "greedy_scheduler",
+        "ipc_client",
         "ipc_server",
         "job_statistics",
+        "memory_buffer",
         "message_router",
         "metric",
         "monitor",
         "multi_thread_scheduler",
-        "network_router",
+        "event_based_scheduler",
         "network_context",
+        "network_router",
         "new_component_allocator",
-        "parameter_parser",
-        "parameter_parser_std",
-        "parameter_registrar",
-        "parameter_storage",
-        "parameter_wrapper",
         "program",
         "queue",
         "receiver",
+        "resources",
         "router",
         "router_group",
         "scheduler",
@@ -198,11 +225,9 @@ nv_gxf_cc_library(
         "system_group",
         "tensor",
         "tensor_copier",
-        "resources",
-        "resource_manager",
-        "resource_registrar",
         "timed_throttler",
         "timestamp",
+        "topic",
         "transmitter",
         "typed_message_view",
         "unbounded_allocator",
@@ -244,6 +269,37 @@ nv_gxf_cc_library(
     hdrs = ["ipc_server.hpp"],
     visibility = ["//visibility:public"],
     deps = [
+        "//gxf/core:gxf_cpp_api",
+    ],
+)
+
+nv_gxf_cc_library(
+    name = "ipc_client",
+    hdrs = ["ipc_client.hpp"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//gxf/core:gxf_cpp_api",
+    ],
+)
+
+nv_gxf_cc_library(
+    name = "async_buffer_receiver",
+    srcs = ["async_buffer_receiver.cpp"],
+    hdrs = ["async_buffer_receiver.hpp"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "receiver",
+        "//gxf/core:gxf_cpp_api",
+    ],
+)
+
+nv_gxf_cc_library(
+    name = "async_buffer_transmitter",
+    srcs = ["async_buffer_transmitter.cpp"],
+    hdrs = ["async_buffer_transmitter.hpp"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "transmitter",
         "//gxf/core:gxf_cpp_api",
     ],
 )
@@ -341,6 +397,19 @@ nv_gxf_cc_library(
 )
 
 nv_gxf_cc_library(
+    name = "dlpack_utils",
+    srcs = ["dlpack_utils.cpp"],
+    hdrs = ["dlpack_utils.hpp"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//gxf/core:gxf_cpp_api",
+        "//third_party:cuda_headers",
+        "//third_party:cudart",
+        "@dlpack",
+    ],
+)
+
+nv_gxf_cc_library(
     name = "double_buffer_transmitter",
     srcs = ["double_buffer_transmitter.cpp"],
     hdrs = ["double_buffer_transmitter.hpp"],
@@ -373,9 +442,9 @@ nv_gxf_cc_library(
     deps = [
         "component_factory",
         "entity_resource_helper",
-        "type_registry",
         "//gxf/core:gxf_c_api",
         "//gxf/core:gxf_cpp_api",
+        "//gxf/core:entity_item",
     ],
 )
 
@@ -491,6 +560,7 @@ nv_gxf_cc_library(
         "codelet",
         "receiver",
         "transmitter",
+        "//gxf/core:gxf_cpp_api",
     ],
 )
 
@@ -584,6 +654,27 @@ nv_gxf_cc_library(
 )
 
 nv_gxf_cc_library(
+    name = "event_based_scheduler",
+    srcs = ["event_based_scheduler.cpp"],
+    hdrs = ["event_based_scheduler.hpp"],
+    linkopts = [
+        "-pthread",  # For <thread>
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        "clock",
+        "cpu_thread",
+        "entity_resource_helper",
+        "resources",
+        "scheduler",
+        "//gxf/core:gxf_c_api",
+        "//gxf/std/gems/event_list:unique_event_list",
+        "//gxf/std/gems/staging_queue",
+        "//gxf/std/gems/timed_job_list",
+    ],
+)
+
+nv_gxf_cc_library(
     name = "resources",
     srcs = ["resources.cpp"],
     hdrs = ["resources.hpp"],
@@ -611,74 +702,6 @@ nv_gxf_cc_library(
     deps = [
         "component_allocator",
         "//gxf/core:gxf_cpp_api",
-    ],
-)
-
-nv_gxf_cc_library(
-    name = "parameter_parser",
-    hdrs = [
-        "parameter_parser.hpp",
-    ],
-    visibility = ["//visibility:public"],
-    deps = [
-        "//common",
-        "//gxf/core:expected",
-        "//gxf/core:gxf_c_api",
-        "//gxf/core:handle",
-        "@yaml-cpp",
-    ],
-)
-
-nv_gxf_cc_library(
-    name = "parameter_parser_std",
-    hdrs = ["parameter_parser_std.hpp"],
-    visibility = ["//visibility:public"],
-    deps = [
-        "//gxf/core:expected",
-        "//gxf/core:gxf_c_api",
-        "//gxf/core:handle",
-        "@yaml-cpp",
-    ],
-)
-
-nv_gxf_cc_library(
-    name = "parameter_registrar",
-    srcs = ["parameter_registrar.cpp"],
-    hdrs = ["parameter_registrar.hpp"],
-    visibility = ["//visibility:public"],
-    deps = [
-        "//common",
-        "//gxf/core:expected",
-        "//gxf/core:gxf_c_api",
-        "//gxf/std:parameter_storage",
-        "//gxf/std:type_registry",
-    ],
-)
-
-nv_gxf_cc_library(
-    name = "parameter_storage",
-    srcs = ["parameter_storage.cpp"],
-    hdrs = ["parameter_storage.hpp"],
-    need_multithread = True,
-    visibility = ["//visibility:public"],
-    deps = [
-        "//gxf/core:parameter",
-        "//gxf/core:registry",
-    ],
-)
-
-nv_gxf_cc_library(
-    name = "parameter_wrapper",
-    hdrs = [
-        "parameter_wrapper.hpp",
-    ],
-    visibility = ["//visibility:public"],
-    deps = [
-        "//common",
-        "//gxf/core:expected",
-        "//gxf/core:gxf_c_api",
-        "//gxf/core:handle",
-        "@yaml-cpp",
     ],
 )
 
@@ -719,7 +742,9 @@ nv_gxf_cc_library(
 nv_gxf_cc_library(
     name = "receiver",
     srcs = ["receiver.cpp"],
-    hdrs = ["receiver.hpp"],
+    hdrs = ["receiver.hpp",
+            "transmitter.hpp",
+    ],
     visibility = ["//visibility:public"],
     deps = [
         "queue",
@@ -736,6 +761,7 @@ nv_gxf_cc_library(
         "connection",
         "receiver",
         "transmitter",
+        "network_context",
         "//gxf/core:gxf_cpp_api",
     ],
 )
@@ -771,11 +797,12 @@ nv_gxf_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         "connection",
+        "network_context",
         "receiver",
         "router",
         "timestamp",
+        "topic",
         "transmitter",
-        "network_context",
         "//gxf/core:gxf_cpp_api",
     ],
 )
@@ -834,6 +861,7 @@ nv_gxf_cc_library(
     ],
     hdrs = [
         "scheduling_condition.hpp",
+        "scheduling_term_combiner.hpp",
         "scheduling_term.hpp",
         "scheduling_terms.hpp",
     ],
@@ -841,7 +869,6 @@ nv_gxf_cc_library(
     deps = [
         "allocator",
         "clock",
-        "parameter_parser_std",
         "receiver",
         "timestamp",
         "transmitter",
@@ -879,9 +906,11 @@ nv_gxf_cc_library(
     deps = [
         "allocator",
         "complex",
+        "dlpack_utils",
         "memory_buffer",
         "//gxf/core:gxf_cpp_api",
         "//third_party:cuda_headers",
+        "@dlpack",
     ],
 )
 
@@ -921,18 +950,6 @@ nv_gxf_cc_library(
 )
 
 nv_gxf_cc_library(
-    name = "type_registry",
-    srcs = ["type_registry.cpp"],
-    hdrs = ["type_registry.hpp"],
-    need_multithread = True,
-    visibility = ["//visibility:public"],
-    deps = [
-        "//gxf/core:expected",
-        "@yaml-cpp",
-    ],
-)
-
-nv_gxf_cc_library(
     name = "unbounded_allocator",
     srcs = ["unbounded_allocator.cpp"],
     hdrs = ["unbounded_allocator.hpp"],
@@ -960,7 +977,6 @@ nv_gxf_cc_library(
     hdrs = ["yaml_file_loader.hpp"],
     visibility = ["//visibility:public"],
     deps = [
-        "parameter_storage",
         "//common",
         "//gxf/core:gxf_cpp_api",
         "@yaml-cpp",
@@ -998,28 +1014,6 @@ nv_gxf_cc_library(
 )
 
 nv_gxf_cc_library(
-    name = "resource_manager",
-    srcs = ["resource_manager.cpp"],
-    hdrs = ["resource_manager.hpp"],
-    visibility = ["//visibility:public"],
-    deps = [
-        "//gxf/core:expected",
-        "//gxf/core:gxf_c_api",
-        "//gxf/core:handle",
-    ],
-)
-
-nv_gxf_cc_library(
-    name = "resource_registrar",
-    hdrs = ["resource_registrar.hpp"],
-    visibility = ["//visibility:public"],
-    deps = [
-        "//common",
-        "//gxf/core:gxf_c_api",
-    ],
-)
-
-nv_gxf_cc_library(
     name = "subgraph",
     hdrs = ["subgraph.hpp"],
     visibility = ["//visibility:public"],
@@ -1035,7 +1029,6 @@ nv_gxf_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         "codelet",
-        "parameter_parser_std",
         "receiver",
         "timestamp",
         "transmitter",
@@ -1054,6 +1047,67 @@ nv_gxf_cc_library(
     ],
 )
 
+nv_gxf_cc_library(
+    name = "topic",
+    srcs = ["topic.cpp"],
+    hdrs = ["topic.hpp"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":receiver",
+        ":transmitter",
+        "//gxf/core:gxf_cpp_api",
+    ],
+)
+
+nv_gxf_cc_library(
+    name = "graph_driver_worker_common",
+    srcs = ["graph_driver_worker_common.cpp"],
+    hdrs = ["graph_driver_worker_common.hpp"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//common",
+        "//gxf/core:expected",
+        "//gxf/core:gxf_cpp_api",
+        "@nlohmann-json",
+    ],
+)
+
+nv_gxf_cc_library(
+    name = "graph_driver",
+    srcs = ["graph_driver.cpp"],
+    hdrs = ["graph_driver.hpp"],
+    linkopts = [
+        "-pthread",  # For <thread>
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        "graph_driver_worker_common",
+        "ipc_client",
+        "ipc_server",
+        "system",
+        "//gxf/core:gxf_c_api",
+        "//gxf/std/gems/queue_thread",
+    ],
+)
+
+nv_gxf_cc_library(
+    name = "graph_worker",
+    srcs = ["graph_worker.cpp"],
+    hdrs = ["graph_worker.hpp"],
+    linkopts = [
+        "-pthread",  # For <thread>
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        "graph_driver_worker_common",
+        "ipc_client",
+        "ipc_server",
+        "system",
+        "//gxf/core:gxf_c_api",
+        "//gxf/std/gems/queue_thread",
+    ],
+)
+
 load("//registry/build:registry.bzl", "register_extension")
 
 exports_files(["LICENSE"])
@@ -1066,6 +1120,10 @@ register_extension(
     headers = [
         "BUILD.public",
         "allocator.hpp",
+        "async_buffer_receiver.hpp",
+        "async_buffer_transmitter.hpp",
+        "block_memory_pool.hpp",
+        "broadcast.hpp",
         "clock.hpp",
         "codelet.hpp",
         "complex.hpp",
@@ -1073,31 +1131,36 @@ register_extension(
         "component_factory.hpp",
         "default_extension.hpp",
         "double_buffer_receiver.hpp",
+        "double_buffer_transmitter.hpp",
         "eos.hpp",
         "extension.hpp",
         "extension_factory_helper.hpp",
+        "forward.hpp",
+        "gather.hpp",
+        "graph_driver.hpp",
+        "graph_driver_worker_common.hpp",
+        "graph_worker.hpp",
+        "ipc_client.hpp",
+        "ipc_server.hpp",
         "memory_buffer.hpp",
         "metric.hpp",
         "monitor.hpp",
         "network_context.hpp",
         "network_router.hpp",
         "new_component_allocator.hpp",
-        "parameter_parser.hpp",
-        "parameter_parser_std.hpp",
-        "parameter_registrar.hpp",
-        "parameter_storage.hpp",
-        "parameter_wrapper.hpp",
         "queue.hpp",
         "receiver.hpp",
         "resources.hpp",
+        "scheduler.hpp",
         "scheduling_condition.hpp",
+        "scheduling_term_combiner.hpp",
         "scheduling_term.hpp",
         "scheduling_terms.hpp",
         "system.hpp",
         "tensor.hpp",
+        "tensor_copier.hpp",
         "timestamp.hpp",
         "transmitter.hpp",
-        "type_registry.hpp",
         "typed_message_view.hpp",
         "unbounded_allocator.hpp",
         "vault.hpp",
@@ -1108,6 +1171,7 @@ register_extension(
     python_bindings = [
         "//gxf/std:allocator_pybind.so",
         "//gxf/std:clock_pybind.so",
+        "//gxf/std:eos_pybind.so",
         "//gxf/std:receiver_pybind.so",
         "//gxf/std:timestamp_pybind.so",
         "//gxf/std:tensor_pybind.so",
@@ -1120,10 +1184,13 @@ register_extension(
     python_sources = [
         "//gxf/std:__init__.py",
         "//gxf/std:Components.py",
+        "//gxf/std:standard_graph.py",
+        "//gxf/std:standard_methods.py",
+        "//gxf/std:compute_entity.py",
         "//gxf/python/gxe:gxe.py",
     ],
     url = "www.nvidia.com",
     uuid = "8ec2d5d6-b5df-48bf-8dee-0252606fdd7e",
-    version = "2.3.0",
+    version = "2.6.0",
     visibility = ["//visibility:public"],
 )

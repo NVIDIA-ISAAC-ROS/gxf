@@ -1,5 +1,5 @@
 """
-Copyright (c) 2021, NVIDIA CORPORATION. All rights reserved.
+Copyright (c) 2021-2024, NVIDIA CORPORATION. All rights reserved.
 
 NVIDIA CORPORATION and its licensors retain all intellectual property
 and proprietary rights in and to this software, related documentation
@@ -32,6 +32,17 @@ nv_gxf_cc_library(
     name = "time",
     srcs = ["time.cpp"],
     hdrs = ["time.hpp"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//gxf/core:expected",
+        "//gxf/core:gxf_c_api",
+    ],
+)
+
+nv_gxf_cc_library(
+    name = "storage_size",
+    srcs = ["storage_size.cpp"],
+    hdrs = ["storage_size.hpp"],
     visibility = ["//visibility:public"],
     deps = [
         "//gxf/core:expected",

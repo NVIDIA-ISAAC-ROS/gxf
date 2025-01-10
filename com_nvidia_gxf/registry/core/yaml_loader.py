@@ -1,5 +1,5 @@
 ################################################################################
-# SPDX-FileCopyrightText: Copyright (c) 2021-2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2021-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -25,9 +25,9 @@ import yaml
 # Check if cloader is available, else load the python based impl
 # See more info: https://github.com/yaml/pyyaml/pull/436
 try:
-    from yaml import CSafeLoader as Loader, CSafeDumper as Dumper
+    from yaml import CSafeLoader as Loader, CSafeDumper as Dumper, CFullLoader as FullLoader
 except ImportError:
-    from yaml import SafeLoader as Loader, SafeDumper as Dumper
+    from yaml import SafeLoader as Loader, SafeDumper as Dumper, FullLoader as FullLoader
 
 import registry.core.logger as log
 
@@ -57,7 +57,7 @@ class YamlLoader:
                 logger.error("Yaml Loader: Invalid file, not a text file")
                 return None
             with open(file_path) as fp:
-                doc = copy.deepcopy(yaml.safe_load(fp))
+                doc = copy.deepcopy(yaml.full_load(fp))
                 return doc
         except yaml.YAMLError as exc:
             if hasattr(exc, 'problem_mark'):
@@ -73,7 +73,7 @@ class YamlLoader:
             return None
         try:
             with open(file_path) as fp:
-                docs = copy.deepcopy(list(yaml.load_all(fp, Loader=yaml.SafeLoader)))
+                docs = copy.deepcopy(list(yaml.full_load_all(fp)))
                 return docs
         except yaml.YAMLError as exc:
              if hasattr(exc, 'problem_mark'):
@@ -86,7 +86,7 @@ class YamlLoader:
         """
 
         try:
-            doc = yaml.load(yaml_string, Loader=Loader)
+            doc = yaml.load(yaml_string, Loader=FullLoader)
             return doc
         except yaml.YAMLError as exc:
             if hasattr(exc, 'problem_mark'):

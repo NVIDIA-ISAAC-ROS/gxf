@@ -1,0 +1,111 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#  http://www.apache.org/licenses/LICENSE-2.0
+#
+#  Unless required by applicable law or agreed to in writing, software
+#  distributed under the License is distributed on an "AS IS" BASIS,
+#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#  See the License for the specific language governing permissions and
+#  limitations under the License.
+
+@PACKAGE_INIT@
+
+include(CMakeFindDependencyMacro)
+
+# core/std dependencies
+
+find_dependency(Threads)
+find_dependency(dlpack)
+find_dependency(magic_enum)
+find_dependency(yaml-cpp)
+
+find_dependency(CUDAToolkit 12.2 COMPONENTS nvtx3 cudart)
+# Backport to support `nvtx3` target in CMake<=3.24.
+# CMake<=3.24 "FindCUDAToolkit" does not initialize CUDA::nvtx3,
+# so we must add the target ourselves.
+# TODO: Remove this workaround and enforce CMake>=3.25.
+if(NOT TARGET CUDA::nvtx3)
+    find_file(
+        CUDA_nvtx3_INCLUDE_DIR
+        NAME "nvtx3"
+        HINTS ${CUDAToolkit_INCLUDE_DIRS}
+        REQUIRED
+    )
+    add_library(CUDA::nvtx3 INTERFACE IMPORTED)
+    set_target_properties(CUDA::nvtx3
+        PROPERTIES INTERFACE_INCLUDE_DIRECTORIES ${CUDA_nvtx3_INCLUDE_DIR}
+    )
+endif()
+
+# dependencies for other components
+
+if(GXF_FIND_COMPONENTS AND "http" IN_LIST GXF_FIND_COMPONENTS)
+    find_dependency(cpprestsdk)
+else()
+    # Create dummy target so that import succeeds
+    add_library(cpprest INTERFACE IMPORTED)
+    add_library(cpprestsdk::cpprest ALIAS cpprest)
+endif()
+
+if(GXF_FIND_COMPONENTS AND "python_codelet" IN_LIST GXF_FIND_COMPONENTS)
+    find_dependency(pybind11)
+endif()
+
+if(GXF_FIND_COMPONENTS AND "stream" IN_LIST GXF_FIND_COMPONENTS)
+    find_dependency(nvsci)
+endif()
+
+if(GXF_FIND_COMPONENTS AND "stream" IN_LIST GXF_FIND_COMPONENTS)
+    find_dependency(nvsci)
+endif()
+
+if(GXF_FIND_COMPONENTS AND ("ucx" IN_LIST GXF_FIND_COMPONENTS))
+    # TODO: Multiple UCX "find"s will result in target redefinition.
+    # We arbitrarily select the `ucx:ucs` target as a proxy workaround
+    # to determine whether ucx has already been included.
+    # https://github.com/openucx/ucx/issues/9614
+    if(NOT TARGET ucx::ucs)
+        find_dependency(ucx)
+    endif()
+endif()
+
+if(GXF_FIND_COMPONENTS AND ("grpc_ext" IN_LIST GXF_FIND_COMPONENTS))
+    find_dependency(gRPC)
+endif()
+
+if(GXF_FIND_COMPONENTS AND ("python_codelet" IN_LIST GXF_FIND_COMPONENTS))
+    find_dependency(Python3 COMPONENTS Development)
+    find_dependency(pybind11)
+endif()
+
+set(_GXF_components @GXF_COMPONENTS@)
+
+include(${CMAKE_CURRENT_LIST_DIR}/GXFCoreTargets.cmake)
+include(${CMAKE_CURRENT_LIST_DIR}/GXFExtensionTargets.cmake)
+
+foreach(component ${_GXF_components})
+    set(GXF_${component}_FOUND TRUE)
+endforeach()
+
+foreach(component ${GXF_FIND_COMPONENTS})
+    if(NOT GXF_${component}_FOUND)
+        set(GXF_${component}_FOUND FALSE)
+        if(NOT GXF_FIND_QUIETLY)
+            message(WARNING "Missing required GXF component \"${component}\"")
+        endif()
+    endif()
+endforeach()
+
+set(GXF_ROOT ${CMAKE_CURRENT_LIST_DIR}/../../..)
+cmake_path(NORMAL_PATH GXF_ROOT)
+set_and_check(GXF_ROOT ${GXF_ROOT})
+set_and_check(GXF_INCLUDE_DIR ${GXF_ROOT}/include)
+
+check_required_components(GXF)
+
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}")

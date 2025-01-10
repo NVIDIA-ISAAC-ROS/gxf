@@ -186,6 +186,7 @@ TEST_F(GxfGraphRunTest, InvalidAppRun) {
   GXF_ASSERT_EQ(GxfGraphDeactivate(context), GXF_FAILURE);
 }
 
+
 TEST_F(GxfGraphRunTest, InvalidAppRunAsync) {
   const char* kGraphFileName = "gxf/core/tests/apps/test_app_GxfGraphRun_step_count_mismatch.yaml";
   GXF_ASSERT_SUCCESS(GxfGraphLoadFile(context, kGraphFileName));
@@ -194,3 +195,4 @@ TEST_F(GxfGraphRunTest, InvalidAppRunAsync) {
   GXF_ASSERT_SUCCESS(GxfGraphWait(context));
   GXF_ASSERT_EQ(GxfGraphDeactivate(context), GXF_FAILURE);
 }
+

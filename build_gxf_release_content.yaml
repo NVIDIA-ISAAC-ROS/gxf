@@ -1,4 +1,4 @@
-# Copyright (c) 2021-2023, NVIDIA CORPORATION.  All rights reserved.
+# Copyright (c) 2021-2024, NVIDIA CORPORATION.  All rights reserved.
 #
 # NVIDIA CORPORATION and its licensors retain all intellectual property
 # and proprietary rights in and to this software, related documentation
@@ -11,21 +11,19 @@ workspace_name_release: "com_nvidia_gxf"
 enable_code_coverage: false
 
 platforms:
-  x86_cuda_11_8: {
-    platform: "platform_x86_64_cuda_11_8",
-    define: "x86_64_cuda_11_8",
+  x86_cuda_12_6: {
+    platform: "platform_x86_64_cuda_12_6",
+    define: "x86_64_cuda_12_6",
     src_lib: "bazel-out/k8-opt/bin",
-    dst_lib: "gxf_x86_64_cuda_11_8",
-    bazel_config: "x86_64_cuda_11_8"
-    # cxx_config: "cxx17",
-    # disable_cxx11_abi: true
+    dst_lib: "gxf_x86_64_cuda_12_6",
+    bazel_config: "x86_64_cuda_12_6"
   }
-  jetpack51: {
-    platform: "platform_jetpack51",
-    define: "jetpack51",
+  jetpack61: {
+    platform: "platform_jetpack61",
+    define: "jetpack61",
     src_lib: "bazel-out/aarch64-opt/bin",
-    dst_lib: "gxf_jetpack51",
-    bazel_config: "jetpack51"
+    dst_lib: "gxf_jetpack61",
+    bazel_config: "jetpack61"
   }
 
 targets: [
@@ -38,19 +36,30 @@ targets: [
     "cuda/tests/libgxf_test_cuda.so",
     "gxe/gxe",
 
-    "messages/libcamera_message.lo",
+    "ipc/grpc/libgxf_grpc.so",
+    "ipc/http/libgxf_http.so",
+
+    "logger/libgxf_logger.so",
+
     "multimedia/libgxf_multimedia.so",
+
     "npp/libgxf_npp.so",
+
     "network/libgxf_network.so",
+
     "python_codelet/libgxf_python_codelet.so",
     "python_codelet/pycodelet.so",
+
     "sample/libgxf_sample.so",
+
     "serialization/libgxf_serialization.so",
     "serialization/libserialization_buffer.lo",
     "serialization/libentity_serializer.lo",
+
     "std/allocator_pybind.so",
     "std/clock_pybind.so",
     "std/libdefault_extension.lo",
+    "std/libdlpack_utils.lo",
     "std/libgxf_std.so",
     "std/libgxf_std_static.lo",
     "std/libmetric.lo",
@@ -61,8 +70,7 @@ targets: [
     "std/timestamp_pybind.so",
     "std/transmitter_pybind.so",
     "std/vault_pybind.so",
-    "stream/libgxf_stream.so",
-    "stream/tests/libgxf_test_stream_sync_cuda.so",
+
     "test/extensions/libgxf_test.so",
 ]
 
@@ -91,6 +99,18 @@ files_to_copy_release:
     {
       src: "gxf/cuda/tests/BUILD.release",
       dst: "gxf/cuda/tests/BUILD",
+    },
+    {
+      src: "gxf/ipc/grpc/BUILD.release",
+      dst: "gxf/ipc/grpc/BUILD",
+    },
+    {
+      src: "gxf/ipc/http/BUILD.release",
+      dst: "gxf/ipc/http/BUILD",
+    },
+    {
+      src: "gxf/logger/BUILD.release",
+      dst: "gxf/logger/BUILD",
     },
     {
       src: "gxf/multimedia/BUILD.release",
@@ -129,24 +149,12 @@ files_to_copy_release:
       dst: "gxf/std/BUILD",
     },
     {
-      src: "gxf/stream/BUILD.release",
-      dst: "gxf/stream/BUILD",
-    },
-    {
-      src: "gxf/stream/tests/BUILD.release",
-      dst: "gxf/stream/tests/BUILD",
-    },
-    {
       src: "gxf/gxe/BUILD.release",
       dst: "gxf/gxe/BUILD",
     },
     {
-      src: "gxf/messages/BUILD.release",
-      dst: "gxf/messages/BUILD",
-    },
-    {
-      src: "release/README",
-      dst: "README",
+      src: "release/README.md",
+      dst: "README.md",
     },
     {
       src: "release/release_build_setup.sh",
@@ -158,14 +166,46 @@ files_to_copy_release:
     },
   ]
 
+files_to_copy_per_platform: [
+  {
+    src: "release/cmake/GXFConfig.cmake",
+    dst: "cmake/GXF/GXFConfig.cmake"
+  },
+  {
+    src: "release/cmake/GXFConfigVersion.cmake",
+    dst: "cmake/GXF/GXFConfigVersion.cmake"
+  },
+  {
+    src: "release/cmake/GXFTargets.cmake",
+    dst: "cmake/GXF/GXFTargets.cmake"
+  },
+  {
+    src: "release/cmake/GXFTargets-release.cmake",
+    dst: "cmake/GXF/GXFTargets-release.cmake"
+  },
+  {
+    src: "cmake/UseGXF.cmake",
+    dst: "cmake/GXF/UseGXF.cmake"
+  }
+]
+
 files_to_copy_test_as_is: [
     ".bazelrc",
+    "BUILD",
     "gxf/repo.bzl",
     "gxf/gxf.bzl",
     "gxf/run.sh.tpl",
     "gxf/BUILD",
 
     "gxf/gxe/manifest.yaml",
+    "gxf/gxe/manifest_extended.yaml",
+
+    "bzl/BUILD",
+    "bzl/cuda.bzl",
+    "bzl/docker.bzl",
+    "bzl/docker_images.bzl",
+    "bzl/mkstamp.sh",
+    "bzl/utils.bzl",
 
     "common/assert.hpp",
     "common/backtrace.hpp",
@@ -186,6 +226,7 @@ files_to_copy_test_as_is: [
     "common/type_name.hpp",
     "common/type_utils.hpp",
     "common/unique_index_map.hpp",
+    "common/yaml_parser.hpp",
 
     "engine/build/BUILD",
     "engine/build/scripts/deploy.sh",
@@ -204,6 +245,7 @@ files_to_copy_test_as_is: [
     "engine/build/toolchain/crosstool/BUILD",
     "engine/build/toolchain/crosstool/crosstool_wrapper_driver_is_not_gcc.py.tpl",
     "engine/build/toolchain/crosstool/cc_toolchain_config.bzl.tpl",
+    "engine/build/toolchain/python/BUILD",
 
     "engine/build/style/BUILD",
     "engine/build/style/cpplint.bzl",
@@ -242,35 +284,66 @@ files_to_copy_test_as_is: [
     "gxf/behavior_tree/tests/test_stress_behavior_tree.yaml",
 
     "gxf/core/__init__.py",
-    "gxf/core/Gxf.py",
-    "gxf/core/logger.py",
+    "gxf/core/common_expected_macro.hpp",
     "gxf/core/component.hpp",
     "gxf/core/entity.hpp",
+    "gxf/core/expected_macro.hpp",
     "gxf/core/expected.hpp",
+    "gxf/core/filepath.hpp",
     "gxf/core/gxf.h",
+    "gxf/core/Gxf.py",
     "gxf/core/gxf_ext.h",
     "gxf/core/handle.hpp",
+    "gxf/core/logger.py",
     "gxf/core/parameter.hpp",
+    "gxf/core/parameter_parser.hpp",
+    "gxf/core/parameter_parser_std.hpp",
+    "gxf/core/parameter_registrar.hpp", # lo
+    "gxf/core/parameter_storage.hpp", # lo
+    "gxf/core/parameter_wrapper.hpp", # lo
     "gxf/core/registrar.hpp",
     "gxf/core/resource.hpp",
+    "gxf/core/resource_manager.hpp",
+    "gxf/core/resource_registrar.hpp",
+    "gxf/core/type_registry.hpp",
 
     "gxf/cuda/__init__.py",
     "gxf/cuda/Components.py",
+    "gxf/cuda/cuda_allocator.hpp",
+    "gxf/cuda/cuda_buffer.hpp",
     "gxf/cuda/cuda_stream.hpp",
     "gxf/cuda/cuda_event.hpp",
+    "gxf/cuda/cuda_scheduling_terms.hpp",
     "gxf/cuda/cuda_stream_id.hpp",
     "gxf/cuda/cuda_stream_pool.hpp",
     "gxf/cuda/cuda_stream_sync.hpp",
     "gxf/cuda/cuda_common.hpp",
+    "gxf/cuda/stream_ordered_allocator.hpp",
 
+    "gxf/cuda/tests/convolution.h",
+    "gxf/cuda/tests/convolution.cu.cpp",
     "gxf/cuda/tests/test_cuda_ext.cpp",
     "gxf/cuda/tests/test_cuda_helper.hpp",
     "gxf/cuda/tests/test_cuda_unit.cpp",
     "gxf/cuda/tests/test_cuda_stream_dotproduct.yaml",
+    "gxf/cuda/tests/test_cuda_event_st_dotproduct_mock.yaml",
+    "gxf/cuda/tests/test_cuda_stream_ordered_allocator_cuda_event_st_dotproduct.yaml",
+    "gxf/cuda/tests/test_cuda_stream_st_dotproduct_mock.yaml",
     "gxf/cuda/tests/test_stress_cuda_stream_dotproduct.py",
+    "gxf/cuda/tests/test_cuda_allocator.yaml",
+    "gxf/cuda/tests/test_cuda_allocator_stress_test.yaml",
+    "gxf/cuda/tests/test_cuda_unit.yaml",
     "gxf/cuda/tests/test_cuda_unit.yaml",
 
-    "gxf/messages/camera_message.hpp",
+    "gxf/ipc/grpc/grpc_client.hpp",
+    "gxf/ipc/grpc/grpc_server.hpp",
+    "gxf/ipc/http/http_client.hpp",
+    "gxf/ipc/http/http_client_cpprest_impl.hpp",
+    "gxf/ipc/http/http_ipc_client.hpp",
+    "gxf/ipc/http/http_server.hpp",
+
+    "gxf/logger/logger.hpp",
+    "gxf/logger/gxf_logger.hpp",
 
     "gxf/multimedia/audio.hpp",
     "gxf/multimedia/camera.hpp",
@@ -279,8 +352,10 @@ files_to_copy_test_as_is: [
     "gxf/network/__init__.py",
     "gxf/network/Components.py",
     "gxf/network/tcp_server.hpp",
+    "gxf/network/tcp_client_socket.hpp",
     "gxf/network/tcp_client.hpp",
     "gxf/network/tcp_codelet.hpp",
+    "gxf/network/tcp_server_socket.hpp",
 
     "gxf/npp/__init__.py",
     "gxf/npp/Components.py",
@@ -301,6 +376,12 @@ files_to_copy_test_as_is: [
     "gxf/python/tests/complex/gpu_fft/RunFFT.py",
     "gxf/python/tests/complex/gpu_fft/test_gpu_fft.yaml",
     "gxf/python/tests/complex/gpu_fft/VerifyTensor.py",
+    "gxf/python/tests/dlpack/generate_dlpack_apps.py",
+    "gxf/python/tests/dlpack/MatMul.py",
+    "gxf/python/tests/dlpack/StepCount.py",
+    "gxf/python/tests/dlpack/TensorPairGenerator.py",
+    "gxf/python/tests/dlpack/test_python_api_dlpack.py",
+    "gxf/python/tests/dlpack/VerifyEqual.py",
     "gxf/python/tests/PingRx.py",
     "gxf/python/tests/PingTx.py",
     "gxf/python/tests/StepCount.py",
@@ -316,6 +397,7 @@ files_to_copy_test_as_is: [
     "gxf/python/tests/test_python_cuda_stream_tensor_generator.yaml",
     "gxf/python/tests/test_python_data_on_device_cupy.yaml",
     "gxf/python/tests/test_python_data_on_device.yaml",
+    "gxf/python/tests/test_python_apis.py",
     "gxf/python/tests/test_std_tensor.py",
     "gxf/python/tests/test_std_tensor.yaml",
     "gxf/python/tests/test_std_vault.py",
@@ -330,8 +412,12 @@ files_to_copy_test_as_is: [
     "gxf/python_codelet/codelet.py",
     "gxf/python_codelet/py_codelet.hpp",
 
+    "gxf/run_apps.py",
+
     "gxf/sample/__init__.py",
     "gxf/sample/Components.py",
+    "gxf/sample/ping_rx_async.hpp",
+    "gxf/sample/ping_tx_async.hpp",
     "gxf/sample/hello_world.hpp",
     "gxf/sample/ping_batch_rx.hpp",
     "gxf/sample/ping_rx.hpp",
@@ -366,74 +452,79 @@ files_to_copy_test_as_is: [
     "gxf/serialization/tests/test_std_component_serializer_system.yaml",
 
     "gxf/std/__init__.py",
-    "gxf/std/Components.py",
+    "gxf/std/async_buffer_receiver.hpp",
+    "gxf/std/async_buffer_transmitter.hpp",
     "gxf/std/block_memory_pool.hpp",
+    "gxf/std/Components.py",
+    "gxf/std/controller.hpp",
     "gxf/std/complex.hpp",
     "gxf/std/component_allocator.hpp",
     "gxf/std/component_factory.hpp", # lo
     "gxf/std/cpu_thread.hpp",
     "gxf/std/default_extension.hpp", # lo
-    "gxf/std/eos.hpp",
-    "gxf/std/extension.hpp", # lo
-    "gxf/std/extension_factory_helper.hpp", # lo
-    "gxf/std/network_context.hpp",
-    "gxf/std/new_component_allocator.hpp",
-    "gxf/std/parameter_parser.hpp",
-    "gxf/std/parameter_registrar.hpp", # lo
-    "gxf/std/parameter_storage.hpp", # lo
-    "gxf/std/parameter_wrapper.hpp", # lo
-    "gxf/std/resources.hpp",
-    "gxf/std/type_registry.hpp",
-    "gxf/std/timestamp.hpp",
-    "gxf/std/monitor.hpp",
     "gxf/std/double_buffer_receiver.hpp",
     "gxf/std/double_buffer_transmitter.hpp",
+    "gxf/std/eos.hpp",
+    "gxf/std/extension.hpp", # lo
+    "gxf/std/event_based_scheduler.hpp",
+    "gxf/std/extension_factory_helper.hpp", # lo
+    "gxf/std/graph_driver_worker_common.hpp",
+    "gxf/std/graph_driver.hpp",
+    "gxf/std/graph_worker.hpp",
+    "gxf/std/greedy_scheduler.hpp",
+    "gxf/std/ipc_client.hpp",
+    "gxf/std/ipc_server.hpp",
+    "gxf/std/monitor.hpp",
+    "gxf/std/multi_thread_scheduler.hpp",
+    "gxf/std/network_context.hpp",
+    "gxf/std/new_component_allocator.hpp",
+    "gxf/std/resources.hpp",
+    "gxf/std/scheduler.hpp",
+    "gxf/std/timestamp.hpp",
+    "gxf/std/topic.hpp",
 
+    "gxf/std/gems/event_list/event_list.hpp",
+    "gxf/std/gems/event_list/unique_event_list.hpp",
+    "gxf/std/gems/queue_thread/queue_thread.hpp",
+    "gxf/std/gems/timed_job_list/timed_job_list.hpp",
     "gxf/std/gems/staging_queue/staging_queue_iterator.hpp",
     "gxf/std/gems/staging_queue/staging_queue.hpp",
     "gxf/std/gems/suballocators/first_fit_allocator.hpp",
     "gxf/std/gems/suballocators/first_fit_allocator_base.hpp",
+    "gxf/std/gems/utils/time.hpp",
     "gxf/std/gems/video_buffer/allocator.hpp",
 
     "gxf/std/allocator.hpp",
     "gxf/std/codelet.hpp",
+    "gxf/std/dlpack_utils.hpp",
     "gxf/std/queue.hpp",
     "gxf/std/receiver.hpp",
-    "gxf/std/resource_manager.hpp",
-    "gxf/std/resource_registrar.hpp",
     "gxf/std/tensor.hpp",
     "gxf/std/transmitter.hpp",
     "gxf/std/system.hpp",
+    "gxf/std/scheduling_term_combiner.hpp",
     "gxf/std/scheduling_term.hpp",
     "gxf/std/scheduling_condition.hpp",
     "gxf/std/clock.hpp",
     "gxf/std/scheduling_terms.hpp",
-    "gxf/std/parameter_parser_std.hpp",
     "gxf/std/metric.hpp",
     "gxf/std/memory_buffer.hpp",
     "gxf/std/unbounded_allocator.hpp",
     "gxf/std/vault.hpp",
     "gxf/std/yaml_file_loader.hpp",
 
-    "gxf/stream/stream_nvsci.hpp",
-    "gxf/stream/stream_nvscisync.hpp",
-    "gxf/stream/stream_sync_id.hpp",
-
-    "gxf/stream/tests/test_stream_sync_cuda_ext.cpp",
-    "gxf/stream/tests/test_gxf_stream_sync_cuda_helper.hpp",
-    "gxf/stream/tests/test_gxf_stream_cuda_dotproduct.yaml",
-
     "gxf/test/BUILD",
     "gxf/test/test_main.cpp",
 
     "gxf/test/apps/BUILD",
-    "gxf/test/apps/test_camera_message.yaml",
     "gxf/test/apps/example_basics_1.yaml",
     "gxf/test/apps/example_basics_2.yaml",
     "gxf/test/apps/example_basics_3.yaml",
     "gxf/test/apps/forward_subgraph.yaml",
     "gxf/test/apps/gather_subgraph.yaml",
     "gxf/test/apps/gather_subgraph.param.yaml",
+    "gxf/test/apps/multiple_receiver_memory_available_st.yaml",
+    "gxf/test/apps/multiple_tx_rx_memory_available_st.yaml",
     "gxf/test/apps/test_deadlock_timeout_greedy.yaml",
     "gxf/test/apps/test_deadlock_timeout_multi_thread.yaml",
     "gxf/test/apps/test_delayed_periodic_stress.yaml",
@@ -449,6 +540,8 @@ files_to_copy_test_as_is: [
     "gxf/test/apps/test_std_parameter.yaml",
     "gxf/test/apps/test_ping_3.yaml",
     "gxf/test/apps/test_ping_broadcast.yaml",
+    "gxf/test/apps/test_ping_faster_consumer.yaml",
+    "gxf/test/apps/test_ping_faster_producer.yaml",
     "gxf/test/apps/test_load_parameter_from_yaml_correction.yaml",
     "gxf/test/apps/test_ping_gather.yaml",
     "gxf/test/apps/test_fixed_vector_parameter.yaml",
@@ -462,12 +555,16 @@ files_to_copy_test_as_is: [
     "gxf/test/apps/test_multi_thread_mock_codelet.yaml",
     "gxf/test/apps/test_multi_thread_pool.yaml",
     "gxf/test/apps/test_ping_multi_thread.yaml",
+    "gxf/test/apps/test_ping_multi_thread_interrupt.yaml",
     "gxf/test/apps/test_ping_periodic.yaml",
     "gxf/test/apps/test_ping.yaml",
     "gxf/test/apps/test_ping_composer.yaml",
     "gxf/test/apps/test_ping_log.yaml",
+    "gxf/test/apps/test_ping_multi_connect.yaml",
     "gxf/test/apps/test_ping_graph.yaml",
     "gxf/test/apps/test_ping_graph_parameters.yaml",
+    "gxf/test/apps/test_ping_or_scheduling_term.yaml",
+    "gxf/test/apps/test_ping_or_scheduling_term_greedy.yaml",
     "gxf/test/apps/test_register_parameter_interface.yaml",
     "gxf/test/apps/test_subgraph_global_parameter_app.yaml",
     "gxf/test/apps/test_subgraph_global_parameter_subgraph.yaml",
@@ -480,6 +577,7 @@ files_to_copy_test_as_is: [
     "gxf/test/apps/test_tensor_copier_host_to_device.yaml",
     "gxf/test/apps/test_tensor_copier_device_to_system.yaml",
     "gxf/test/apps/test_synchronization.yaml",
+    "gxf/test/apps/test_synchronization_multi.yaml",
     "gxf/test/apps/test_synchronization_threshold.yaml",
     "gxf/test/apps/test_pingtx_async_2_gather.yaml",
     "gxf/test/apps/test_pingrx_async_greedy.yaml",
@@ -488,6 +586,7 @@ files_to_copy_test_as_is: [
     "gxf/test/apps/test_pingtx_async.yaml",
     "gxf/test/apps/test_pingrx_async.yaml",
     "gxf/test/apps/test_ping_target_time.yaml",
+    "gxf/test/apps/test_ping_topics.yaml",
     "gxf/test/apps/test_ping_target_time_multi_thread.yaml",
     "gxf/test/apps/test_load_parameter_from_yaml.yaml",
     "gxf/test/apps/test_factorial.yaml",
@@ -498,7 +597,7 @@ files_to_copy_test_as_is: [
     "gxf/test/apps/test_stress_tensor_device_to_host.py",
     "gxf/test/apps/test_stress_tensor_host_to_device.py",
     "gxf/test/apps/test_timed_throttler.yaml",
-    "gxf/test/apps/test_stress_brodcast_gather.py",
+    "gxf/test/apps/test_stress_broadcast_gather.py",
     "gxf/test/apps/test_metric.yaml",
     "gxf/test/apps/test_load_parameter_from_yaml_wrong.yaml",
     "gxf/test/apps/test_timestamps.yaml",
@@ -510,10 +609,19 @@ files_to_copy_test_as_is: [
     "gxf/test/apps/test_stress_ping.py",
     "gxf/test/apps/test_message_available_frequency_throttler.yaml",
     "gxf/test/apps/test_vault.yaml",
+    "gxf/test/apps/test_deadlock_timeout_ebs.yaml",
+    "gxf/test/apps/test_ebs_mock_codelet.yaml",
+    "gxf/test/apps/test_ebs_pool.yaml",
+    "gxf/test/apps/test_entity_group_default_and_users_ebs.yaml",
+    "gxf/test/apps/test_entity_group_default_ebs.yaml",
+    "gxf/test/apps/test_entity_group_root_and_subgraph_ebs.yaml",
+    "gxf/test/apps/test_entity_group_users_ebs.yaml",
+    "gxf/test/apps/test_hello_world_ebs.yaml",
+    "gxf/test/apps/test_hello_world_ebs_unscheduled.yaml",
+    "gxf/test/apps/test_message_available_frequency_throttler_ebs.yaml",
+    "gxf/test/apps/test_ping_target_time_ebs.yaml",
 
     "gxf/test/components/BUILD",
-    "gxf/test/components/camera_message_generator.hpp",
-    "gxf/test/components/camera_message_generator.cpp",
     "gxf/test/components/entity_monitor.hpp",
     "gxf/test/components/entity_monitor.cpp",
     "gxf/test/components/mock_allocator.hpp",
@@ -543,42 +651,36 @@ files_to_copy_test_as_is: [
 
     "third_party/breakpad.BUILD",
     "third_party/BUILD",
-    "third_party/cuda_aarch64_hp11_sbsa.BUILD",
-    "third_party/cuda_aarch64_hp20_sbsa.BUILD",
     "third_party/cuda_aarch64_hp21ea_sbsa.BUILD",
-    "third_party/cuda_aarch64_jetpack51.BUILD",
-    "third_party/cuda_x86_64_11071.BUILD",
-    "third_party/cuda_x86_64_11080.BUILD",
-    "third_party/cuda_x86_64_12010.BUILD",
-    "third_party/cuda_x86_64.BUILD",
+    "third_party/cuda_aarch64_hp21ga_sbsa.BUILD",
+    "third_party/cuda_aarch64_jetpack60.BUILD",
+    "third_party/cuda_aarch64_jetpack61.BUILD",
+    "third_party/cuda_x86_64_12020.BUILD",
+    "third_party/cuda_x86_64_12060.BUILD",
+    "third_party/cuda_x86_64_rhel9_12020.BUILD",
     "third_party/cuda.bzl",
-    "third_party/gcc_9_3_aarch64_linux_gnu.BUILD",
-    "third_party/gcc_9_3_aarch64_linux_gnu.patch",
+    "third_party/dlpack.BUILD",
+    "third_party/gcc_11_3_aarch64_linux_gnu.BUILD",
     "third_party/gtest.BUILD",
     "third_party/gxf.bzl",
-    "third_party/libcudacxx_aarch64_cuda_11_4.diff",
-    "third_party/libcudacxx_aarch64_cuda_11_6.diff",
-    "third_party/libcudacxx_x86_64_cuda_11_6.diff",
     "third_party/LICENSE.txt",
-    "third_party/lss_gcc_9_3.patch",
     "third_party/lss.BUILD",
+    "third_party/lss_gcc.patch",
     "third_party/nlohmann_json.BUILD",
-    "third_party/nvcc_11_04.BUILD",
-    "third_party/nvcc_11_06.BUILD",
-    "third_party/nvcc_11_07.BUILD",
-    "third_party/nvcc_11_08.BUILD",
-    "third_party/nvcc_12_01.BUILD",
-    "third_party/nvsci_aarch64_hp11_sbsa.BUILD",
-    "third_party/nvsci_aarch64_hp20_sbsa.BUILD",
+    "third_party/nvcc_12_02.BUILD",
+    "third_party/nvcc_12_06.BUILD",
     "third_party/nvsci_aarch64_hp21ea_sbsa.BUILD",
-    "third_party/nvsci_aarch64_jetpack51.BUILD",
-    "third_party/nvsci_x86_64.BUILD",
-    "third_party/nvsci_x86_64_cuda_11_8.BUILD",
-    "third_party/nvsci_x86_64_cuda_12_1.BUILD",
+    "third_party/nvsci_aarch64_hp21ga_sbsa.BUILD",
+    "third_party/nvsci_aarch64_jetpack60.BUILD",
+    "third_party/nvsci_aarch64_jetpack61.BUILD",
+    "third_party/nvsci_x86_64_cuda_12_2.BUILD",
+    "third_party/nvsci_x86_64_cuda_12_6.BUILD",
+    "third_party/nvsci_x86_64_rhel9_cuda_12_2.BUILD",
     "third_party/nvsci.bzl",
-    "third_party/python_aarch64_3_8.BUILD",
-    "third_party/python_x86_64.BUILD",
-    "third_party/python_x86_64_3_7.BUILD",
+    "third_party/python_aarch64_3_10.BUILD",
+    "third_party/python_x86_64_3_10.BUILD",
+    "third_party/python_x86_64_rhel9_3_10.BUILD",
+    "third_party/rules_docker.context_dir.patch",
     "third_party/yaml-cpp.BUILD",
 ]
 

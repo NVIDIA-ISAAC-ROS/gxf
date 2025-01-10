@@ -1,0 +1,98 @@
+# SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+%YAML 1.2
+---
+dependencies:
+- extension: StandardExtension
+  uuid: 8ec2d5d6-b5df-48bf-8dee-0252606fdd7e
+  version: 2.6.0
+- extension: TestHelperExtension
+  uuid: 1b99ffeb-c250-4ced-8117-62ac05969a50
+  version: 2.6.0
+- extension: SerializationExtension
+  uuid: bc573c2f-89b3-d4b0-8061-2da8b11fe79a
+  version: 2.6.0
+- extension: MultimediaExtension
+  uuid: 6f2d1afc-1057-481a-9da6-a5f61fed178e
+  version: 2.6.0
+- extension: UcxExtension
+  uuid: 525f8a1a-dfb5-426b-8ddb-00c3ac839994
+  version: 0.8.0
+---
+name: generator_device_0
+components:
+- name: allocator
+  type: nvidia::gxf::test::MockAllocator
+- name: serialization_buffer
+  type: nvidia::gxf::UcxSerializationBuffer
+  parameters:
+    allocator: allocator
+- name: output
+  type: nvidia::gxf::UcxTransmitter
+  parameters:
+    receiver_address: 0.0.0.0
+    port: 13337
+    buffer: serialization_buffer
+- type: nvidia::gxf::test::TensorGenerator
+  parameters:
+    output: output
+    allocator: allocator
+    shape: [ 4, 4, 4, 4 ]
+    storage_type: 1
+- type: nvidia::gxf::CountSchedulingTerm
+  parameters:
+    count: 10
+- type: nvidia::gxf::test::StepCount
+  parameters:
+    expected_count: 10
+---
+name: ucx
+components:
+- name: allocator
+  type: nvidia::gxf::test::MockAllocator
+- name: component_serializer
+  type: nvidia::gxf::UcxComponentSerializer
+  parameters:
+    allocator: allocator
+- name: entity_serializer
+  type: nvidia::gxf::UcxEntitySerializer
+  parameters:
+    component_serializers: [ component_serializer ]
+- name: ucx_context
+  type: nvidia::gxf::UcxContext
+  parameters:
+    serializer: entity_serializer
+---
+components:
+- type: nvidia::gxf::GreedyScheduler
+  parameters:
+    stop_on_deadlock: false
+    clock: clock
+- name: clock
+  type: nvidia::gxf::ManualClock
+---
+name: gpu_resource_entity_0
+components:
+- type: nvidia::gxf::GPUDevice
+  name: gpu_resource_0
+  parameters:
+    dev_id: 0
+---
+EntityGroups:
+- name: entity_group_0
+  target:
+  - "generator_device_0"
+  - "ucx"
+  - "gpu_resource_entity_0"

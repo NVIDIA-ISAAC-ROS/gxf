@@ -1,4 +1,4 @@
-# Copyright (c) 2020-2023, NVIDIA CORPORATION.  All rights reserved.
+# Copyright (c) 2020-2024, NVIDIA CORPORATION.  All rights reserved.
 #
 # NVIDIA CORPORATION and its licensors retain all intellectual property
 # and proprietary rights in and to this software, related documentation
@@ -66,7 +66,7 @@ def make_extension_group(subpar):
     required_grp_variant.add_argument("-f", "--distro",
                                     dest="distribution",
                                     required=True, nargs=1,
-                                    help="Select an OS distro from: ubuntu_20.04")
+                                    help="Select an OS distro from: ubuntu_22.04")
     required_grp_variant.add_argument("-o", "--os", dest="os",
                                     required=True, nargs=1,
                                     help="Select an os from: Linux")
@@ -175,7 +175,7 @@ def make_extension_group(subpar):
     required_grp_variant.add_argument("-f", "--distro",
                                     dest="distribution",
                                     required=True, nargs=1,
-                                    help="Select an OS distro from: ubuntu_20.04")
+                                    help="Select an OS distro from: ubuntu_22.04")
     required_grp_variant.add_argument("-o", "--os", dest="os",
                                     required=True, nargs=1,
                                     help="Select an OS from: Linux")
@@ -288,8 +288,8 @@ def make_extension_group(subpar):
     required_grp_variant.add_argument("-f", "--distro",
                                        dest="distribution",
                                        required=True, nargs=1,
-                                       help="Select an OS distro from ubuntu_20.04"
-                                            " Default value: ubuntu_20.04")
+                                       help="Select an OS distro from ubuntu_22.04"
+                                            " Default value: ubuntu_22.04")
     required_grp_variant.add_argument("-o", "--os", dest="os",
                                        required=True, nargs=1,
                                        help="Select an OS from Linux"
@@ -468,7 +468,7 @@ def make_graph_group(subpar):
                                 nargs=1,
                                 help="Directory structure to be used "
                                      "for export to directory / archive."
-                                     " Default value in archive: /opt/nvidia/nvgraph/"
+                                     " Default value in archive: /opt/nvidia/gxf/"
                                      " Default value in directory: \"\"")
     # parser_install.add_argument("-s", "--sm-arch",
     #                             dest="sm_arch",
@@ -559,7 +559,7 @@ def make_cache_group(subpar):
     group.add_argument(
         "-s", "--set", dest="set",
         nargs=1, help="Set directory path for cache. If not set, then it uses "
-                      "default path /home/<username>/.cache/nvgraph_registry")
+                      "default path /var/tmp/gxf/.cache/gxf_registry")
     group.add_argument(
         "-c", "--clean", dest="clean", action="store_true",
         help="Clean registry cache, delete all cached information")

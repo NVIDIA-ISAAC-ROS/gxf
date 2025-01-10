@@ -1,5 +1,5 @@
 """
- SPDX-FileCopyrightText: Copyright (c) 2022-2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ SPDX-FileCopyrightText: Copyright (c) 2022-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  SPDX-License-Identifier: Apache-2.0
 
  Licensed under the Apache License, Version 2.0 (the "License");
@@ -20,8 +20,6 @@ load(
     "nv_gxf_http_archive",
 )
 
-load("//third_party:deps.bzl", "local_archive")
-
 NVSCI_SO = [
     "nvscibuf",
     "nvscisync",
@@ -29,9 +27,11 @@ NVSCI_SO = [
 ]
 
 NVSCI_X86_COMMON_SO = [
+    "gnat-23",
     "nvscicommon",
     "nvsciipc",
     "nvsci_mm",
+    "nvos",
 ]
 
 NVSCI_NEEDED_SO = [
@@ -42,6 +42,7 @@ NVSCI_NEEDED_SO = [
     "nvrm_sync",
     "nvscicommon",
     "nvsciipc",
+    "nvtegrahv",
 ]
 
 # Get the path for the shared library with given name for the given version
@@ -57,7 +58,7 @@ def make_cc_library(so, dependencies, headers, family):
         name = so,
         hdrs = headers,
         srcs = native.glob([nvsci_so_path(so, family)]),
-        deps = dependencies,
+        deps = dependencies + ["nvos", "gnat-23"],
         strip_include_prefix = "usr/include",
         visibility = ["//visibility:public"],
         linkopts = [
@@ -119,11 +120,25 @@ def nvsci_device_deps(family):
             visibility = ["//visibility:public"],
         )
 
+        nvscisync_tegra_dependencies = [
+            "nvrm_host1x",
+            "nvrm_chip",
+            "nvos",
+            "nvscicommon",
+            "nvscibuf",
+            "nvsciipc"
+        ]
         native.cc_library(
             name = "nvscisync",
             hdrs = nvsci_hdrs,
             srcs = native.glob([nvsci_so_path("nvscisync", family)]),
-            deps = ["nvrm_host1x"] + ["nvrm_chip"] + ["nvos"] + ["nvscicommon"] + ["nvscibuf"] + ["nvsciipc"],
+            deps = select({
+                "@com_nvidia_gxf//engine/build:platform_jetpack60": nvscisync_tegra_dependencies + ["nvtegrahv"],
+                "@com_nvidia_gxf//engine/build:platform_hp21ea_sbsa": nvscisync_tegra_dependencies + ["nvtegrahv"],
+                "@com_nvidia_gxf//engine/build:platform_jetpack61": nvscisync_tegra_dependencies + ["nvtegrahv"],
+                "@com_nvidia_gxf//engine/build:platform_hp21ga_sbsa": nvscisync_tegra_dependencies + ["nvtegrahv"],
+                "//conditions:default": nvscisync_tegra_dependencies,
+            }),
             strip_include_prefix = "usr/include",
             linkopts = [
                 "-Wl,--no-as-needed," +
@@ -174,13 +189,14 @@ def nvsci_device_deps(family):
 # Selects the correct version of `target` based on the current platform
 def _nvsci_select(target):
     return select({
-        "//conditions:default": ["@nvsci_x86_64//:" + target],
-        "//engine/build:platform_x86_64_cuda_11_8": ["@nvsci_x86_64_cuda_11_8//:" + target],
-        "//engine/build:platform_x86_64_cuda_12_1": ["@nvsci_x86_64_cuda_12_1//:" + target],
-        "//engine/build:platform_hp11_sbsa": ["@nvsci_aarch64_hp11_sbsa//:" + target],
-        "//engine/build:platform_hp20_sbsa": ["@nvsci_aarch64_hp20_sbsa//:" + target],
+        "//conditions:default": ["@nvsci_x86_64_cuda_12_2//:" + target],
+        "//engine/build:platform_x86_64_cuda_12_2": ["@nvsci_x86_64_cuda_12_2//:" + target],
+        "//engine/build:platform_x86_64_cuda_12_6": ["@nvsci_x86_64_cuda_12_6//:" + target],
+        "//engine/build:platform_x86_64_rhel9_cuda_12_2": ["@nvsci_x86_64_cuda_12_2//:" + target],
         "//engine/build:platform_hp21ea_sbsa": ["@nvsci_aarch64_hp21ea_sbsa//:" + target],
-        "//engine/build:platform_jetpack51": ["@nvsci_aarch64_jetpack51//:" + target],
+        "//engine/build:platform_hp21ga_sbsa": ["@nvsci_aarch64_hp21ga_sbsa//:" + target],
+        "//engine/build:platform_jetpack60": ["@nvsci_aarch64_jetpack60//:" + target],
+        "//engine/build:platform_jetpack61": ["@nvsci_aarch64_jetpack61//:" + target],
     })
 
 # Creates all nvsci related dependencies for the current platform
@@ -198,72 +214,64 @@ def clean_dep(dep):
 def nvsci_workspace():
     """Loads external dependencies required to build apps"""
 
-    # Debian package is obtained from  //netapp39/linuxbuilds/daily/Embedded/BuildBrain/Desktop/x86-lin64//stage-main/1316/nvsci_pkg_x86_64_stage-main_20230124_32411046.deb
-    local_archive(
-        name = "nvsci_x86_64",
-        build_file = clean_dep("//third_party:nvsci_x86_64.BUILD"),
-        src = "//third_party:nvsci_1.0_stage-main_20230124_32411046-x86_64.tar.xz",
+    # Debian package is obtained from  \\netapp39\linuxbuilds\daily\Embedded\BuildBrain\Desktop\x86-lin64\rel-36
+    nv_gxf_http_archive(
+        name = "nvsci_x86_64_cuda_12_2",
+        build_file = clean_dep("//third_party:nvsci_x86_64_cuda_12_2.BUILD"),
+        sha256 = "51ce61eb91a8bfffed690f6f2d55e93ae9cadb63b263993a9264ef70fa6689b4",
+        url = "https://urm.nvidia.com/artifactory/sw-isaac-gxf-generic/dependencies/internal/nvsci_cuda_12_2_x86_64_rel-36_20230807_34016753-xz.xz",
+        type = "tar.xz",
+        licenses = [""],
     )
 
-    local_archive(
-        name = "nvsci_x86_64_cuda_11_7",
-        build_file = clean_dep("//third_party:nvsci_x86_64_cuda_11_7.BUILD"),
-        src = "//third_party:nvsci_1.0_stage-main_20230124_32411046-x86_64.tar.xz",
+    # Debian package is obtained from \\netapp39\projects1\builds\release\Embedded\BuildBrain\Desktop\x86-lin64\rel-36\0003\nvsci_pkg_x86_64_rel-36_20240822_37344366.deb
+    nv_gxf_http_archive(
+        name = "nvsci_x86_64_cuda_12_6",
+        build_file = clean_dep("//third_party:nvsci_x86_64_cuda_12_6.BUILD"),
+        sha256 = "e82614e435a81d5a8d9e3c59c43cfa4375810ea87d4e57dba4cb1754507bed86",
+        url = "https://urm.nvidia.com/artifactory/sw-isaac-gxf-generic-local/dependencies/internal/nvsci/nvsci_36-x86_64-tar-xz",
+        type = "tar.xz",
+        licenses = [""],
     )
 
-    local_archive(
-        name = "nvsci_x86_64_cuda_11_8",
-        build_file = clean_dep("//third_party:nvsci_x86_64_cuda_11_8.BUILD"),
-        src = "//third_party:nvsci_1.0_stage-main_20230124_32411046-x86_64.tar.xz",
-    )
-
-    local_archive(
-        name = "nvsci_x86_64_cuda_12_1",
-        build_file = clean_dep("//third_party:nvsci_x86_64_cuda_12_1.BUILD"),
-        src = "//third_party:nvsci_1.0_stage-main_20230124_32411046-x86_64.tar.xz",
-    )
-
-    # Debian package is obtained from https://urm.nvidia.com/artifactory/sw-l4t-generic-local/nightly/rel-35/2023-03-27_0046/t186ref/customer_release.tbz2
-    # (customer_release.tbz2 -> t186ref_release_aarch64/Jetson_Linux_R35.1.0_aarch64.tbz2 -> Linux_for_Tegra/nv_tegra/l4t_deb_packages/nvidia-l4t-nvsci*.deb)
-    local_archive(
-        name = "nvsci_aarch64_jetpack50",
-        build_file = clean_dep("//third_party:nvsci_aarch64_jetpack50.BUILD"),
-        src = "//third_party:nvsci_2_4-arm64.tar.xz",
-    )
-
-    local_archive(
-        name = "nvsci_aarch64_jetpack502",
-        build_file = clean_dep("//third_party:nvsci_aarch64_jetpack502.BUILD"),
-        src = "//third_party:nvsci_2_4-arm64.tar.xz",
-    )
-
-    # Debian package is obtained from https://urm.nvidia.com/artifactory/sw-l4t-generic-local/nightly/rel-35/2023-03-27_0046/t186ref/customer_release.tbz2
-    # (customer_release.tbz2 -> t186ref_release_aarch64/Jetson_Linux_R35.1.0_aarch64.tbz2 -> Linux_for_Tegra/nv_tegra/l4t_deb_packages/nvidia-l4t-nvsci*.deb)
-    local_archive(
-        name = "nvsci_aarch64_hp11_sbsa",
-        build_file = clean_dep("//third_party:nvsci_aarch64_hp11_sbsa.BUILD"),
-        src = "//third_party:nvsci_2_4-arm64.tar.xz",
-    )
-
-    # Debian package is obtained from https://urm.nvidia.com/artifactory/sw-l4t-generic-local/nightly/rel-35/2023-03-27_0046/t186ref/customer_release.tbz2
-    # (customer_release.tbz2 -> t186ref_release_aarch64/Jetson_Linux_R35.1.0_aarch64.tbz2 -> Linux_for_Tegra/nv_tegra/l4t_deb_packages/nvidia-l4t-nvsci*.deb)
-    local_archive(
-        name = "nvsci_aarch64_hp20_sbsa",
-        build_file = clean_dep("//third_party:nvsci_aarch64_hp20_sbsa.BUILD"),
-        #sha256 = "4880ce772ab4a95ff7faa343e603872f282e8298f65169abd22bbed3dea24ac4",
-        src = "//third_party:nvsci_2_4-arm64.tar.xz",
-    )
-
-    # Debian package is obtained from https://urm.nvidia.com/artifactory/sw-l4t-generic-local/nightly/rel-35/2023-03-27_0046/t186ref/customer_release.tbz2
-    # (customer_release.tbz2 -> t186ref_release_aarch64/Jetson_Linux_R35.1.0_aarch64.tbz2 -> Linux_for_Tegra/nv_tegra/l4t_deb_packages/nvidia-l4t-nvsci*.deb)
-    local_archive(
+    #//linux4tegra/l4t/Releases/Engineering Releases/ER-2023-07-27_rel-36/generic/customer_release.tbz2 (generic_release_aarch64 ->
+    # Jetson_Linux_R36.0.0_aarch64.tbz2 -> Linux_for_Tegra -> nv_tegra -> l4t_deb_packages -> nvidia-l4t-nvsci_36.0.0-20230727103555_arm64.deb)
+    nv_gxf_http_archive(
         name = "nvsci_aarch64_hp21ea_sbsa",
         build_file = clean_dep("//third_party:nvsci_aarch64_hp21ea_sbsa.BUILD"),
-        src = "//third_party:nvsci_2_4-arm64.tar.xz",
+        sha256 = "87302dd326e20d70c79d283ea69148c84dd0a3658014e10f25d72a9063b6b916",
+        url = "https://urm.nvidia.com/artifactory/sw-isaac-gxf-generic-local/dependencies/internal/nvsci/nvsci_arm64-linux-36.0.0-20230727103555-xz.xz",
+        type = "tar.xz",
+        licenses = [""],
     )
 
-    local_archive(
-        name = "nvsci_aarch64_jetpack51",
-        build_file = clean_dep("//third_party:nvsci_aarch64_jetpack51.BUILD"),
-        src = "//third_party:nvsci_2_4-arm64.tar.xz",
+    nv_gxf_http_archive(
+        name = "nvsci_aarch64_hp21ga_sbsa",
+        build_file = clean_dep("//third_party:nvsci_aarch64_hp21ga_sbsa.BUILD"),
+        sha256 = "87302dd326e20d70c79d283ea69148c84dd0a3658014e10f25d72a9063b6b916",
+        url = "https://urm.nvidia.com/artifactory/sw-isaac-gxf-generic-local/dependencies/internal/nvsci/nvsci_arm64-linux-36.0.0-20230727103555-xz.xz",
+        type = "tar.xz",
+        licenses = [""],
+    )
+
+    #//linux4tegra/l4t/Releases/Engineering Releases/ER-2023-07-27_rel-36/generic/customer_release.tbz2 (generic_release_aarch64 ->
+    # Jetson_Linux_R36.0.0_aarch64.tbz2 -> Linux_for_Tegra -> nv_tegra -> l4t_deb_packages -> nvidia-l4t-nvsci_36.0.0-20230727103555_arm64.deb)
+    nv_gxf_http_archive(
+        name = "nvsci_aarch64_jetpack60",
+        build_file = clean_dep("//third_party:nvsci_aarch64_jetpack60.BUILD"),
+        sha256 = "87302dd326e20d70c79d283ea69148c84dd0a3658014e10f25d72a9063b6b916",
+        url = "https://urm.nvidia.com/artifactory/sw-isaac-gxf-generic-local/dependencies/internal/nvsci/nvsci_arm64-linux-36.0.0-20230727103555-xz.xz",
+        type = "tar.xz",
+        licenses = [""],
+    )
+
+    #//linux4tegra/l4t/Releases/Engineering Releases/ER-2024-08-16_rel-36/generic/customer_release.tbz2 (generic_release_aarch64 ->
+    # Jetson_Linux_R36.4.0_aarch64.tbz2 -> Linux_for_Tegra -> nv_tegra -> l4t_deb_packages -> nvidia-l4t-nvsci_36.4.0-20240816120710_arm64.deb)
+    nv_gxf_http_archive(
+        name = "nvsci_aarch64_jetpack61",
+        build_file = clean_dep("//third_party:nvsci_aarch64_jetpack61.BUILD"),
+        sha256 = "3a6fbffcee9b3399a33b2bc98022ec8dc205c3570c789f24a3dc171361e0222c",
+        url = "https://urm.nvidia.com/artifactory/sw-isaac-gxf-generic-local/dependencies/internal/nvsci/nvsci_arm64-linux-36.4.0-20240816120710-xz.xz",
+        type = "tar.xz",
+        licenses = [""],
     )

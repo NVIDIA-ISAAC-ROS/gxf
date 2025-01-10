@@ -26,7 +26,7 @@ class SystemGroup : public System {
   gxf_result_t runAsync_abi() override;
   gxf_result_t stop_abi() override;
   gxf_result_t wait_abi() override;
-  gxf_result_t event_notify_abi(gxf_uid_t eid) override;
+  gxf_result_t event_notify_abi(gxf_uid_t eid, gxf_event_t event) override;
 
   // Adds a system to the group
   Expected<void> addSystem(Handle<System> system);

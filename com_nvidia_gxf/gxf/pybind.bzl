@@ -32,7 +32,7 @@ def pybind_library(name, cc_hdrs = [], cc_srcs = [], cc_deps = [], py_srcs = [],
         copts = ["-Wno-unused-function"],
         # Provides dependency of Python2.7@TX2 when compiling for AARCH64.
         # Defaults to host Python2.
-        deps = cc_deps + filtered_deps + ["@pybind11"] + ["//third_party:python"],
+        deps = cc_deps + filtered_deps + ["@pybind11"] + ["@com_nvidia_gxf//third_party:python"],
     )
     native.cc_binary(
         name = so_name,

@@ -1,0 +1,16 @@
+License: Copyright (c) 2024, NVIDIA CORPORATION. All rights reserved. \
+ NVIDIA Corporation and its licensors retain all intellectual property \
+ and proprietary rights in and to this software, related documentation \
+ and any modifications thereto.  Any use, reproduction, disclosure or \
+ distribution of this software and related documentation without an express \
+ license agreement from NVIDIA Corporation is strictly prohibited.
+Package: graph-composer
+Version: 4.1.0
+Section: custom
+Priority: standard
+Architecture: amd64
+Essential: no
+Installed-Size: 864576
+Maintainer: nvidia.com
+Description: NVIDIA Graph Tools
+Depends: rsync (=3.2.7-0ubuntu0.22.04.2), libyaml-cpp-dev (=0.7.0+dfsg-8build1), python3-yaml (=5.4.1-1ubuntu1), graph-composer-runtime (=4.1.0)

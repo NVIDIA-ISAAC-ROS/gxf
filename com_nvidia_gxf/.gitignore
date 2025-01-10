@@ -10,3 +10,7 @@ imgui.ini
 venv/
 **/__pycache__/
 */**/*.pyc
+gxf/**/tmp/*
+release_tarball
+.cache/
+compile_commands.json

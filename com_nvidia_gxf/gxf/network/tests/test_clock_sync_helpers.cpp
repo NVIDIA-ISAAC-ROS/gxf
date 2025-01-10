@@ -1,6 +1,5 @@
 /*
-Copyright (c) 2022-2023, NVIDIA CORPORATION. All rights reserved.
-
+Copyright (c) 2022-2024, NVIDIA CORPORATION. All rights reserved.
 NVIDIA CORPORATION and its licensors retain all intellectual property
 and proprietary rights in and to this software, related documentation
 and any modifications thereto. Any use, reproduction, disclosure or
@@ -9,7 +8,7 @@ license agreement from NVIDIA CORPORATION is strictly prohibited.
 */
 #include "gxf/network/tests/test_clock_sync_helpers.hpp"
 
-#include "gxf/std/parameter_parser_std.hpp"
+#include "gxf/core/parameter_parser_std.hpp"
 
 namespace nvidia {
 namespace gxf {
@@ -52,6 +51,7 @@ gxf_result_t ClockChecker::tick() {
   if (synthetic_clock_->timestamp() != *iter_++) {
     // fail if clock timestamp does not match user input
     const auto pv = std::prev(iter_, 1);
+    (void)pv;  // avoid unused variable warning
     GXF_LOG_ERROR("synthetic_clock_->timestamp() did not match expected %ldns.", *pv);
     return GXF_FAILURE;
   }

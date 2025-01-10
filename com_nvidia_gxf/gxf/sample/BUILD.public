@@ -1,5 +1,5 @@
 """
- SPDX-FileCopyrightText: Copyright (c) 2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ SPDX-FileCopyrightText: Copyright (c) 2022-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  SPDX-License-Identifier: Apache-2.0
 
  Licensed under the Apache License, Version 2.0 (the "License");
@@ -22,10 +22,18 @@ cc_library(
     name = "SampleExtension",
     hdrs = [
         "ping_rx.hpp",
+        "ping_rx_async.hpp",
         "ping_tx.hpp",
+        "ping_tx_async.hpp",
         "ping_batch_rx.hpp",
         "hello_world.hpp",
     ],
     include_prefix = "gxf/sample",
     visibility = ["//visibility:public"],
 )
+
+exports_files(
+    glob(include = ["*"]),
+    visibility = ["//visibility:public"],
+)
+

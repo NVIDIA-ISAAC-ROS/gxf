@@ -1,5 +1,5 @@
 """
-Copyright (c) 2020-2023, NVIDIA CORPORATION. All rights reserved.
+Copyright (c) 2020-2024, NVIDIA CORPORATION. All rights reserved.
 
 NVIDIA CORPORATION and its licensors retain all intellectual property
 and proprietary rights in and to this software, related documentation
@@ -47,12 +47,15 @@ nv_gxf_cc_library(
     name = "cuda_lib",
     visibility = ["//visibility:public"],
     deps = [
+        "cuda_buffer",
         "cuda_common",
         "cuda_event",
         "cuda_stream",
         "cuda_stream_id",
         "cuda_stream_pool",
         "cuda_stream_sync",
+        "cuda_scheduling_terms",
+        "stream_ordered_allocator",
         "//gxf/core:gxf",
     ],
 )
@@ -68,14 +71,46 @@ nv_gxf_cc_extension(
 )
 
 nv_gxf_cc_library(
+    name = "stream_ordered_allocator",
+    srcs = ["stream_ordered_allocator.cpp"],
+    hdrs = ["stream_ordered_allocator.hpp"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "cuda_allocator",
+        "cuda_common",
+        "cuda_event",
+        "cuda_stream",
+        "cuda_stream_id",
+        "//gxf/core:gxf",
+    ],
+)
+
+nv_gxf_cc_library(
+    name = "cuda_buffer",
+    hdrs = ["cuda_buffer.hpp"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "cuda_allocator",
+        "cuda_common",
+        "cuda_event",
+        "cuda_stream_pool",
+        "cuda_stream_id",
+        "//gxf/core:gxf",
+        "//gxf/std:memory_buffer",
+    ],
+)
+
+nv_gxf_cc_library(
     name = "cuda_stream",
     srcs = ["cuda_stream.cpp"],
     hdrs = ["cuda_stream.hpp"],
     visibility = ["//visibility:public"],
     deps = [
+        "cuda_allocator",
         "cuda_common",
         "cuda_event",
-        "//gxf/core:gxf_cpp_api",
+        "cuda_stream_id",
+        "//gxf/core:gxf",
     ],
 )
 
@@ -143,6 +178,32 @@ nv_gxf_cc_library(
     ],
 )
 
+nv_gxf_cc_library(
+    name = "cuda_allocator",
+    hdrs = ["cuda_allocator.hpp"],
+    srcs = ["cuda_allocator.cpp"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//gxf/std:allocator",
+        "//gxf/core:gxf_cpp_api",
+        "//gxf/std/gems/utils:storage_size",
+        "//third_party:cudart",
+    ],
+)
+
+nv_gxf_cc_library(
+    name = "cuda_scheduling_terms",
+    srcs = ["cuda_scheduling_terms.cpp"],
+    hdrs = ["cuda_scheduling_terms.hpp"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "cuda_buffer",
+        "cuda_stream_id",
+        "cuda_stream_pool",
+        "//gxf/core:gxf",
+    ],
+)
+
 load("//registry/build:registry.bzl", "register_extension")
 
 exports_files(["LICENSE"])
@@ -152,9 +213,11 @@ register_extension(
     badges = [""],
     extension = "cuda",
     uuid = "d63a98fa-7882-11eb-a917-b38f664f399c",
-    version = "2.3.0",
+    version = "2.6.0",
     headers = [
         "BUILD.public",
+        "cuda_allocator.hpp",
+        "cuda_buffer.hpp",
         "cuda_common.hpp",
         "cuda_event.hpp",
         "cuda_stream.hpp",

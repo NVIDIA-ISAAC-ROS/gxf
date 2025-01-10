@@ -1,5 +1,5 @@
 """
- SPDX-FileCopyrightText: Copyright (c) 2020-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ SPDX-FileCopyrightText: Copyright (c) 2020-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  SPDX-License-Identifier: Apache-2.0
 
  Licensed under the Apache License, Version 2.0 (the "License");
@@ -32,12 +32,13 @@ cc_library(
         selects.with_or({
             "@com_nvidia_gxf//engine/build:windows": [],
             "@com_nvidia_gxf//engine/build:windows_msvc": [],
-            ("@com_nvidia_gxf//engine/build:platform_hp11_sbsa",
-             "@com_nvidia_gxf//engine/build:platform_hp20_sbsa",
-             "@com_nvidia_gxf//engine/build:platform_hp21ea_sbsa",
-             "@com_nvidia_gxf//engine/build:platform_jetpack51",
-             "@com_nvidia_gxf//engine/build:platform_x86_64_cuda_11_8",
-             "@com_nvidia_gxf//engine/build:platform_x86_64_cuda_12_1") : [ "-pthread"],
+            ("@com_nvidia_gxf//engine/build:platform_hp21ea_sbsa",
+             "@com_nvidia_gxf//engine/build:platform_hp21ga_sbsa",
+             "@com_nvidia_gxf//engine/build:platform_jetpack60",
+             "@com_nvidia_gxf//engine/build:platform_jetpack61",
+             "@com_nvidia_gxf//engine/build:platform_x86_64_cuda_12_2",
+             "@com_nvidia_gxf//engine/build:platform_x86_64_cuda_12_6",
+             "@com_nvidia_gxf//engine/build:platform_x86_64_rhel9_cuda_12_2") : [ "-pthread"],
         }),
     visibility = ["//visibility:public"],
     linkstatic=True,
@@ -58,12 +59,13 @@ cc_library(
         selects.with_or({
             "@com_nvidia_gxf//engine/build:windows": [],
             "@com_nvidia_gxf//engine/build:windows_msvc": [],
-            ("@com_nvidia_gxf//engine/build:platform_hp11_sbsa",
-             "@com_nvidia_gxf//engine/build:platform_hp20_sbsa",
-             "@com_nvidia_gxf//engine/build:platform_hp21ea_sbsa",
-             "@com_nvidia_gxf//engine/build:platform_jetpack51",
-             "@com_nvidia_gxf//engine/build:platform_x86_64_cuda_11_8",
-             "@com_nvidia_gxf//engine/build:platform_x86_64_cuda_12_1") : [ "-pthread"],
+            ("@com_nvidia_gxf//engine/build:platform_hp21ea_sbsa",
+             "@com_nvidia_gxf//engine/build:platform_hp21ga_sbsa",
+             "@com_nvidia_gxf//engine/build:platform_jetpack60",
+             "@com_nvidia_gxf//engine/build:platform_jetpack61",
+             "@com_nvidia_gxf//engine/build:platform_x86_64_cuda_12_2",
+             "@com_nvidia_gxf//engine/build:platform_x86_64_cuda_12_6",
+             "@com_nvidia_gxf//engine/build:platform_x86_64_rhel9_cuda_12_2") : [ "-pthread"],
         }),
     visibility = ["//visibility:public"],
     linkstatic=True,

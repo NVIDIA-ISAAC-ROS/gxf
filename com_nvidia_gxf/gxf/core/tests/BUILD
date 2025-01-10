@@ -1,5 +1,5 @@
 """
-Copyright (c) 2020-2023, NVIDIA CORPORATION. All rights reserved.
+Copyright (c) 2020-2024, NVIDIA CORPORATION. All rights reserved.
 
 NVIDIA CORPORATION and its licensors retain all intellectual property
 and proprietary rights in and to this software, related documentation
@@ -7,6 +7,8 @@ and any modifications thereto. Any use, reproduction, disclosure or
 distribution of this software and related documentation without an express
 license agreement from NVIDIA CORPORATION is strictly prohibited.
 """
+
+load("//gxf:gxf.bzl", "nv_gxf_cc_test")
 
 cc_test(
     name = "test_entity",
@@ -754,6 +756,19 @@ cc_test(
 )
 
 cc_test(
+    name = "test_gxf_core_GxfComponentIsBase",
+    srcs = ["test_gxf_core_GxfComponentIsBase.cpp"],
+    data = [
+        "//gxf/gxe:manifest",
+        "//gxf/std",
+    ],
+    deps = [
+        "//gxf/core:gxf",
+        "@gtest//:main",
+    ],
+)
+
+cc_test(
     name = "test_gxf_core_GxfExtensionInfo",
     srcs = ["test_gxf_core_GxfExtensionInfo.cpp"],
     data = [
@@ -820,9 +835,46 @@ cc_test(
     ],
 )
 
+nv_gxf_cc_test(
+    name = "test_gxf_core_GxfComponentAddAndGetPtr",
+    srcs = ["test_gxf_core_GxfComponentAddAndGetPtr.cpp"],
+    data = [
+        "//gxf/gxe:manifest",
+    ],
+    deps = [
+        "//gxf/core:gxf",
+        "@gtest//:main",
+    ],
+)
+
+nv_gxf_cc_test(
+    name = "test_gxf_core_GxfEntityItemPtr",
+    srcs = ["test_gxf_core_GxfEntityItemPtr.cpp"],
+    data = [
+        "//gxf/gxe:manifest",
+    ],
+    deps = [
+        "//gxf/core:entity_item",
+        "//gxf/core:gxf",
+        "@gtest//:main",
+    ],
+)
+
 cc_test(
     name = "test_gxf_core_GxfComponentFind",
     srcs = ["test_gxf_core_GxfComponentFind.cpp"],
+    data = [
+        "//gxf/gxe:manifest",
+    ],
+    deps = [
+        "//gxf/core:gxf",
+        "@gtest//:main",
+    ],
+)
+
+nv_gxf_cc_test(
+    name = "test_gxf_core_GxfComponentFindAndGetPtr",
+    srcs = ["test_gxf_core_GxfComponentFindAndGetPtr.cpp"],
     data = [
         "//gxf/gxe:manifest",
     ],
@@ -859,6 +911,18 @@ cc_test(
 cc_test(
     name = "test_gxf_core_GxfParameterGetStr",
     srcs = ["test_gxf_core_GxfParameterGetStr.cpp"],
+    data = [
+        "//gxf/gxe:manifest",
+    ],
+    deps = [
+        "//gxf/core:gxf",
+        "@gtest//:main",
+    ],
+)
+
+nv_gxf_cc_test(
+    name = "test_gxf_core_GxfEntityGetName",
+    srcs = ["test_gxf_core_GxfEntityGetName.cpp"],
     data = [
         "//gxf/gxe:manifest",
     ],
@@ -976,6 +1040,16 @@ cc_test(
     ],
 )
 
+nv_gxf_cc_test(
+    name = "test_gxf_core_GxfCreateEntityAndGetItem",
+    srcs = ["test_gxf_core_GxfCreateEntityAndGetItem.cpp"],
+    deps = [
+        "//gxf/core:gxf",
+        "@gtest//:main",
+        "//common"
+    ],
+)
+
 cc_test(
     name = "test_gxf_core_GxfUpdateEntityGroup",
     srcs = ["test_gxf_core_GxfUpdateEntityGroup.cpp"],
@@ -1043,6 +1117,140 @@ cc_test(
 cc_test(
     name = "test_gxf_core_GxfEntityRefCountDec",
     srcs = ["test_gxf_core_GxfEntityRefCountDec.cpp"],
+    data = [
+        "//gxf/gxe:manifest",
+    ],
+    deps = [
+        "//gxf/core:gxf",
+        "@gtest//:main",
+    ],
+)
+
+nv_gxf_cc_test(
+    name = "test_gxf_core_GxfEntityGetRefCount",
+    srcs = ["test_gxf_core_GxfEntityGetRefCount.cpp"],
+    data = [
+        "//gxf/gxe:manifest",
+    ],
+    deps = [
+        "//gxf/core:gxf",
+        "@gtest//:main",
+    ],
+)
+
+cc_test(
+    name = "test_api_GxfComponentRemoveParam1DFloat64",
+    srcs = ["test_api_GxfComponentRemoveParam1DFloat64.cpp"],
+    data = [
+        "//gxf/gxe:manifest",
+    ],
+    deps = [
+        "//gxf/core:gxf",
+        "@gtest//:main",
+    ],
+)
+
+cc_test(
+    name = "test_api_GxfComponentRemoveParam1DFloat64Info",
+    srcs = ["test_api_GxfComponentRemoveParam1DFloat64Info.cpp"],
+    data = [
+        "//gxf/gxe:manifest",
+    ],
+    deps = [
+        "//gxf/core:gxf",
+        "@gtest//:main",
+    ],
+)
+
+cc_test(
+    name = "test_gxf_core_GxfComponentRemove",
+    srcs = ["test_gxf_core_GxfComponentRemove.cpp"],
+    data = [
+        "//gxf/gxe:manifest",
+    ],
+    deps = [
+        "//gxf/core:gxf",
+        "@gtest//:main",
+    ],
+)
+
+cc_test(
+    name = "test_gxf_core_GxfComponentRemoveEntityActivate",
+    srcs = ["test_gxf_core_GxfComponentRemoveEntityActivate.cpp"],
+    data = [
+        "test_ping_dynamic_activation.yaml",
+        "//gxf/gxe:manifest",
+    ],
+    deps = [
+        "//gxf/core:gxf",
+        "@gtest//:main",
+    ],
+)
+
+cc_test(
+    name = "test_gxf_core_GxfComponentRemoveEntityDeactivate",
+    srcs = ["test_gxf_core_GxfComponentRemoveEntityDeactivate.cpp"],
+    data = [
+        "test_ping_dynamic_activation.yaml",
+        "//gxf/gxe:manifest",
+    ],
+    deps = [
+        "//gxf/core:gxf",
+        "@gtest//:main",
+    ],
+)
+
+cc_test(
+    name = "test_gxf_core_GxfComponentRemoveGraphActivate",
+    srcs = ["test_gxf_core_GxfComponentRemoveGraphActivate.cpp"],
+    data = [
+        "//gxf/gxe:manifest",
+    ],
+    deps = [
+        "//gxf/core:gxf",
+        "@gtest//:main",
+    ],
+)
+
+cc_test(
+    name = "test_gxf_core_GxfComponentRemoveGraphDeactivate",
+    srcs = ["test_gxf_core_GxfComponentRemoveGraphDeactivate.cpp"],
+    data = [
+        "//gxf/gxe:manifest",
+    ],
+    deps = [
+        "//gxf/core:gxf",
+        "@gtest//:main",
+    ],
+)
+
+cc_test(
+    name = "test_gxf_core_GxfComponentRemoveParamBool",
+    srcs = ["test_gxf_core_GxfComponentRemoveParamBool.cpp"],
+    data = [
+        "//gxf/gxe:manifest",
+    ],
+    deps = [
+        "//gxf/core:gxf",
+        "@gtest//:main",
+    ],
+)
+
+cc_test(
+    name = "test_gxf_core_GxfComponentRemoveParamFloat32",
+    srcs = ["test_gxf_core_GxfComponentRemoveParamFloat32.cpp"],
+    data = [
+        "//gxf/gxe:manifest",
+    ],
+    deps = [
+        "//gxf/core:gxf",
+        "@gtest//:main",
+    ],
+)
+
+cc_test(
+    name = "test_gxf_core_GxfComponentRemoveParamHandle",
+    srcs = ["test_gxf_core_GxfComponentRemoveParamHandle.cpp"],
     data = [
         "//gxf/gxe:manifest",
     ],

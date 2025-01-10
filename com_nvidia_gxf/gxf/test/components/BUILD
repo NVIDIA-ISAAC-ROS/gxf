@@ -24,7 +24,6 @@ nv_gxf_cc_library(
     name = "components",
     visibility = ["//visibility:public"],
     deps = [
-        "camera_message_generator",
         "entity_monitor",
         "mock_allocator",
         "mock_codelet",
@@ -107,21 +106,6 @@ nv_gxf_cc_library(
     deps = [
         "//common",
         "//gxf/core:gxf",
-        "//gxf/std",
-        "//third_party:cudart",
-        "@yaml-cpp",
-    ],
-)
-
-nv_gxf_cc_library(
-    name = "camera_message_generator",
-    srcs = ["camera_message_generator.cpp"],
-    hdrs = ["camera_message_generator.hpp"],
-    deps = [
-        "//common",
-        "//gxf/core:gxf",
-        "//gxf/messages:camera_message",
-        "//gxf/multimedia",
         "//gxf/std",
         "//third_party:cudart",
         "@yaml-cpp",

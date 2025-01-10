@@ -1,5 +1,5 @@
 """
-Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
+Copyright (c) 2022-2023, NVIDIA CORPORATION. All rights reserved.
 
 NVIDIA CORPORATION and its licensors retain all intellectual property
 and proprietary rights in and to this software, related documentation
@@ -18,7 +18,8 @@ nv_gxf_cc_extension(
     srcs = ["test_extension.cpp"],
     deps = [
        "//common",
-        "//gxf/core:libgxf_core.so",
+       "//gxf/std:extension_factory_helper",
+       "//gxf/core:gxf",
     ],
     ext_deps = ["//gxf/std"],
 )

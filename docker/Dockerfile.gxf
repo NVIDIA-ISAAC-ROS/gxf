@@ -1,63 +1,66 @@
-# Copyright (c) 2021, NVIDIA CORPORATION.  All rights reserved.
-#
+#####################################################################################
+# Copyright (c) 2020-2024, NVIDIA CORPORATION. All rights reserved.
+
 # NVIDIA CORPORATION and its licensors retain all intellectual property
 # and proprietary rights in and to this software, related documentation
-# and any modifications thereto.  Any use, reproduction, disclosure or
+# and any modifications thereto. Any use, reproduction, disclosure or
 # distribution of this software and related documentation without an express
 # license agreement from NVIDIA CORPORATION is strictly prohibited.
-#
-# Docker file to build Isaac ROS - GXF Extensions on x86_64
+#####################################################################################
+# Full GXF build environment for development activities.
 
-ARG BASE_IMAGE=nvidia/cuda:11.6.1-devel-ubuntu20.04
+# Use cuda-12.6 base image
+ARG BASE_IMAGE=nvcr.io/nvidia/cuda:12.6.0-devel-ubuntu22.04
 FROM ${BASE_IMAGE}
-
-# non-root user name
-ARG USERNAME=admin
 
 # disable terminal interaction for apt
 ENV DEBIAN_FRONTEND=noninteractive
 
-# GXF fundamentals
+# wget: for vulkan and cudnn download
 # apt-utils: https://github.com/phusion/baseimage-docker/issues/319
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    apt-utils \
-&& rm -rf /var/lib/apt/lists/* \
-&& apt-get clean
+# aha, rsync, xz-utils: Install AHA utility to prepare HTML reports from the test results
+
+RUN --mount=type=cache,target=/var/cache/apt \
+    apt-get update && apt-get install -y --no-install-recommends wget git apt-utils aha \
+    rsync xz-utils lsb-release software-properties-common ssh
 
 # Configure the build for CUDA configuration
-ENV LD_LIBRARY_PATH /usr/local/cuda/extras/CUPTI/lib64:$LD_LIBRARY_PATH
+ENV LD_LIBRARY_PATH=/usr/local/cuda/extras/CUPTI/lib64:$LD_LIBRARY_PATH
 
-# Copy script into image
-RUN mkdir -p /opt/nvidia/gxf
-COPY scripts/install_dependencies.sh /opt/nvidia/gxf
+# Install nsight systems to help profile applications
+RUN --mount=type=cache,target=/var/cache/apt \
+if [ "$(uname -m)" = "x86_64" ]; then \
+    apt-get update && apt-get install -y \
+        cuda-nsight-systems-12-6 libnvidia-compute-560:amd64 ; \
+fi
 
-RUN mkdir -p /opt/nvidia/gxf/engine/build/scripts
-COPY scripts/registry_requirements.txt /opt/nvidia/gxf/engine/build/scripts/registry_requirements.txt
-COPY scripts/requirements.txt /opt/nvidia/gxf/engine/build/scripts/requirements.txt
 
-## Install GXF dependencies
-RUN echo 'debconf debconf/frontend select Noninteractive' | debconf-set-selections && \
-    pushd . >/dev/null && \
-    cd /opt/nvidia/gxf && \
-    sudo -u ${USERNAME} /usr/bin/python3 -m pip install --upgrade pip && \
-    sudo -u ${USERNAME} /opt/nvidia/gxf/install_dependencies.sh && \
-    popd \
-&& rm -rf /var/lib/apt/lists/* \
-&& apt-get clean
+# Install SDK dependencies
+ADD scripts/install_dependencies.sh engine/build/scripts/
+ADD scripts/requirements.txt engine/build/scripts/
+ADD scripts/registry_requirements.txt engine/build/scripts/
+RUN --mount=type=cache,target=/var/cache/apt \
+if [ "$(uname -m)" = "x86_64" ]; then \
+    apt update && engine/build/scripts/install_dependencies.sh ; \
+fi
 
-# Install ngc.
-RUN curl -s -L https://ngc.nvidia.com/downloads/ngccli_bat_linux.zip -o ngccli_bat_linux.zip \
-    && unzip -o ngccli_bat_linux.zip \
-    && chmod +x ngc-cli \
-    && mv ngc-cli /usr/local/bin/ \
-    && rm ngccli_bat_linux.zip
+RUN --mount=type=cache,target=/var/cache/apt \
+    apt update && apt install -y python3.10 python3-venv python3-pip python3.10-venv
+RUN update-alternatives --install /usr/bin/python python /usr/bin/python3.10 1
 
-# scripts/update_isaac_ros_nitros_ws_tarball.sh
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    patchelf \
-&& rm -rf /var/lib/apt/lists/* \
-&& apt-get clean
+# Install cupy 12.6 from whl file
+RUN --mount=type=cache,target=/var/cache/apt \
+if [ "$(uname -m)" = "x86_64" ]; then \
+    apt update && \
+    pip3 install "https://github.com/cupy/cupy/releases/download/v13.3.0/cupy_cuda12x-13.3.0-cp310-cp310-manylinux2014_x86_64.whl" ; \
+fi
 
-# Forcibly downgrade setuptools to version required by ROS 2
-# https://github.com/pypa/setuptools/issues/3772
-RUN sudo -u ${USERNAME} /usr/bin/python3 -m pip install --force-reinstall setuptools==65.7.0
+# Set cache dir in /tmp/ since we dont have access to {$HOME} in CI
+ENV CUPY_CACHE_DIR=/tmp/cupy_cuda_12_6/
+
+RUN --mount=type=cache,target=/var/cache/apt \
+    add-apt-repository -y ppa:deadsnakes/ppa && apt update && apt install -y python3.10 python3-venv python3.10-venv
+
+COPY docker_entrypoint.sh /
+ENTRYPOINT ["/docker_entrypoint.sh"]
+CMD ["/bin/bash"]

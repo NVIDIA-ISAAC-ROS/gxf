@@ -1,4 +1,4 @@
-# Copyright (c) 2020-2023, NVIDIA CORPORATION.  All rights reserved.
+# Copyright (c) 2020-2024, NVIDIA CORPORATION.  All rights reserved.
 #
 # NVIDIA CORPORATION and its licensors retain all intellectual property
 # and proprietary rights in and to this software, related documentation
@@ -42,6 +42,7 @@ from registry.core.utils import (PlatformConfig, ComputeConfig, TargetConfig, uu
                                  ExtensionRecord, Variant, get_ext_subdir, target_to_str)
 from registry.core.yaml_loader import YamlLoader
 from registry.core.version import GXF_CORE_COMPATIBLE_VERSION, REGISTRY_CORE_VERSION
+from registry.core.config import GRAPH_TARGETS_CONFIG
 
 WINDOWS = platform.system() == "Windows"
 logger = log.get_logger("Registry")
@@ -72,13 +73,13 @@ class RegistryCore:
             raise OSError (errno.EIO,"Failed to create registry cache directory")
 
         # Setup registry lock
-        self._lock = path.join(self._cache_path(), "nvgraph.registry.lock")
+        self._lock = path.join(self._cache_path(), "gxf.registry.lock")
         self._lock_fd = None
         if platform.system() == "Linux" and not self._acquire_lock():
             raise OSError(errno.EIO, "Failed to acquire lock")
 
         # Setup utility helpers
-        self._db = DatabaseManager(os.path.join(self._cache_path(), "nvgraph.db"))
+        self._db = DatabaseManager(os.path.join(self._cache_path(), "gxf.db"))
         self._repo_mgr = RepositoryManager(self._config, self._db)
         self._dep_gov = DependencyGovernor(self._db)
         self._default_repo = LocalRepository("default", self._repo_path(), self._db)
@@ -136,7 +137,7 @@ class RegistryCore:
             .
         """
         if not metadata_file:
-            metadata_file = "/tmp/nvgraph_registry_meta.yaml"
+            metadata_file = "/tmp/gxf_registry_meta.yaml"
 
         manifest_file = self._cleanpath(manifest_file)
         manifest_node = self._yaml_loader.load_yaml(manifest_file)
@@ -571,7 +572,7 @@ class RegistryCore:
                 return False
 
             # LICENSE file is currently optional, copy if present
-            if path.exists(ext.license_file):
+            if ext.license_file and path.exists(ext.license_file):
                 if not self._default_repo.add_to_repo(ext.license_file, eid):
                     logger.error(f"Failed to add \"{ext.license_file}\" to default repo")
                     return False
@@ -647,7 +648,7 @@ class RegistryCore:
             logger.error("cache path cannot be empty")
             return False
 
-        new_cache_path = self._cleanpath(cache_path + "/nvgraph_registry/")
+        new_cache_path = self._cleanpath(cache_path + "/gxf_registry/")
 
         if os.path.exists(new_cache_path) and not os.path.isdir(new_cache_path):
             logger.error(f"Path {new_cache_path} exists and is not a directory, please remove it")
@@ -664,7 +665,7 @@ class RegistryCore:
         """ Get the path for the cache used by Registry
 
         Returns:
-            str: Path for Regsitry Cache
+            str: Path for Registry Cache
         """
 
         return self._config.get_cache_path()
@@ -903,7 +904,7 @@ class RegistryCore:
     def update_graph_dependencies(self, graphs: list):
         """ Update graph to the latest version of its dependencies.
         """
-        logger.info("Updating graph dependecies...")
+        logger.info("Updating graph dependencies...")
         latest_ext_versions = {}
         for ext in self._exts.values():
             latest_ext_versions[ext.uuid] = self._db.get_latest_ext_version(ext.name, ext.uuid)
@@ -987,11 +988,12 @@ class RegistryCore:
 
             ext_repo = self._db.get_extension_source_repo(ext)
             if ext_repo != "default":
-                logger.debug(f"Importing py srcs from ngc repo for {ext.name}")
-                result = self._repo_mgr.import_extension_py_srcs(ext_repo, dst_path, ext.uuid,
+                if ext.python_sources:
+                    logger.debug(f"Importing py srcs from ngc repo for {ext.name}")
+                    result = self._repo_mgr.import_extension_py_srcs(ext_repo, dst_path, ext.uuid,
                                                          ext.version, ext.name)
-                if not result:
-                    return None
+                    if not result:
+                        return None
                 logger.debug(f"Importing ext libs from ngc repo for {ext.name}")
                 result = self._repo_mgr.import_extension_variant(ext_repo, dst_path, ext.uuid,
                                                      ext.version, target_cfg)
@@ -1089,10 +1091,10 @@ class RegistryCore:
         """
 
         # Default path for extension contents inside an archive
-        in_export_dp = in_export_dp if in_export_dp is not None else "/opt/nvidia/nvgraph/"
+        in_export_dp = in_export_dp if in_export_dp is not None else "/opt/nvidia/gxf/"
 
         # Temporary staging area to build an archive
-        staging_path =  tempfile.mkdtemp(prefix="/tmp/nvgraph.")
+        staging_path =  tempfile.mkdtemp(prefix="/tmp/gxf.")
 
         # Install the graph to a staging area
         if not self.install_graph_with_dir(graph_paths, manifest_path, staging_path, in_export_dp, target_filepath, True):
@@ -1128,16 +1130,30 @@ class RegistryCore:
             manifest_path (str): Manifest file path
             output_path: Output directory path to copy the contents
             target_filepath(str): Graph target file path
+                                - might be file path or target key ['x86', 'aarch']
+                                  or target config (yaml) itself
 
         Returns:
             bool: True if graph installation is successful
         """
         # Use a tmp staging area to download all ngc extensions
-        staging_path = tempfile.mkdtemp(prefix= tempfile.gettempdir() + "//.nvgraph.")
+        staging_path = tempfile.mkdtemp(prefix= tempfile.gettempdir() + "//.gxf.")
         logger.debug(f"Installing graph in dir {staging_path}")
 
-        target_cfg = self._read_graph_target_file(target_filepath)
+        target_cfg = None
+        # if target path is specified
+        if os.path.exists(os.path.abspath(target_filepath)):
+            target_cfg = self._read_graph_target_file(target_filepath)
+        # if target cfg is directly passed
+        elif isinstance(target_filepath, TargetConfig):
+            target_cfg = target_filepath
+        # if target key ('x86','aarch') is passed
+        else:
+            target_cfg = self._get_target_config(target_filepath)
+
         if not target_cfg:
+            logger.error(f"Failed to get any target configs from {target_filepath}."\
+                         " Please pass the target keyword - x86 / aarch64")
             return None
 
         manifest_exts = self.install_graph(graph_paths, target_cfg)
@@ -1544,7 +1560,7 @@ class RegistryCore:
         distro = _get_str_if_exist(node["platform"], "distribution")
 
         if None in [os, arch, distro]:
-              logger.error("Invalid platfrom info in graph target file")
+              logger.error("Invalid platform info in graph target file")
               return None
         platform_cfg = PlatformConfig(arch, os, distro)
 
@@ -1560,6 +1576,45 @@ class RegistryCore:
             compute_cfg = None
 
         return TargetConfig(platform_cfg, compute_cfg)
+
+    def _get_target_config(self, target_key):
+        """
+        Given a target key ('x86', 'aarch'), return the TargetConfig.
+        """
+        self._target_configs = dict()
+        # read graph targets config if exists
+        nodes = YamlLoader().load_all(GRAPH_TARGETS_CONFIG)
+        for node in nodes:
+            _node = dict(node)
+            target = _node.get('target', None)
+            if not target:
+                logger.error('No Target Key found! Invalid config.'
+                             f'Please correct config in {GRAPH_TARGETS_CONFIG}')
+
+            if not "platform" in _node:
+                logger.error(f"Platform info missing in graph target file")
+                return None
+            os = dict(_node.get('platform', {})).get('os', None)
+            arch = dict(_node.get('platform', {})).get('arch', None)
+            distro = dict(_node.get('platform', {})).get('distribution', None)
+            if None in [os, arch, distro]:
+              logger.error("Invalid platform info in graph target file")
+              return None
+            platform_cfg = PlatformConfig(arch, os, distro)
+
+            if "compute" in _node:
+                cuda = dict(_node.get('compute', {})).get('cuda', None)
+                cudnn = dict(_node.get('compute', {})).get('cudnn', None)
+                tensorrt = dict(_node.get('compute', {})).get('tensorrt', None)
+                deepstream = dict(_node.get('compute', {})).get('deepstream', None)
+                triton = dict(_node.get('compute', {})).get('triton', None)
+                vpi = dict(_node.get('compute', {})).get('vpi', None)
+                compute_cfg = ComputeConfig(cuda, cudnn, tensorrt, deepstream, triton, vpi)
+            else:
+                compute_cfg = None
+
+            self._target_configs[target] = TargetConfig(platform_cfg, compute_cfg)
+        return self._target_configs.get(target_key, None)
 
     def _exts_to_map(self, exts):
         result = []

@@ -1,5 +1,5 @@
 """
- SPDX-FileCopyrightText: Copyright (c) 2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ SPDX-FileCopyrightText: Copyright (c) 2022-2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  SPDX-License-Identifier: Apache-2.0
 
  Licensed under the Apache License, Version 2.0 (the "License");
@@ -19,16 +19,17 @@ from gxf.std import Tensor
 from gxf.python_codelet import CodeletAdapter
 import numpy as np
 
+
 class VerifyTensor(CodeletAdapter):
     """ Python codelet to receive a msg on tick()
 
     Python implementation of TensorDescription.
-    Receives a message on the Reciever on every tick()
+    Receives a message on the Receiver on every tick()
     """
 
     def start(self):
         self.params = self.get_params()
-        self.rx = Receiver.get(self.context(), self.cid(), self.params[f"receiver0"])
+        self.rx = Receiver.get(self.context(), self.cid(), self.params["receiver0"])
         self.count = 0
 
     def tick(self):
@@ -49,9 +50,9 @@ class VerifyTensor(CodeletAdapter):
         assert(tensor0.get_tensor_description().shape.rank()==SHAPE_RANK)
         assert(tensor0.get_tensor_description().bytes_per_element==BYTES_PER_ELEMENT)
 
-        numpy_array = np.array(tensor0)
-        print("received complex tensor type : ", numpy_array.dtype)
-        print("received complex tensor: ", numpy_array)
+        numpy_array = np.asarray(tensor0)
+        print("received complex tensor type: ", numpy_array.dtype)
+        print("First 10 elements of received complex tensor: ", numpy_array[:10])
 
         return
 

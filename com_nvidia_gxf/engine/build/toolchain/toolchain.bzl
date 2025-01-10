@@ -1,5 +1,5 @@
 """
- SPDX-FileCopyrightText: Copyright (c) 2018-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ SPDX-FileCopyrightText: Copyright (c) 2018-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  SPDX-License-Identifier: Apache-2.0
 
  Licensed under the Apache License, Version 2.0 (the "License");
@@ -20,30 +20,33 @@ _COMPLIER = "compiler"
 _CPU = "cpu"
 
 _GCC_PATH_MAP = {
-    "x86_64_cuda_11_8|gcc-9": "/usr/bin/gcc-9",
-    "x86_64_cuda_12_1|gcc-9": "/usr/bin/gcc-9",
-    "hp11_sbsa|gcc-9": "external/gcc_9_3_aarch64_linux_gnu/bin/aarch64-linux-gcc-9.3.0",
-    "hp20_sbsa|gcc-9": "external/gcc_9_3_aarch64_linux_gnu/bin/aarch64-linux-gcc-9.3.0",
-    "hp21ea_sbsa|gcc-9": "external/gcc_9_3_aarch64_linux_gnu/bin/aarch64-linux-gcc-9.3.0",
-    "jetpack51|gcc-9": "external/gcc_9_3_aarch64_linux_gnu/bin/aarch64-linux-gcc-9.3.0",
+    "x86_64_cuda_12_6|gcc-11": "/usr/bin/gcc-11",
+    "x86_64_cuda_12_2|gcc-11": "/usr/bin/gcc-11",
+    "x86_64_rhel9_cuda_12_2|gcc-11": "/usr/bin/gcc-11",
+    "hp21ea_sbsa|gcc-11": "external/gcc_11_3_aarch64_linux_gnu/bin/aarch64-linux-gcc-11.3.0",
+    "hp21ga_sbsa|gcc-11": "external/gcc_11_3_aarch64_linux_gnu/bin/aarch64-linux-gcc-11.3.0",
+    "jetpack60|gcc-11": "external/gcc_11_3_aarch64_linux_gnu/bin/aarch64-linux-gcc-11.3.0",
+    "jetpack61|gcc-11": "external/gcc_11_3_aarch64_linux_gnu/bin/aarch64-linux-gcc-11.3.0",
 }
 
 _NVCC_PATH_MAP = {
-    "x86_64_cuda_11_8": "external/nvcc_11_08/bin/nvcc",
-    "x86_64_cuda_12_1": "external/nvcc_12_01/bin/nvcc",
-    "hp11_sbsa": "external/nvcc_11_06/bin/nvcc",
-    "hp20_sbsa": "external/nvcc_11_08/bin/nvcc",
-    "hp21ea_sbsa": "external/nvcc_12_01/bin/nvcc",
-    "jetpack51": "external/nvcc_11_04/bin/nvcc",
+    "x86_64_cuda_12_6": "external/nvcc_12_06/bin/nvcc",
+    "x86_64_cuda_12_2": "external/nvcc_12_02/bin/nvcc",
+    "x86_64_rhel9_cuda_12_2": "external/nvcc_12_02/bin/nvcc",
+    "hp21ea_sbsa": "external/nvcc_12_02/bin/nvcc",
+    "hp21ga_sbsa": "external/nvcc_12_06/bin/nvcc",
+    "jetpack60": "external/nvcc_12_02/bin/nvcc",
+    "jetpack61": "external/nvcc_12_06/bin/nvcc",
 }
 
 _CUDA_CAPABILITIES_MAP = {
-    "x86_64_cuda_11_8": '"5.2", "5.3",  "6.0", "6.1", "6.2", "7.0", "7.5", "8.6", "8.9", "9.0"',
-    "x86_64_cuda_12_1": '"5.2", "5.3",  "6.0", "6.1", "6.2", "7.0", "7.5", "8.6", "8.9", "9.0"',
-    "hp11_sbsa": '"5.2", "5.3",  "6.0", "6.1", "6.2", "7.0", "7.5", "8.6"',
-    "hp20_sbsa": '"5.2", "5.3",  "6.0", "6.1", "6.2", "7.0", "7.5", "8.6", "8.9", "9.0"',
+    "x86_64_cuda_12_6": '"5.2", "5.3",  "6.0", "6.1", "6.2", "7.0", "7.5", "8.6", "8.9", "9.0"',
+    "x86_64_cuda_12_2": '"5.2", "5.3",  "6.0", "6.1", "6.2", "7.0", "7.5", "8.6", "8.9", "9.0"',
+    "x86_64_rhel9_cuda_12_2": '"5.2", "5.3",  "6.0", "6.1", "6.2", "7.0", "7.5", "8.6", "8.9", "9.0"',
     "hp21ea_sbsa": '"5.2", "5.3",  "6.0", "6.1", "6.2", "7.0", "7.5", "8.6", "8.9", "9.0"',
-    "jetpack51": '"5.3","6.2","7.2","7.5","8.6","8.7"',
+    "hp21ga_sbsa": '"5.2", "5.3",  "6.0", "6.1", "6.2", "7.0", "7.5", "8.6", "8.9", "9.0"',
+    "jetpack60": '"5.3","6.2","7.2","7.5","8.6","8.7"',
+    "jetpack61": '"5.3","6.2","7.2","7.5","8.6","8.7"',
 }
 
 def _tpl(repository_ctx, tpl, substitutions = {}, out = None):
@@ -65,16 +68,16 @@ def _toolchain_impl(repository_ctx):
     }
 
     if cpu == "k8":
-        host_substitutions = {
-            "%{gcc_path}": _GCC_PATH_MAP[target_platform + "|" + compiler],
-            "%{nvcc_path}": _NVCC_PATH_MAP[target_platform],
-            "%{cuda_capabilities}": _CUDA_CAPABILITIES_MAP[target_platform],
-        }
+        host_substitutions = substitutions
     else:
+        if target_platform == "jetpack61" or target_platform == "hp21ga_sbsa":
+            host_config = "x86_64_cuda_12_6"
+        else:
+            host_config = "x86_64_cuda_12_2"
         host_substitutions = {
-            "%{gcc_path}": _GCC_PATH_MAP["x86_64_cuda_12_1" + "|" + compiler],
-            "%{nvcc_path}": _NVCC_PATH_MAP["x86_64_cuda_12_1"],
-            "%{cuda_capabilities}": _CUDA_CAPABILITIES_MAP["x86_64_cuda_12_1"],
+            "%{gcc_path}": _GCC_PATH_MAP[host_config + "|" + compiler],
+            "%{nvcc_path}": _NVCC_PATH_MAP[host_config],
+            "%{cuda_capabilities}": _CUDA_CAPABILITIES_MAP[host_config],
         }
 
     _tpl(

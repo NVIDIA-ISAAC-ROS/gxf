@@ -15,4 +15,16 @@
  limitations under the License.
 """
 
-exports_files(["run.sh.tpl"])
+exports_files([
+    "run.sh.tpl",
+    "run_apps.py",
+])
+
+
+py_binary(
+  name = "run_apps",
+  srcs = ["run_apps.py"],
+  main = "run_apps.py",
+  srcs_version = "PY3",
+  visibility = ["//visibility:public"],
+)

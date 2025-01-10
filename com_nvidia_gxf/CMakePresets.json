@@ -1,0 +1,70 @@
+{
+    "version": 5,
+    "cmakeMinimumRequired": {
+        "major": 3,
+        "minor": 24,
+        "patch": 0
+    },
+    "configurePresets": [
+        {
+            "name": "default",
+            "hidden": true,
+            "generator": "Ninja",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "BUILD_TESTING": {
+                    "type": "BOOL",
+                    "value": "OFF"
+                }
+            }
+        },
+        {
+            "name": "x86_64",
+            "hidden": true,
+            "inherits": "default",
+            "cacheVariables": {
+                "nvsci_URL": "https://urm.nvidia.com/artifactory/sw-isaac-gxf-generic/dependencies/internal/nvsci_cuda_12_2_x86_64_rel-36_20230807_34016753-xz.xz",
+                "nvsci_HASH": "51ce61eb91a8bfffed690f6f2d55e93ae9cadb63b263993a9264ef70fa6689b4"
+            }
+        },
+        {
+            "name": "aarch64",
+            "hidden": true,
+            "inherits": "default",
+            "cacheVariables": {
+                "nvsci_URL": "https://urm.nvidia.com/artifactory/sw-isaac-gxf-generic-local/dependencies/internal/nvsci/nvsci_arm64-linux-36.0.0-20230727103555-xz.xz",
+                "nvsci_HASH": "87302dd326e20d70c79d283ea69148c84dd0a3658014e10f25d72a9063b6b916"
+            }
+        },
+        {
+            "name": "x86_64_cuda_12_2",
+            "inherits": "x86_64",
+            "cacheVariables": {
+                "GXF_PRESET_NAME": "x86_64_cuda_12_2",
+                "ucx_URL": "https://urm.nvidia.com/artifactory/sw-isaac-gxf-generic-local/dependencies/internal/ucx-cuda-x86-cuda-12.2.tar.gz",
+                "ucx_HASH": "f98db885a1b10d8415572d72c12a9449061416614ac10211584a5ee18db42f2f",
+                "ucx_INSTALL_PREFIX": "usr/"
+            }
+        },
+        {
+            "name": "jetpack60",
+            "inherits": "aarch64",
+            "cacheVariables": {
+                "GXF_PRESET_NAME": "jetpack60",
+                "ucx_URL": "https://urm.nvidia.com/artifactory/sw-isaac-gxf-generic/dependencies/internal/ucx/ucx_1.14.1_jetpack60.tar.gz",
+                "ucx_HASH": "c0d684d4a248417ac54f66cb3021a475c24e4698d624351dd51cf88fe8648c96",
+                "ucx_INSTALL_PREFIX": "usr/"
+            }
+        },
+        {
+            "name": "hp21ea_sbsa",
+            "inherits": "aarch64",
+            "cacheVariables": {
+                "GXF_PRESET_NAME": "hp21ea_sbsa",
+                "ucx_URL": "https://urm.nvidia.com/artifactory/sw-isaac-gxf-generic/dependencies/internal/ucx/ucx-cuda-hp20-sbsa-ea-2.1.tar.gz",
+                "ucx_HASH": "c7a7845e14109e538eae89ef113ad52daf39ec29305ae633cbb8324e45b2dc82",
+                "ucx_INSTALL_PREFIX": ""
+            }
+        }
+    ]
+}

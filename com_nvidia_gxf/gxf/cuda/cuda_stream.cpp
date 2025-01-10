@@ -102,7 +102,7 @@ Expected<void> CudaStream::record(
   gxf_uid_t eid = kNullUid;
   auto ret = GxfComponentEntity(event.context(), event.cid(), &eid);
   if (ret != GXF_SUCCESS || eid == kNullUid) {
-    GXF_LOG_ERROR("Failture creating stream event from CudaEvent handle, event entity not found");
+    GXF_LOG_ERROR("Failure creating stream event from CudaEvent handle, event entity not found");
     return Unexpected{GXF_ARGUMENT_NULL};
   }
   // Clone event's entity

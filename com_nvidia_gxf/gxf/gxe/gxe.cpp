@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2020-2021, NVIDIA CORPORATION. All rights reserved.
+Copyright (c) 2020-2024, NVIDIA CORPORATION. All rights reserved.
 
 NVIDIA CORPORATION and its licensors retain all intellectual property
 and proprietary rights in and to this software, related documentation
@@ -29,8 +29,9 @@ DEFINE_string(app, "", "GXF app file to execute. Multiple files can be comma-sep
 DEFINE_string(app_root, "", "Root path for GXF app and subgraph files with relative path");
 DEFINE_string(manifest, "",
               "GXF manifest file with extensions. Multiple files can be comma-separated");
-DEFINE_int32(severity, 3, "Set log severity levels: 0=None, 1=Error, 2=Warning, 3=Info,"
-             " 4=Debug. Default: Info");
+DEFINE_int32(severity, -1,
+             "Set log severity levels: 0=None, 1=Error, 2=Warning, 3=Info,"
+             " 4=Debug, 5=Verbose. Default: Info");
 DEFINE_string(log_file_path, "", "Path to a file for logging.");
 DEFINE_string(graph_directory, "", "Path to a directory for searching graph files.");
 DEFINE_bool(run, true, "Executes GXF application. Can be set to 'false' to verify extension and"
@@ -202,6 +203,18 @@ int main(int argc, char** argv) {
   gflags::SetUsageMessage(usage);
 
   gflags::ParseCommandLineFlags(&argc, &argv, true);
+
+  if (FLAGS_severity < -1 || FLAGS_severity > 5) {
+    GXF_LOG_ERROR("Invalid log severity level: %d", FLAGS_severity);
+    return 1;
+  }
+  // Retrieve the current severity level if it has not been set yet.
+  // The default logging severity is INFO, but it can be modified using the
+  // GXF_LOG_LEVEL environment variable.
+  if (FLAGS_severity == -1) {
+    // Obtain the current severity level and assign it to FLAGS_severity
+    GxfGetSeverity(context, reinterpret_cast<gxf_severity_t*>(&FLAGS_severity));
+  }
 
   code = GxfSetSeverity(context, static_cast<gxf_severity_t>(FLAGS_severity));
   if (code != GXF_SUCCESS) {

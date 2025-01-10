@@ -6,10 +6,10 @@
 The [isaac_ros_gxf](https://github.com/NVIDIA-ISAAC-ROS/isaac_ros_nitros/tree/main/isaac_ros_gxf) package is located in Isaac ROS NITROS repository that holds the GXF framework binaries and headers. This `GXF` repository contains the buildable source code for the GXF framework and its deployment for Isaac ROS NITROS. Developers could use the scripts here to build the GXF source and install the updated binaries and headers for all supported platforms in the [isaac_ros_gxf](https://github.com/NVIDIA-ISAAC-ROS/isaac_ros_nitros/tree/main/isaac_ros_gxf) package locally.
 
 ## Setup
-The build environment can be setup on an x86_64 system running Ubuntu 20.04+ using the [Isaac ROS Dev)](https://github.com/NVIDIA-ISAAC-ROS/isaac_ros_common) base containers.
+The build environment can be setup on an x86_64 system running Ubuntu 22.04+ using the [Isaac ROS Dev)](https://github.com/NVIDIA-ISAAC-ROS/isaac_ros_common) base containers.
 
 ## Build and Install
-1. Set up your development environment by following the instructions [here](https://nvidia-isaac-ros.github.io/getting_started/dev_env_setup.html).
+1. Set up your development environment by following the instructions [here](https://isaac_ros.gitlab-master-pages.nvidia.com/isaac_ros_docs/getting_started/dev_env_setup.html).
 
 2. Clone the following repositories and its dependencies under `~/workspaces/isaac_ros-dev/src`.
 
@@ -66,4 +66,5 @@ This work is published under the [NVIDIA ISAAC ROS](https://github.com/NVIDIA-IS
 
 | Date       | Changes                                                                                 |
 | ---------- | --------------------------------------------------------------------------------------- |
+| 2024-11-05 | Update to GXF 4.1                                                                       |
 | 2023-10-18 | Initial release                                                                         |

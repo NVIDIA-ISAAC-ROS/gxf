@@ -1,5 +1,5 @@
 """
- SPDX-FileCopyrightText: Copyright (c) 2020-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ SPDX-FileCopyrightText: Copyright (c) 2020-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  SPDX-License-Identifier: Apache-2.0
 
  Licensed under the Apache License, Version 2.0 (the "License");
@@ -62,6 +62,8 @@ nv_gxf_cc_test_group(
         "gxf/test/apps/test_ping_target_time_multi_thread.yaml",
         "gxf/test/apps/test_ping.yaml",
         "gxf/test/apps/test_ping_composer.yaml",
+        "gxf/test/apps/test_ping_faster_consumer.yaml",
+        "gxf/test/apps/test_ping_faster_producer.yaml",
         "gxf/test/apps/test_ping_log.yaml",
         "gxf/test/apps/test_ping_multi_thread.yaml",
         "gxf/test/apps/test_ping_3.yaml",
@@ -81,6 +83,7 @@ nv_gxf_cc_test_group(
         "gxf/test/apps/test_std_parameter.yaml",
         "gxf/test/apps/test_step_count.yaml",
         "gxf/test/apps/test_synchronization.yaml",
+        "gxf/test/apps/test_synchronization_multi.yaml",
         "gxf/test/apps/test_synchronization_threshold.yaml",
         "gxf/test/apps/test_tensor_copier_device_to_host.yaml",
         "gxf/test/apps/test_tensor_copier_device_to_system.yaml",
@@ -93,9 +96,14 @@ nv_gxf_cc_test_group(
         "gxf/test/apps/test_round_robin_broadcast.yaml",
         "gxf/test/apps/test_delayed_periodic.yaml",
         "gxf/test/apps/test_downstream_scheduling.yaml",
+        "gxf/test/apps/multiple_receiver_memory_available_st.yaml",
+        "gxf/test/apps/multiple_tx_rx_memory_available_st.yaml",
+        "gxf/test/apps/multiple_tx_rx_memory_available_st_rmm.yaml"
     ],
     data = ["//gxf/test/apps:yaml_files"],
     extensions = [
+        "//gxf/cuda",
+        "//gxf/rmm",
         "//gxf/std",
         "//gxf/sample",
         "//gxf/test/extensions:test",

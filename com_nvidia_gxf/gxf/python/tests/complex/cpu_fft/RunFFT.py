@@ -22,18 +22,20 @@ from gxf.std import Tensor
 from gxf.python_codelet import CodeletAdapter
 import numpy as np
 
+
 class RunFFT(CodeletAdapter):
     """ Python codelet to receive a msg on tick()
 
     Python implementation of TensorDescription.
-    Receives a message on the Reciever on every tick()
+    Receives a message on the Receiver on every tick()
     """
 
     def start(self):
         self.params = self.get_params()
-        self.rx = Receiver.get(self.context(), self.cid(), self.params[f"receiver0"])
-        self.tx = Transmitter.get(self.context(), self.cid(), self.params[f"transmitter0"])
-        self.allocator = Allocator.get(self.context(), self.cid(), self.params[f"allocator0"])
+        self.rx = Receiver.get(self.context(), self.cid(), self.params["receiver0"])
+        self.tx = Transmitter.get(self.context(), self.cid(), self.params["transmitter0"])
+        self.allocator = Allocator.get(self.context(), self.cid(), self.params["allocator0"])
+        self.use_dlpack = bool(self.params["use_dlpack"])
 
     def tick(self):
         in0 = self.rx.receive()
@@ -52,16 +54,23 @@ class RunFFT(CodeletAdapter):
         assert(tensor0.get_tensor_description().shape.size()==SHAPE_SIZE)
         assert(tensor0.get_tensor_description().shape.rank()==SHAPE_RANK)
         assert(tensor0.get_tensor_description().bytes_per_element==BYTES_PER_ELEMENT)
-        numpy_array = np.array(tensor0)
-        print("received tensor: ", numpy_array)
+        if self.use_dlpack:
+            numpy_array = np.from_dlpack(tensor0)
+        else:
+            numpy_array = np.array(tensor0)
+        print("First 10 elements of received tensor: ", numpy_array[:10])
 
         # Perform FFT on the numpy tensor
         fft_tensor = np.fft.fft(numpy_array).astype(np.complex64)
-        print("FFT of received tensor")
-        print(fft_tensor)
+        print("First 10 elements of received tensor of FFT output:", fft_tensor[:10])
 
         host_msg = MessageEntity(self.context())
-        test = Tensor.add_np_array_as_tensor_to_entity(host_msg, "host_tensor", fft_tensor, self.allocator)
+        if self.use_dlpack:
+            Tensor.add_to_entity(host_msg, Tensor.from_dlpack(fft_tensor), "host_tensor"            )
+        else:
+            Tensor.add_np_array_as_tensor_to_entity(
+                host_msg, "host_tensor", fft_tensor, self.allocator
+            )
 
         self.tx.publish(host_msg)
 

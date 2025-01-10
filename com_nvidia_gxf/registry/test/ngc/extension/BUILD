@@ -1,5 +1,5 @@
 """
-Copyright (c) 2021-2022, NVIDIA CORPORATION. All rights reserved.
+Copyright (c) 2021-2024, NVIDIA CORPORATION. All rights reserved.
 
 NVIDIA CORPORATION and its licensors retain all intellectual property
 and proprietary rights in and to this software, related documentation
@@ -41,7 +41,7 @@ register_extension(
     name = "register_ngc_test_ext",
     extension = "ngc_test",
     uuid = "fb5bcf10-43f3-44bc-846f-d95a0a077045",
-    version = "1.1.0",
+    version = "1.4.0",
     license_file = ":LICENSE",
     url = "www.nvidia.com",
     priority = "1",
@@ -58,13 +58,13 @@ publish_extension(
     ext_registration_target = ":register_ngc_test_ext",
     repo_name = "test1",
     arch = "x86_64",
-    distribution = "ubuntu_20.04",
+    distribution = "ubuntu_22.04",
     os = "linux",
-    cuda = "12.1",
-    cudnn = "8.8.1",
-    tensorrt = "8.5.3",
-    deepstream = "6.2.1",
-    triton = "2.32.0",
-    vpi = "2.3.1",
+    cuda = "12.6",
+    cudnn = "9.3.0",
+    tensorrt = "10.3.0",
+    deepstream = "7.1",
+    triton = "2.49.0",
+    vpi = "3.0.10",
     force = True,
 )

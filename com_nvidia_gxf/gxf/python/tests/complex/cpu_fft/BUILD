@@ -10,12 +10,6 @@ license agreement from NVIDIA CORPORATION is strictly prohibited.
 
 load("//gxf/python:pygxf.bzl", "nv_pygxf_test")
 
-exports_files([
-    "CreateTensor.py",
-    "RunFFT.py",
-    "VerifyTensor.py",
-])
-
 nv_pygxf_test(
     name = "test_cpu_fft",
     srcs = ["test_cpu_fft.py"],

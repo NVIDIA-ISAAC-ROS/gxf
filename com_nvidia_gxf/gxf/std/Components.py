@@ -67,6 +67,7 @@ class BTSchedulingTerm(Component, BTSchedulingTerm_pybind):
     def __init__(self, name: str = "", **params):
         # TODO: explicitly check the parameters
         Component.__init__(self, type=self.get_gxf_type(), name=name, **params)
+        BTSchedulingTerm_pybind.__init__(self)
 
 
 class BlockMemoryPool(Component):
@@ -74,7 +75,7 @@ class BlockMemoryPool(Component):
     '''
     gxf_native_type: str = "nvidia::gxf::BlockMemoryPool"
 
-    _validation_info_parameters = {'storage_type': {'key': 'storage_type', 'headline': 'Storage type', 'description': 'The memory storage type used by this allocator. Can be kHost (0), kDevice (1) or kSystem (2)', 'gxf_parameter_type': 'GXF_PARAMETER_TYPE_INT32', 'rank': 0, 'shape': [1], 'flags': 'GXF_PARAMETER_FLAGS_NONE', 'handle_type': 'N/A', 'default': 0}, 'block_size': {'key': 'block_size', 'headline': 'Block size', 'description': 'The size of one block of memory in byte. Allocation requests can only be fullfilled if they fit into one block. If less memory is requested still a full block is issued.', 'gxf_parameter_type': 'GXF_PARAMETER_TYPE_UINT64', 'rank': 0, 'shape': [
+    _validation_info_parameters = {'storage_type': {'key': 'storage_type', 'headline': 'Storage type', 'description': 'The memory storage type used by this allocator. Can be kHost (0), kDevice (1) or kSystem (2)', 'gxf_parameter_type': 'GXF_PARAMETER_TYPE_INT32', 'rank': 0, 'shape': [1], 'flags': 'GXF_PARAMETER_FLAGS_NONE', 'handle_type': 'N/A', 'default': 0}, 'block_size': {'key': 'block_size', 'headline': 'Block size', 'description': 'The size of one block of memory in byte. Allocation requests can only be fulfilled if they fit into one block. If less memory is requested still a full block is issued.', 'gxf_parameter_type': 'GXF_PARAMETER_TYPE_UINT64', 'rank': 0, 'shape': [
         1], 'flags': 'GXF_PARAMETER_FLAGS_NONE', 'handle_type': 'N/A', 'default': 'N/A'}, 'num_blocks': {'key': 'num_blocks', 'headline': 'Number of blocks', 'description': 'The total number of blocks which are allocated by the pool. If more blocks are requested allocation requests will fail.', 'gxf_parameter_type': 'GXF_PARAMETER_TYPE_UINT64', 'rank': 0, 'shape': [1], 'flags': 'GXF_PARAMETER_FLAGS_NONE', 'handle_type': 'N/A', 'default': 'N/A'}}
 
     def __init__(self, name: str = "", **params):
@@ -91,6 +92,7 @@ class BooleanSchedulingTerm(Component, BooleanSchedulingTerm_pybind):
     def __init__(self, name: str = "", **params):
         # TODO: explicitly check the parameters
         Component.__init__(self, type=self.get_gxf_type(), name=name, **params)
+        BooleanSchedulingTerm_pybind.__init__(self)
 
 
 class Broadcast(Component):
@@ -167,6 +169,7 @@ class CountSchedulingTerm(Component, CountSchedulingTerm_pybind):
     def __init__(self, name: str = "", **params):
         # TODO: explicitly check the parameters
         Component.__init__(self, type=self.get_gxf_type(), name=name, **params)
+        CountSchedulingTerm_pybind.__init__(self)
 
 
 class DoubleBufferReceiver(Component, DoubleBufferReceiver_pybind):
@@ -179,6 +182,7 @@ class DoubleBufferReceiver(Component, DoubleBufferReceiver_pybind):
     def __init__(self, name: str = "", **params):
         # TODO: explicitly check the parameters
         Component.__init__(self, type=self.get_gxf_type(), name=name, **params)
+        DoubleBufferReceiver_pybind.__init__(self)
 
 
 class DoubleBufferTransmitter(Component, DoubleBufferTransmitter_pybind):
@@ -191,6 +195,7 @@ class DoubleBufferTransmitter(Component, DoubleBufferTransmitter_pybind):
     def __init__(self, name: str = "", **params):
         # TODO: explicitly check the parameters
         Component.__init__(self, type=self.get_gxf_type(), name=name, **params)
+        DoubleBufferTransmitter_pybind.__init__(self)
 
 
 class DownstreamReceptiveSchedulingTerm(Component):
@@ -307,6 +312,7 @@ class ManualClock(Component, ManualClock_pybind):
 
     def __init__(self, name: str = "", **params):
         Component.__init__(self, type=self.get_gxf_type(), name=name, **params)
+        ManualClock_pybind.__init__(self)
 
 
 class MemoryAvailableSchedulingTerm(Component):
@@ -391,6 +397,18 @@ class MultiThreadScheduler(Component):
         Component.__init__(self, type=self.get_gxf_type(), name=name, **params)
 
 
+class EventBasedScheduler(Component):
+    '''A multi thread scheduler that executes codelets for maximum throughput.
+    '''
+    gxf_native_type: str = "nvidia::gxf::EventBasedScheduler"
+
+    _validation_info_parameters = {'clock': {'key': 'clock', 'headline': 'Clock', 'description': 'The clock used by the scheduler to define flow of time. Typical choices are a RealtimeClock or a ManualClock.', 'gxf_parameter_type': 'GXF_PARAMETER_TYPE_HANDLE', 'rank': 0, 'shape': [1], 'flags': 'GXF_PARAMETER_FLAGS_NONE', 'handle_type': 'nvidia::gxf::Clock', 'default': 'N/A'}, 'max_duration_ms': {'key': 'max_duration_ms', 'headline': 'Max Duration [ms]', 'description': 'The maximum duration for which the scheduler will execute (in ms). If not specified the scheduler will run until all work is done. If periodic terms are present this means the application will run indefinitely.', 'gxf_parameter_type': 'GXF_PARAMETER_TYPE_INT64', 'rank': 0, 'shape': [1], 'flags': 'GXF_PARAMETER_FLAGS_OPTIONAL', 'handle_type': 'N/A', 'default': 'N/A'}, 'check_recession_period_ms': {'key': 'check_recession_period_ms', 'headline': 'Duration to sleep before checking the condition of an entity again [ms]', 'description': 'The maximum duration for which the scheduler would wait (in ms) when an entity is not ready to run yet.', 'gxf_parameter_type': 'GXF_PARAMETER_TYPE_FLOAT64', 'rank': 0, 'shape': [1], 'flags': 'GXF_PARAMETER_FLAGS_NONE', 'handle_type': 'N/A', 'default': 5.0}, 'stop_on_deadlock': {'key': 'stop_on_deadlock', 'headline': 'Stop on dead end', 'description': 'If enabled the scheduler will stop when all entities are in a waiting state, but no periodic entity exists to break the dead end. Should be disabled when scheduling conditions can be changed by external actors, for example by clearing queues manually.', 'gxf_parameter_type': 'GXF_PARAMETER_TYPE_BOOL', 'rank': 0, 'shape': [
+        1], 'flags': 'GXF_PARAMETER_FLAGS_NONE', 'handle_type': 'N/A', 'default': True}, 'worker_thread_number': {'key': 'worker_thread_number', 'headline': 'Thread Number', 'description': 'Number of threads.', 'gxf_parameter_type': 'GXF_PARAMETER_TYPE_INT64', 'rank': 0, 'shape': [1], 'flags': 'GXF_PARAMETER_FLAGS_NONE', 'handle_type': 'N/A', 'default': 1}, 'thread_pool_allocation_auto': {'key': 'thread_pool_allocation_auto', 'headline': 'Automatic Pool Allocation', 'description': 'If enabled, only one thread pool will be created. If disabled, user should enumerate pools and priorities', 'gxf_parameter_type': 'GXF_PARAMETER_TYPE_BOOL', 'rank': 0, 'shape': [1], 'flags': 'GXF_PARAMETER_FLAGS_NONE', 'handle_type': 'N/A', 'default': True}, 'strict_job_thread_pinning': {'key': 'strict_job_thread_pinning', 'headline': 'Strict Job-Thread Pinning', 'description': 'If enabled, for entity pinned thread, it cannot execute other entities. i.e. true entity-thread pinning.', 'gxf_parameter_type': 'GXF_PARAMETER_TYPE_BOOL', 'rank': 0, 'shape': [1], 'flags': 'GXF_PARAMETER_FLAGS_NONE', 'handle_type': 'N/A', 'default': False}, 'stop_on_deadlock_timeout': {'key': 'stop_on_deadlock_timeout', 'headline': 'A refreshing version of max_duration_ms when stop_on_dealock kick-in [ms]', 'description': 'Scheduler will wait this amount of time when stop_on_dead_lock indicates should stop. It will reset if a job comes in during the wait. Negative value means not stop on deadlock.', 'gxf_parameter_type': 'GXF_PARAMETER_TYPE_INT64', 'rank': 0, 'shape': [1], 'flags': 'GXF_PARAMETER_FLAGS_NONE', 'handle_type': 'N/A', 'default': 0}}
+
+    def __init__(self, name: str = "", **params):
+        Component.__init__(self, type=self.get_gxf_type(), name=name, **params)
+
+
 class NetworkContext(Component):
     '''Interface for a component for network context like UCX
     '''
@@ -423,6 +441,7 @@ class PeriodicSchedulingTerm(Component, PeriodicSchedulingTerm_pybind):
     def __init__(self, name: str = "", **params):
         # TODO: explicitly check the parameters
         Component.__init__(self, type=self.get_gxf_type(), name=name, **params)
+        PeriodicSchedulingTerm_pybind.__init__(self)
 
 
 class Queue(Component):
@@ -444,6 +463,7 @@ class RealtimeClock(Component, RealtimeClock_pybind):
 
     def __init__(self, name: str = "", **params):
         Component.__init__(self, type=self.get_gxf_type(), name=name, **params)
+        RealtimeClock_pybind.__init__(self)
 
 
 class Receiver(Receiver_pybind):
@@ -526,7 +546,7 @@ class Synchronization(Component):
     '''
     gxf_native_type: str = "nvidia::gxf::Synchronization"
 
-    _validation_info_parameters = {'inputs': {'key': 'inputs', 'headline': 'Inputs', 'description': 'All the inputs for synchronization, number of inputs must match that of the outputs.', 'gxf_parameter_type': 'GXF_PARAMETER_TYPE_HANDLE', 'rank': 1, 'shape': [-1], 'flags': 'GXF_PARAMETER_FLAGS_NONE', 'handle_type': 'nvidia::gxf::Receiver', 'default': 'N/A'}, 'outputs': {'key': 'outputs', 'headline': 'Outputs', 'description': 'All the outputs for synchronization, number of outpus must match that of the inputs.', 'gxf_parameter_type': 'GXF_PARAMETER_TYPE_HANDLE', 'rank': 1, 'shape': [-1], 'flags': 'GXF_PARAMETER_FLAGS_NONE', 'handle_type': 'nvidia::gxf::Transmitter', 'default': 'N/A'}, 'sync_threshold': {
+    _validation_info_parameters = {'inputs': {'key': 'inputs', 'headline': 'Inputs', 'description': 'All the inputs for synchronization, number of inputs must match that of the outputs.', 'gxf_parameter_type': 'GXF_PARAMETER_TYPE_HANDLE', 'rank': 1, 'shape': [-1], 'flags': 'GXF_PARAMETER_FLAGS_NONE', 'handle_type': 'nvidia::gxf::Receiver', 'default': 'N/A'}, 'outputs': {'key': 'outputs', 'headline': 'Outputs', 'description': 'All the outputs for synchronization, number of outputs must match that of the inputs.', 'gxf_parameter_type': 'GXF_PARAMETER_TYPE_HANDLE', 'rank': 1, 'shape': [-1], 'flags': 'GXF_PARAMETER_FLAGS_NONE', 'handle_type': 'nvidia::gxf::Transmitter', 'default': 'N/A'}, 'sync_threshold': {
         'key': 'sync_threshold', 'headline': 'Synchronization threshold (ns)', 'description': 'Synchronization threshold in nanoseconds. Messages will not be synchronized if timestamp difference is above the threshold. By default, timestamps should be identical for synchronization (default threshold = 0). Synchronization threshold will only work if maximum timestamp variation is much less than minimal delta between timestamps of subsequent messages in any input.', 'gxf_parameter_type': 'GXF_PARAMETER_TYPE_INT64', 'rank': 0, 'shape': [1], 'flags': 'GXF_PARAMETER_FLAGS_NONE', 'handle_type': 'N/A', 'default': 0}}
 
     def __init__(self, name: str = "", **params):
@@ -577,6 +597,7 @@ class TargetTimeSchedulingTerm(Component, TargetTimeSchedulingTerm_pybind):
     def __init__(self, name: str = "", **params):
         # TODO: explicitly check the parameters
         Component.__init__(self, type=self.get_gxf_type(), name=name, **params)
+        TargetTimeSchedulingTerm_pybind.__init__(self)
 
 
 class Tensor(Tensor_pybind):
