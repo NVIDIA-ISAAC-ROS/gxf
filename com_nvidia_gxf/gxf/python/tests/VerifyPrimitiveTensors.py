@@ -14,20 +14,17 @@
  See the License for the specific language governing permissions and
  limitations under the License.
 """
-from gxf.core import MessageEntity
-from gxf.std import MemoryStorageType
+import numpy as np
+
 from gxf.std import Receiver
-from gxf.std import Shape
 from gxf.std import Tensor
 from gxf.python_codelet import CodeletAdapter
-import ctypes
-import numpy as np
 
 class VerifyTensors(CodeletAdapter):
     """ Python codelet to receive a msg on tick()
 
     Python implementation of test tensor info.
-    Receives a message on the Reciever on every tick()
+    Receives a message on the Receiver on every tick()
     """
 
     def start(self):

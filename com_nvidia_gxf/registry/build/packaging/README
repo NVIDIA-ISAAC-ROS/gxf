@@ -1,5 +1,5 @@
 #####################################################################################
-# Copyright (c) 2021, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2021-2024, NVIDIA CORPORATION. All rights reserved.
 
 # NVIDIA CORPORATION and its licensors retain all intellectual property
 # and proprietary rights in and to this software, related documentation
@@ -8,8 +8,8 @@
 # license agreement from NVIDIA CORPORATION is strictly prohibited.
 #####################################################################################
 
-# Generating nvgraph_registry
-Creates a nvgraph_registry binary in current directory.
+# Generating gxf registry
+Creates a gxf registry binary in current directory.
 
 ## Usage
 python3 make_bin_and_pip_pkg.py <gxf_root> <pygxf.so> <build_setting.yaml>

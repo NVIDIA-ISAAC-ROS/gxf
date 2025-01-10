@@ -16,17 +16,15 @@
 """
 from gxf.python_codelet import CodeletAdapter
 from gxf.std import Clock
-from gxf.std import Transmitter
 from gxf.std import Receiver
 from gxf.std import CountSchedulingTerm
-from gxf.core import MessageEntity
-import yaml
+
 
 class TestCountSchedulingTerm(CodeletAdapter):
     """ Python codelet to receive a msg on tick()
 
     Python implementation of CountSchedulingTerm.
-    Receives a message on the Reciever on every tick()
+    Receives a message on the Receiver on every tick()
     """
 
     def start(self):

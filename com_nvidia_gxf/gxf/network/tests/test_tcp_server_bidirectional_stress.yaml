@@ -32,7 +32,7 @@ components:
     port: 7000
     timeout_period: 100ms
     async_scheduling_term: async_st
-    max_msg_delay_ms: 100
+    max_msg_delay_ms: 1000
 - name: async_st
   type: nvidia::gxf::AsynchronousSchedulingTerm
 ---

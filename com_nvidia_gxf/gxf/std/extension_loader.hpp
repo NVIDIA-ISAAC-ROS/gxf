@@ -40,6 +40,8 @@ class ExtensionLoader : public ComponentFactory {
   Expected<void> initialize(gxf_context_t context);
   Expected<void> load(const char* filename);
   Expected<void> load(Extension* extension, void* handle = nullptr);
+  Expected<void> registerRuntimeComponent(const gxf_tid_t& component_tid,
+                                          const gxf_tid_t& extension_tid);
   Expected<void> getComponentTypes(gxf_tid_t* pointer, size_t* size);
   Expected<void> unloadAll();
 

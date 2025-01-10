@@ -1,5 +1,5 @@
 #####################################################################################
-# SPDX-FileCopyrightText: Copyright (c) 2021 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2021-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -21,22 +21,29 @@ numpy==1.23.5 # we have to use an older version otherwise the `cupy` doesn't wor
 # Sphinx for document generation
 sphinx
 sphinx-rtd-theme
-result==0.5.0
-requests==2.18.4
+result==0.10.0
+requests==2.25.1
 toml==0.10.2
 construct  # for python/gxf/serialization/cask.py
-pyarmor==6.7.0
-pyinstaller==4.10
+pyarmor==7.7.4
+pyinstaller==5.13.2
+gitpython
+yq
+
+# CMake build requirements
+cmake==3.24.3
+ninja==1.11.1.1
 
 # Container builder requirements
-requests==2.18.4
+requests==2.25.1
 docker==4.4.1
 Jinja2==2.11.2
 MarkupSafe==1.1.1
-urllib3==1.21.1
+urllib3==1.26.5
 PyYAML==5.3.1
-pylint==2.6.0
-pytest==6.2.2
+pylint==2.12.2
+pytest==6.2.5
+python-on-whales==0.65.0
 
 # GXF Cli requirements
 grpcio==1.47.0

@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2021 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-FileCopyrightText: Copyright (c) 2021-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * SPDX-License-Identifier: Apache-2.0
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -34,7 +34,7 @@ class Codelet : public Component {
   // execute custom code during the start phase. This is a good place to obtain resources which
   // are necessary for ticking the codelet. This function is guaranteed to be called before the
   // first call to tick.
-  virtual gxf_result_t start() = 0;
+  virtual gxf_result_t start() { return GXF_SUCCESS; }
 
   // This function is called whenever the codelet is expected to do work, e.g. when an event was
   // received or periodically. The tick method can be specified with various other member functions.
@@ -47,7 +47,7 @@ class Codelet : public Component {
   // it was before 'start' was called. Be careful to not leave any unintended left overs as 'start'
   // might be called again afterwards. It is guaranteed that stop is called after the last
   // call to tick. When start was called stop will be called, too.
-  virtual gxf_result_t stop() = 0;
+  virtual gxf_result_t stop() { return GXF_SUCCESS; }
 
   // Timestamp (in nanoseconds) of the beginning of the start, tick or stop function. The execution
   // timestamp does not change during the start, tick or stop function.
@@ -82,15 +82,15 @@ class Codelet : public Component {
   void beforeStop();
 
   // The number of times the codelet tick function was called.
-  int64_t execution_count_;
+  int64_t execution_count_{0};
   // The timestamp of the previous execution. Equal to 'execution_timestamp' during 'start'.
-  int64_t previous_execution_timestamp_;
+  int64_t previous_execution_timestamp_{0};
   // The timestamp of the current execution in nanoseconds.
   int64_t execution_timestamp_;
   // Same as execution_timestamp_ but in seconds and as a floating point.
   double execution_time_;
   // The difference between the current and the previous execution time in seconds.
-  double delta_time_;
+  double delta_time_{0.0};
 };
 
 }  // namespace gxf

@@ -1,5 +1,5 @@
 """
-Copyright (c) 2020-2022, NVIDIA CORPORATION. All rights reserved.
+Copyright (c) 2020-2024, NVIDIA CORPORATION. All rights reserved.
 
 NVIDIA CORPORATION and its licensors retain all intellectual property
 and proprietary rights in and to this software, related documentation
@@ -153,6 +153,6 @@ register_extension(
     priority = "1",
     url = "www.nvidia.com",
     uuid = "9e6e55d4-1bc9-11ec-9621-0242ac130002",
-    version = "0.3.0",
+    version = "0.6.0",
     visibility = ["//visibility:public"],
 )

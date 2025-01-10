@@ -94,6 +94,13 @@ gxf_result_t StdEntitySerializer::registerInterface(Registrar* registrar) {
   return ToResultCode(result);
 }
 
+gxf_result_t StdEntitySerializer::initialize() {
+  serializer_cache_.clear();
+  outgoing_sequence_number_ = 0;
+  incoming_sequence_number_ = 0;
+  return GXF_SUCCESS;
+}
+
 gxf_result_t StdEntitySerializer::serialize_entity_abi(gxf_uid_t eid, Endpoint* endpoint,
                                                        uint64_t* size) {
   if (endpoint == nullptr || size == nullptr) { return GXF_ARGUMENT_NULL; }

@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2021 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-FileCopyrightText: Copyright (c) 2021-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * SPDX-License-Identifier: Apache-2.0
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -18,7 +18,6 @@
 #define NVIDIA_GXF_TEST_EXTENSIONS_TEST_METRIC_HPP
 
 #include "common/assert.hpp"
-#include "gtest/gtest.h"
 #include "gxf/std/codelet.hpp"
 #include "gxf/std/metric.hpp"
 
@@ -89,8 +88,7 @@ class TestMetricLogger : public Codelet {
     if (!maybe_aggregated_value) {
       gxf::ForwardError(maybe_aggregated_value);
     }
-    // FIXME(dbhaskara): use GXF_ASSERT_NEAR when available
-    EXPECT_NEAR(maybe_aggregated_value.value(), expected_aggregated_value, 1e-4);
+    GXF_ASSERT_NEAR(maybe_aggregated_value.value(), expected_aggregated_value, 1e-4);
 
     const auto maybe_success = metric->evaluateSuccess();
     if (!maybe_success) {

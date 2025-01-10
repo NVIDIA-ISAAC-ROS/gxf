@@ -78,10 +78,10 @@ Expected<void> SystemGroup::removeSystem(Handle<System> system) {
   return Unexpected{GXF_ENTITY_COMPONENT_NOT_FOUND};
 }
 
-gxf_result_t SystemGroup::event_notify_abi(gxf_uid_t eid) {
+gxf_result_t SystemGroup::event_notify_abi(gxf_uid_t eid, gxf_event_t event) {
   for (size_t i = 0; i < systems_.size(); i++) {
       const auto& system = systems_.at(i).value();
-      const auto& result = system->event_notify_abi(eid);
+      const auto& result = system->event_notify_abi(eid, event);
       if (result != GXF_SUCCESS) { return result; }
   }
 

@@ -1,5 +1,5 @@
 """
- SPDX-FileCopyrightText: Copyright (c) 2021 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ SPDX-FileCopyrightText: Copyright (c) 2021-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  SPDX-License-Identifier: Apache-2.0
 
  Licensed under the Apache License, Version 2.0 (the "License");
@@ -139,4 +139,4 @@ def save(filename, text):
 
 if __name__ == "__main__":
   out_dir = sys.argv[1]
-  save(out_dir + '/test_stress_subgraph_gen.yaml', create_app(51))
+  save(out_dir + '/test_stress_subgraph_gen.yaml', create_app(30))

@@ -1,0 +1,137 @@
+"""
+  SPDX-FileCopyrightText: Copyright (c) 2021-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+  SPDX-License-Identifier: Apache-2.0
+
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+"""
+
+diff --git bazel/grpc_build_system.bzl bazel/grpc_build_system.bzl
+index a51f1677c0..77ced0f5d7 100644
+--- bazel/grpc_build_system.bzl
++++ bazel/grpc_build_system.bzl
+@@ -153,7 +153,13 @@ def grpc_cc_library(
+       linkstatic: Whether to enable linkstatic on the cc_library.
+     """
+     visibility = _update_visibility(visibility)
+-    copts = []
++    copts = [
++        "-Wno-unused-but-set-parameter",
++        "-Wno-attributes",
++        "-Wno-maybe-uninitialized",
++        "-Wno-format-security",
++        "-Wno-stringop-overread"
++    ]
+     if language.upper() == "C":
+         copts = copts + if_not_windows(["-std=c11"])
+     linkopts = if_not_windows(["-pthread"]) + if_windows(["-defaultlib:ws2_32.lib"])
+diff --git third_party/cares/cares.BUILD third_party/cares/cares.BUILD
+index 43e8ac7b68..0ec6cf6fa8 100644
+--- third_party/cares/cares.BUILD
++++ third_party/cares/cares.BUILD
+@@ -211,6 +211,7 @@ cc_library(
+         "-D_GNU_SOURCE",
+         "-D_HAS_EXCEPTIONS=0",
+         "-DHAVE_CONFIG_H",
++        "-Wno-stringop-overflow",
+     ] + select({
+         ":windows": [
+             "-DNOMINMAX",
+diff --git bazel/grpc_extra_deps.bzl bazel/grpc_extra_deps.bzl
+index 4d8afa3..514189f 100644
+--- bazel/grpc_extra_deps.bzl
++++ bazel/grpc_extra_deps.bzl
+@@ -53,7 +53,7 @@ def grpc_extra_deps(ignore_version_differences = False):
+     api_dependencies()
+
+     go_rules_dependencies()
+-    go_register_toolchains(version = "1.18")
++    go_register_toolchains()
+     gazelle_dependencies()
+
+     # Pull-in the go 3rd party dependencies for protoc_gen_validate, which is
+diff --git bazel/cc_grpc_library.bzl bazel/cc_grpc_library.bzl
+index 9c31f0c..358200e 100644
+--- bazel/cc_grpc_library.bzl
++++ bazel/cc_grpc_library.bzl
+@@ -13,6 +13,7 @@
+ # limitations under the License.
+ """Generates and compiles C++ grpc stubs from proto_library rules."""
+
++load("//bazel:copts.bzl", "GRPC_DEFAULT_COPTS")
+ load("@rules_proto//proto:defs.bzl", "proto_library")
+ load("//bazel:generate_cc.bzl", "generate_cc")
+ load("//bazel:protobuf.bzl", "well_known_proto_libs")
+@@ -114,5 +115,6 @@ def cc_grpc_library(
+             deps = deps +
+                    extra_deps +
+                    ["@com_github_grpc_grpc//:grpc++_codegen_proto"],
++            copts = GRPC_DEFAULT_COPTS,
+             **kwargs
+         )
+diff --git bazel/copts.bzl bazel/copts.bzl
+index 10be944..0056b55 100644
+--- bazel/copts.bzl
++++ bazel/copts.bzl
+@@ -54,9 +54,17 @@ GRPC_LLVM_WARNING_FLAGS = [
+     # Exceptions but will be removed
+     "-Wno-deprecated-declarations",
+     "-Wno-unused-function",
++    "-fvisibility=hidden",
++    "-fvisibility-inlines-hidden",
+ ]
+
+ GRPC_DEFAULT_COPTS = select({
+-    "//:use_strict_warning": GRPC_LLVM_WARNING_FLAGS + ["-DUSE_STRICT_WARNING=1"],
+-    "//conditions:default": [],
++    "//conditions:default": ["-fvisibility=hidden",
++                             "-fvisibility-inlines-hidden",
++                             "-Wno-unused-but-set-parameter",
++                             "-Wno-attributes",
++                             "-Wno-maybe-uninitialized",
++                             "-Wno-format-security",
++                             "-Wno-stringop-overread",
++                             "-Wno-error=array-bounds"],
+ })
+diff --git third_party/upb/BUILD third_party/upb/BUILD
+index 80a7245..2770532 100644
+--- third_party/upb/BUILD
++++ third_party/upb/BUILD
+@@ -111,7 +111,7 @@ cc_library(
+         "upb/upb.h",
+         "upb/upb.hpp",
+     ],
+-    copts = UPB_DEFAULT_COPTS,
++    copts = UPB_DEFAULT_COPTS + "-Wno-maybe-uninitialized",
+     visibility = ["//visibility:public"],
+     deps = [
+         ":fastdecode",
+diff --git third_party/upb/bazel/build_defs.bzl third_party/upb/bazel/build_defs.bzl
+index b5bc64f..b9c4814 100644
+--- third_party/upb/bazel/build_defs.bzl
++++ third_party/upb/bazel/build_defs.bzl
+@@ -46,7 +46,14 @@ _DEFAULT_COPTS.extend([
+     # GCC (at least) emits spurious warnings for this that cannot be fixed
+     # without introducing redundant initialization (with runtime cost):
+     #   https://gcc.gnu.org/bugzilla/show_bug.cgi?id=80635
+-    #"-Wno-maybe-uninitialized",
++    "-Wno-maybe-uninitialized",
++    "-fvisibility=hidden",
++    "-fvisibility-inlines-hidden",
++    "-Wno-unused-but-set-parameter",
++    "-Wno-attributes",
++    "-Wno-format-security",
++    "-Wno-stringop-overread",
++    "-Wno-error=array-bounds",
+ ])
+ # end:github_only
+

@@ -32,11 +32,9 @@ components:
     port: 7000
     timeout_period: 100ms
     async_scheduling_term: async_st
+    max_msg_delay_ms: 1000
 - name: async_st
   type: nvidia::gxf::AsynchronousSchedulingTerm
-- type: nvidia::gxf::PeriodicSchedulingTerm
-  parameters:
-    recess_period: 100Hz
 ---
 name: generator_1
 components:

@@ -1,5 +1,5 @@
 """
- SPDX-FileCopyrightText: Copyright (c) 2021-2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ SPDX-FileCopyrightText: Copyright (c) 2021-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  SPDX-License-Identifier: Apache-2.0
 
  Licensed under the Apache License, Version 2.0 (the "License");
@@ -52,7 +52,13 @@ class TestCore(unittest.TestCase):
         gxf.core.load_extensions(context, manifest_filenames=[MANIFEST_YAML])
         gxf.core.graph_load_file(context, APP_YAML)
 
+        try:
+            gxf.core.entity_get_ref_count(context, 1)
+        except ValueError as value:
+            self.assertEqual(str(value),"GXF_PARAMETER_NOT_FOUND")
         eid = gxf.core.entity_find(context, "parameter_test")
+        self.assertEqual(gxf.core.entity_get_ref_count(context, eid), 1)
+        self.assertEqual(gxf.core.entity_get_name(context, eid), "parameter_test")
         cids = gxf.core.component_find(
             context, eid, component_name="parameter_test")
         self.assertEqual(len(cids), 1)
@@ -78,6 +84,7 @@ class TestCore(unittest.TestCase):
 
         gxf.core.graph_activate(context)
         eid = gxf.core.entity_find(context, "rx")
+        self.assertEqual(gxf.core.entity_get_ref_count(context, eid), 2)
         self.assertEqual(gxf.core.entity_get_status(context, eid), 0)
         gxf.core.graph_run(context)
         self.assertEqual(gxf.core.entity_get_status(context, eid), 5)
@@ -361,6 +368,8 @@ class TestCore(unittest.TestCase):
                == "nvidia::gxf::PrimitiveType::kUInt32")
         assert(gxf.core.get_gxf_primitive_type(np.dtype(np.uint64))
                == "nvidia::gxf::PrimitiveType::kUInt64")
+        assert(gxf.core.get_gxf_primitive_type(np.dtype(np.float16))
+               == "nvidia::gxf::PrimitiveType::kFloat16")
         assert(gxf.core.get_gxf_primitive_type(np.dtype(np.float32))
                == "nvidia::gxf::PrimitiveType::kFloat32")
         assert(gxf.core.get_gxf_primitive_type(np.dtype(np.float64))
@@ -370,6 +379,144 @@ class TestCore(unittest.TestCase):
         assert(gxf.core.get_gxf_primitive_type(np.dtype(np.complex128))
                == "nvidia::gxf::PrimitiveType::kCustom")
 
+    def test_extension_info(self):
+        context = gxf.core.context_create()
+        self.assertIsNotNone(context)
+        gxf.core.load_extensions(context, manifest_filenames=[MANIFEST_YAML])
+        list = gxf.core.get_extension_list(context)
+        assert len(list) > 0
+        extn_info = gxf.core.get_extension_info(context, list[0])
+        assert extn_info != ""
+        gxf.core.context_destroy(context)
+
+    def test_component_info(self):
+        context = gxf.core.context_create()
+        self.assertIsNotNone(context)
+        gxf.core.load_extensions(context, manifest_filenames=[MANIFEST_YAML])
+        list = gxf.core.get_extension_list(context)
+        assert len(list) > 0
+        comp_list = gxf.core.get_component_list(context, list[0])
+        assert len(comp_list) > 0
+        comp_info = gxf.core.get_component_info(context, comp_list[0])
+        assert comp_info != ""
+        gxf.core.context_destroy(context)
+
+    def test_get_param_info(self):
+        context = gxf.core.context_create()
+        self.assertIsNotNone(context)
+        gxf.core.load_extensions(context, manifest_filenames=[MANIFEST_YAML])
+        list = gxf.core.get_extension_list(context)
+        assert len(list) > 0
+        comp_list = gxf.core.get_component_list(context, list[1])
+        assert len(comp_list) > 0
+        comp_info = gxf.core.get_component_info(context, comp_list[0])
+        assert comp_info != ""
+        param_list = gxf.core.get_param_list(context, comp_list[0])
+        assert len(param_list) > 0
+        param_info = gxf.core.get_param_info(context, comp_list[0], param_list[0])
+        assert len(param_info) > 0
+        gxf.core.context_destroy(context)
+
+    def test_get_param_info(self):
+        context = gxf.core.context_create()
+        self.assertIsNotNone(context)
+        gxf.core.load_extensions(context, manifest_filenames=[MANIFEST_YAML])
+        list = gxf.core.get_extension_list(context)
+        assert len(list) > 0
+
+        for ext in list:
+            comp_list = gxf.core.get_component_list(context, ext)
+            assert len(comp_list) > 0
+            for comp in comp_list:
+                comp_info = gxf.core.get_component_info(context, comp)
+                assert comp_info != ""
+                param_list = gxf.core.get_param_list(context, comp)
+                for param in param_list:
+                    param_info = gxf.core.get_param_info(context, comp, param)
+                    assert len(param_info) > 0
+
+        gxf.core.context_destroy(context)
+
+    def test_set_root_filepath(self):
+        context = gxf.core.context_create()
+        self.assertIsNotNone(context)
+        gxf.core.load_extensions(context, manifest_filenames=[MANIFEST_YAML])
+        gxf.core.set_root_filepath(context, "")
+        gxf.core.context_destroy(context)
+
+    def test_save_graph(self):
+        context = gxf.core.context_create()
+        self.assertIsNotNone(context)
+        gxf.core.load_extensions(context, manifest_filenames=[MANIFEST_YAML])
+        gxf.core.graph_save(context, "Extension")
+        gxf.core.context_destroy(context)
+
+    def test_entity_find_all(self):
+        context = gxf.core.context_create()
+        self.assertIsNotNone(context)
+        gxf.core.load_extensions(context, manifest_filenames=[MANIFEST_YAML])
+
+        gxf.core.graph_load_file(context, "gxf/python/tests/test_ping_py_cpp.yaml")
+        gxf.core.graph_activate(context)
+        gxf.core.graph_run(context)
+        entities = gxf.core.entity_find_all(context)
+        assert len(entities) > 0
+        gxf.core.graph_deactivate(context)
+        gxf.core.context_destroy(context)
+
+    def test_py_codelet_invalid_path(self):
+        context = gxf.core.context_create()
+        self.assertIsNotNone(context)
+        gxf.core.load_extensions(context, manifest_filenames=[MANIFEST_YAML])
+
+        try:
+            gxf.core.graph_load_file(
+                context, "gxf/python/tests/test_py_codelet_invalid.yaml"
+            )
+            gxf.core.graph_activate(context)
+            gxf.core.graph_run(context)
+            gxf.core.graph_deactivate(context)
+            gxf.core.context_destroy(context)
+            assert False
+        except ValueError as v:
+            print("Exception:", v.__str__())
+            assert v.__str__() == "GXF_FAILURE"
+
+    def test_py_codelet_invalid_connection(self):
+        context = gxf.core.context_create()
+        self.assertIsNotNone(context)
+        gxf.core.load_extensions(context, manifest_filenames=[MANIFEST_YAML])
+
+        try:
+            gxf.core.graph_load_file(
+                context, "gxf/python/tests/test_py_codelet_invalid_connection.yaml"
+            )
+            gxf.core.graph_activate(context)
+            gxf.core.graph_run(context)
+            gxf.core.graph_deactivate(context)
+            gxf.core.context_destroy(context)
+            assert False
+        except ValueError as v:
+            print("Exception:", v.__str__())
+            assert v.__str__() == "GXF_ENTITY_COMPONENT_NOT_FOUND"
+
+    def test_py_codelet_empty_path(self):
+        context = gxf.core.context_create()
+        self.assertIsNotNone(context)
+        gxf.core.load_extensions(context, manifest_filenames=[MANIFEST_YAML])
+
+        try:
+            gxf.core.graph_load_file(
+                context, "gxf/python/tests/test_py_codelet_empty_path.yaml"
+            )
+            gxf.core.graph_activate(context)
+            gxf.core.graph_run(context)
+            gxf.core.graph_deactivate(context)
+            gxf.core.context_destroy(context)
+            assert False
+        except ValueError as v:
+            print("Exception:", v.__str__())
+            assert v.__str__() == "GXF_ENTITY_NOT_FOUND"
 
 if __name__ == '__main__':
     unittest.main()

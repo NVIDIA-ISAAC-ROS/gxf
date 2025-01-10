@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2020-2021 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-FileCopyrightText: Copyright (c) 2020-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * SPDX-License-Identifier: Apache-2.0
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -18,16 +18,18 @@
 #define NVIDIA_GXF_TEST_EXTENSIONS_TEST_PARAMETERS_HPP_
 
 #include <cmath>
+#include <complex>
 #include <cstring>
 #include <string>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
 #include "gxf/core/component.hpp"
 #include "gxf/core/entity.hpp"
+#include "gxf/core/parameter_parser_std.hpp"
 #include "gxf/std/allocator.hpp"
 #include "gxf/std/codelet.hpp"
-#include "gxf/std/parameter_parser_std.hpp"
 #include "gxf/std/receiver.hpp"
 #include "gxf/std/tensor.hpp"
 #include "gxf/std/transmitter.hpp"
@@ -254,6 +256,22 @@ class RegisterParameterInterfaceTest : public Component {
     double_default_info.value_range = {-10.0, 10.0, 1.0};
     result &= registrar->parameter(double_default_, double_default_info);
 
+    ParameterInfo<std::complex<float>> complex64_default_info{
+        "complex64",
+        "Complex64",
+        "Description of complex 64 bit number",
+    };
+    complex64_default_info.value_default = std::complex<float>(7.5, 3.0);
+    result &= registrar->parameter(complex64_, complex64_default_info);
+
+    ParameterInfo<std::complex<double>> complex128_default_info{
+        "complex128",
+        "Complex128",
+        "Description of complex 128 bit number",
+    };
+    complex128_default_info.value_default = std::complex<double>(1.234, 5.678);
+    result &= registrar->parameter(complex128_, complex128_default_info);
+
     result &= registrar->parameter(custom_parameter_, "custom_parameter");
 
     // Breaks build
@@ -274,6 +292,8 @@ class RegisterParameterInterfaceTest : public Component {
   Parameter<double> double_default_;
   Parameter<std::vector<std::string>> custom_parameter_;
   Parameter<char*> char_text_;
+  Parameter<std::complex<float>> complex64_;
+  Parameter<std::complex<double>> complex128_;
 };
 
 class FixedVectorParameterTest : public Component {
@@ -342,6 +362,28 @@ class StdParameterTest : public Component {
     GXF_ASSERT_EQ(segments[1].second[0], 20.0);
     GXF_ASSERT_EQ(segments[1].second[1], 2.0);
 
+    const auto& string_to_int_map = string_to_int_map_.get();
+    GXF_ASSERT_EQ(string_to_int_map.size(), 2);
+    GXF_ASSERT_EQ(string_to_int_map.at("hello"), 1);
+    GXF_ASSERT_EQ(string_to_int_map.at("world"), 2);
+
+    const auto& string_to_vector_map = string_to_vector_map_.get();
+    GXF_ASSERT_EQ(string_to_vector_map.size(), 2);
+    GXF_ASSERT_EQ(string_to_vector_map.at("hello").size(), 3);
+    GXF_ASSERT_EQ(string_to_vector_map.at("hello").at(0), 1);
+    GXF_ASSERT_EQ(string_to_vector_map.at("hello").at(1), 2);
+    GXF_ASSERT_EQ(string_to_vector_map.at("hello").at(2), 3);
+    GXF_ASSERT_EQ(string_to_vector_map.at("world").size(), 4);
+    GXF_ASSERT_EQ(string_to_vector_map.at("world").at(0), 4);
+    GXF_ASSERT_EQ(string_to_vector_map.at("world").at(1), 5);
+    GXF_ASSERT_EQ(string_to_vector_map.at("world").at(2), 6);
+    GXF_ASSERT_EQ(string_to_vector_map.at("world").at(3), 7);
+
+    GXF_ASSERT_EQ(complex64_.get().real(), 2);
+    GXF_ASSERT_EQ(complex64_.get().imag(), 1.5);
+
+    GXF_ASSERT_EQ(complex128_.get().real(), -2.102);
+    GXF_ASSERT_EQ(complex128_.get().imag(), -3);
     return GXF_SUCCESS;
   }
 
@@ -372,6 +414,7 @@ class StdParameterTest : public Component {
     };
     vector_info.flags = GXF_PARAMETER_FLAGS_OPTIONAL;
     result &= registrar->parameter(vector_of_handles_, vector_info);
+    result &= registrar->parameter(rank_1_array_, "rank_1_array");
     result &= registrar->parameter(rank_2_array_, "rank_2_array");
     ParameterInfo<std::array<Handle<Allocator>, 2>> array_info {
       "array_of_two_handles",
@@ -381,6 +424,10 @@ class StdParameterTest : public Component {
     };
     array_info.flags = GXF_PARAMETER_FLAGS_OPTIONAL;
     result &= registrar->parameter(array_of_two_handles_, array_info);
+    result &= registrar->parameter(string_to_int_map_, "string_to_int_map");
+    result &= registrar->parameter(string_to_vector_map_, "string_to_vector_map");
+    result &= registrar->parameter(complex64_, "complex64");
+    result &= registrar->parameter(complex128_, "complex128");
     return ToResultCode(result);
   }
 
@@ -394,8 +441,13 @@ class StdParameterTest : public Component {
   Parameter<std::vector<std::vector<uint64_t>>> rank_2_vector_;
   Parameter<std::vector<std::vector<std::vector<uint64_t>>>> rank_3_vector_;
   Parameter<std::vector<Handle<Allocator>>> vector_of_handles_;
+  Parameter<std::array<int32_t, 2 >> rank_1_array_;
   Parameter<std::array<std::array<uint64_t, 2>, 1>> rank_2_array_;
   Parameter<std::array<Handle<Allocator>, 2>> array_of_two_handles_;
+  Parameter<std::unordered_map<std::string, int>> string_to_int_map_;
+  Parameter<std::unordered_map<std::string, std::vector<double>>> string_to_vector_map_;
+  Parameter<std::complex<float>> complex64_;
+  Parameter<std::complex<double>> complex128_;
 };
 
 // Tests various features around handle parameters
@@ -491,6 +543,8 @@ class TestGxfParameterSetFromYamlNode : public Component {
     result &= registrar->parameter(vector_2d_float_, "vector_2d_float");
     result &= registrar->parameter(vector_2d_double_, "vector_2d_double");
     result &= registrar->parameter(vector_2d_string_, "vector_2d_string");
+    result &= registrar->parameter(complex64_, "complex64");
+    result &= registrar->parameter(complex128_, "complex128");
     return ToResultCode(result);
   }
 
@@ -532,6 +586,8 @@ class TestGxfParameterSetFromYamlNode : public Component {
   Parameter<std::vector<std::vector<float>>> vector_2d_float_;
   Parameter<std::vector<std::vector<double>>> vector_2d_double_;
   Parameter<std::vector<std::vector<std::string>>> vector_2d_string_;
+  Parameter<std::complex<float>> complex64_;
+  Parameter<std::complex<double>> complex128_;
 };
 
 }  // namespace test

@@ -1,5 +1,5 @@
 """
- SPDX-FileCopyrightText: Copyright (c) 2021-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ SPDX-FileCopyrightText: Copyright (c) 2021-2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  SPDX-License-Identifier: Apache-2.0
 
  Licensed under the Apache License, Version 2.0 (the "License");
@@ -21,17 +21,29 @@ from gxf.std import Clock
 from gxf.std import Allocator
 from gxf.std import Receiver
 from gxf.std import Transmitter
-
+from gxf.core import Component
 import yaml
 
 class CodeletAdapter:
     """ Base class that users implement for a python codelet.
-        This class is the brige for C++ application and the python codelet.
+        This class is the bridge for C++ application and the python codelet.
         Contains helper functions to access codelet parameters.
     """
 
+    def __init__(self) -> None:
+        self.txs = []
+        self.rxs = []
+        self.sts = []
+
     def set_bridge(self, bridge):
         self.bridge = bridge
+        params = self.get_params()
+        if "_txs" in params:
+            for tx in params["_txs"]:
+                setattr(self, tx, Transmitter.get(self.context(), self.cid(), tx))
+        if "_rxs" in params:
+            for rx in params["_rxs"]:
+                setattr(self, rx, Receiver.get(self.context(), self.cid(), rx))
 
     def context(self):
         return self.bridge.context()

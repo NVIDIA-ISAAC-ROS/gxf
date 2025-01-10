@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2020-2023, NVIDIA CORPORATION. All rights reserved.
+Copyright (c) 2020-2024, NVIDIA CORPORATION. All rights reserved.
 
 NVIDIA CORPORATION and its licensors retain all intellectual property
 and proprietary rights in and to this software, related documentation
@@ -16,6 +16,8 @@ license agreement from NVIDIA CORPORATION is strictly prohibited.
 #include <map>
 #include <memory>
 #include <mutex>
+#include <shared_mutex>  // NOLINT
+#include <thread>
 #include <utility>
 
 #include "nvtx3/nvToolsExt.h"
@@ -33,6 +35,7 @@ license agreement from NVIDIA CORPORATION is strictly prohibited.
 #include "gxf/std/monitor.hpp"
 #include "gxf/std/network_router.hpp"
 #include "gxf/std/router.hpp"
+#include "gxf/std/scheduling_term_combiner.hpp"
 #include "gxf/std/scheduling_terms.hpp"
 #include "gxf/std/system.hpp"
 
@@ -64,6 +67,7 @@ class EntityExecutor {
   // Check if entity is ready to run and run it if possible. Returns scheduling conditions of the
   // entity anyway.
   Expected<SchedulingCondition> executeEntity(gxf_uid_t eid, int64_t timestamp);
+
   // Checks if entity is ready to run but not run it.
   Expected<SchedulingCondition> checkEntity(gxf_uid_t eid, int64_t timestamp);
 
@@ -79,14 +83,18 @@ class EntityExecutor {
   // Removes a monitor from the executor
   Expected<void> removeMonitor(Handle<Monitor> monitor);
 
-  gxf_result_t getEntityStatus(gxf_uid_t eid, gxf_entity_status_t* entity_status);
+  // A thread safe api to the current entity status
+  Expected<void> getEntityStatus(gxf_uid_t eid, gxf_entity_status_t* entity_status);
+
+  // A thread safe api to check if the entity can be executed.
+  // An entity is said to be busy if it is in any one of these states
+  // start pending, started, tick pending or ticking
+  bool isEntityBusy(gxf_uid_t eid);
 
   gxf_result_t getEntityBehaviorStatus(gxf_uid_t eid, entity_state_t& behavior_status);
 
   class EntityItem {
    public:
-    const char* entityStatusStr(gxf_entity_status_t state);
-
     Entity entity;
 
     // store the EntityItem::execute() result for behavior parent codelet to query
@@ -95,17 +103,17 @@ class EntityExecutor {
     // the controller for this entity
     Handle<Controller> controller;
 
-    FixedVector<Handle<PeriodicSchedulingTerm>, kMaxComponents> periodic_terms;
     FixedVector<Handle<DownstreamReceptiveSchedulingTerm>, kMaxComponents>
         downstream_receptive_terms;
     FixedVector<Handle<SchedulingTerm>, kMaxComponents> terms;
     FixedVector<Handle<Codelet>, kMaxComponents> codelets;
+    FixedVector<Handle<SchedulingTermCombiner>, kMaxComponents> combiners;
 
     Expected<SchedulingCondition> check(int64_t timestamp) const;
 
     Expected<bool> activate(
         Entity other, MessageRouter* message_router,
-        std::shared_ptr<FixedVector<Handle<JobStatistics>, kMaxComponents>> statistics,
+        std::shared_ptr<FixedVector<Handle<JobStatistics>>> statistics,
         nvtxDomainHandle_t nvtx_domain, uint32_t nvtx_category_id);
 
     Expected<SchedulingCondition> execute(int64_t timestamp, Router* router,
@@ -128,7 +136,8 @@ class EntityExecutor {
 
     Expected<void> setEntityStatus(const gxf_entity_status_t next_state);
 
-    mutable std::mutex mutex_;
+    mutable std::mutex execution_mutex_;
+    mutable std::mutex status_mutex_;
 
     // Timestamp at which the entity was executed most recently
     int64_t last_execution_timestamp_;
@@ -137,7 +146,7 @@ class EntityExecutor {
     // Flag used to mark nvtx range for state changes
     bool first_status_change_ = true;
     // shared_ptr to statistics_ instance for collecting codelet metrics
-    std::shared_ptr<FixedVector<Handle<JobStatistics>, kMaxComponents>> statistics_;
+    std::shared_ptr<FixedVector<Handle<JobStatistics>>> statistics_;
 
     // NVTX Domain handle used for profiling. All entities use one domain for GXF.
     nvtxDomainHandle_t nvtx_domain_;
@@ -151,7 +160,7 @@ class EntityExecutor {
   };
 
  private:
-  mutable std::mutex mutex_;
+  mutable std::shared_timed_mutex mutex_;
   std::map<gxf_uid_t, std::unique_ptr<EntityItem>> items_;
   Handle<Router> router_;
   Handle<MessageRouter> message_router_;
@@ -159,7 +168,7 @@ class EntityExecutor {
 
   mutable std::mutex statistics_mutex_;
   // List of statistics components that need to be updated when running entities
-  std::shared_ptr<FixedVector<Handle<JobStatistics>, kMaxComponents>> statistics_;
+  std::shared_ptr<FixedVector<Handle<JobStatistics>>> statistics_;
 
   mutable std::mutex monitor_mutex_;
   // List of monitor components that perform a callback when an entity executes

@@ -1,0 +1,162 @@
+%YAML 1.2
+# SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+---
+name: tx
+components:
+- name: signal
+  type: nvidia::gxf::DoubleBufferTransmitter
+- type: nvidia::gxf::DownstreamReceptiveSchedulingTerm
+  parameters:
+    transmitter: signal
+    min_size: 1
+- name: stream_pool
+  type: nvidia::gxf::CudaStreamPool
+  parameters:
+    stream_flags: 0
+    stream_priority: 0
+    reserved_size: 1
+    max_size: 5
+- name: allocator
+  type: nvidia::gxf::StreamOrderedAllocator
+  parameters:
+    release_threshold: "16MB"
+    device_memory_max_size: "32MB"
+- type: nvidia::gxf::test::cuda::CudaAsyncBufferGenerator
+  parameters:
+    signal: signal
+    allocator: allocator
+    stream_pool: stream_pool
+    size: 4096
+- type: nvidia::gxf::CountSchedulingTerm
+  parameters:
+    count: 100
+- type: nvidia::gxf::test::StepCount
+  parameters:
+    expected_count: 100
+---
+name: convolve_1
+components:
+- name: input
+  type: nvidia::gxf::DoubleBufferReceiver
+- type: nvidia::gxf::MessageAvailableSchedulingTerm
+  parameters:
+    receiver: input
+    min_size: 1
+- name: output
+  type: nvidia::gxf::DoubleBufferTransmitter
+- type: nvidia::gxf::DownstreamReceptiveSchedulingTerm
+  parameters:
+    transmitter: output
+    min_size: 1
+- name: allocator
+  type: nvidia::gxf::StreamOrderedAllocator
+  parameters:
+    release_threshold: "16MB"
+    device_memory_max_size: "32MB"
+- type: nvidia::gxf::test::cuda::Convolve2D
+  parameters:
+    allocator: allocator
+    output: output
+    input: input
+    kernel: [[2,2],[2,2]]
+- type: nvidia::gxf::test::StepCount
+  parameters:
+    expected_count: 100
+---
+name: convolve_2
+components:
+- name: input
+  type: nvidia::gxf::DoubleBufferReceiver
+- type: nvidia::gxf::MessageAvailableSchedulingTerm
+  parameters:
+    receiver: input
+    min_size: 1
+- name: output
+  type: nvidia::gxf::DoubleBufferTransmitter
+- type: nvidia::gxf::DownstreamReceptiveSchedulingTerm
+  parameters:
+    transmitter: output
+    min_size: 1
+- name: allocator
+  type: nvidia::gxf::StreamOrderedAllocator
+  parameters:
+    release_threshold: "16MB"
+    device_memory_max_size: "32MB"
+- type: nvidia::gxf::test::cuda::Convolve2D
+  parameters:
+    allocator: allocator
+    output: output
+    input: input
+    kernel: [[4,4],[4,4]]
+- type: nvidia::gxf::test::StepCount
+  parameters:
+    expected_count: 100
+---
+name: rx
+components:
+- name: signal
+  type: nvidia::gxf::DoubleBufferReceiver
+- type: nvidia::gxf::CudaBufferAvailableSchedulingTerm
+  parameters:
+    receiver: signal
+- type: nvidia::gxf::test::cuda::CudaBufferRx
+  parameters:
+    signal: signal
+- type: nvidia::gxf::test::StepCount
+  parameters:
+    expected_count: 100
+---
+name: connections
+components:
+- type: nvidia::gxf::Connection
+  parameters:
+    source: tx/signal
+    target: convolve_1/input
+- type: nvidia::gxf::Connection
+  parameters:
+    source: convolve_1/output
+    target: convolve_2/input
+- type: nvidia::gxf::Connection
+  parameters:
+    source: convolve_2/output
+    target: rx/signal
+---
+name: scheduler
+components:
+- name: clock
+  type: nvidia::gxf::RealtimeClock
+- type: nvidia::gxf::MultiThreadScheduler
+  parameters:
+    clock: clock
+    max_duration_ms: 30000
+    worker_thread_number: 3
+    stop_on_deadlock: true
+    stop_on_deadlock_timeout: 100
+    check_recession_period_ms: 0
+- type: nvidia::gxf::test::EntityMonitor
+- type: nvidia::gxf::JobStatistics
+  parameters:
+    clock: clock
+# Resources
+# GPU
+---
+# only the first will be used by default EntityGroup
+name: GPU_0
+components:
+- type: nvidia::gxf::GPUDevice
+  name: GPU_0
+  parameters:
+    dev_id: 0

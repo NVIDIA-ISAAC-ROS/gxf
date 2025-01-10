@@ -1,0 +1,160 @@
+# SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+application:
+  name: test_multiple_tensor_rx
+---
+dependencies:
+- extension: TestHelperExtension
+  uuid: 1b99ffeb-c250-4ced-8117-62ac05969a50
+  version: 2.6.0
+- extension: StandardExtension
+  uuid: 8ec2d5d6-b5df-48bf-8dee-0252606fdd7e
+  version: 2.6.0
+- extension: UcxExtension
+  uuid: 525f8a1a-dfb5-426b-8ddb-00c3ac839994
+  version: 0.8.0
+---
+components:
+- name: tensor_comparator21
+  parameters:
+    actual: ucx_receiver0
+    compare_timestamp: None
+    expected: double_buffer_receiver23
+  type: nvidia::gxf::test::TensorComparator
+- name: double_buffer_receiver23
+  type: nvidia::gxf::DoubleBufferReceiver
+- name: message_available_scheduling_term27
+  parameters:
+    min_size: 1
+    receiver: double_buffer_receiver23
+  type: nvidia::gxf::MessageAvailableSchedulingTerm
+- name: message_available_scheduling_term28
+  parameters:
+    min_size: 1
+    receiver: ucx_receiver0
+  type: nvidia::gxf::MessageAvailableSchedulingTerm
+- name: step_count43
+  parameters:
+    expected_count: 10
+    expected_start_count: 1
+  type: nvidia::gxf::test::StepCount
+- name: mock_allocator7
+  type: nvidia::gxf::test::MockAllocator
+- name: ucx_receiver0
+  parameters:
+    buffer: ucx_serialization_buffer1
+    port: 13338
+  type: nvidia::gxf::UcxReceiver
+- name: ucx_serialization_buffer1
+  parameters:
+    allocator: mock_allocator7
+    buffer_size: 8192
+  type: nvidia::gxf::UcxSerializationBuffer
+name: TensorComparator0
+ui_property:
+  position:
+    x: 965.0288696289062
+    y: 150.18820190429688
+---
+components:
+- name: greedy_scheduler5
+  parameters:
+    clock: clock
+    stop_on_deadlock: false
+    max_duration_ms: 10000
+  type: nvidia::gxf::GreedyScheduler
+- name: clock
+  type: nvidia::gxf::RealtimeClock
+name: GreedyScheduler
+ui_property:
+  position:
+    x: 857.488037109375
+    y: 576.6712036132812
+---
+components:
+- name: ucx_context7
+  parameters:
+    serializer: ucx_entity_serializer8
+  type: nvidia::gxf::UcxContext
+- name: ucx_entity_serializer8
+  parameters:
+    component_serializers:
+    - ucx_component_serializer9
+  type: nvidia::gxf::UcxEntitySerializer
+- name: ucx_component_serializer9
+  parameters:
+    allocator: mock_allocator10
+  type: nvidia::gxf::UcxComponentSerializer
+- name: mock_allocator10
+  type: nvidia::gxf::test::MockAllocator
+name: UcxContext
+ui_property:
+  position:
+    x: 1075.5767822265625
+    y: 548.384033203125
+---
+components:
+- name: tensor_generator0
+  parameters:
+    allocator: mock_allocator3
+    enable_timestamps: true
+    number_of_tensors: 10
+    output: double_buffer_transmitter1
+    shape: [ 4, 4, 4, 4 ]
+    storage_type: 1
+  type: nvidia::gxf::test::TensorGenerator
+- name: double_buffer_transmitter1
+  type: nvidia::gxf::DoubleBufferTransmitter
+- name: mock_allocator3
+  type: nvidia::gxf::test::MockAllocator
+- name: downstream_receptive_scheduling_term4
+  parameters:
+    min_size: 1
+    transmitter: double_buffer_transmitter1
+  type: nvidia::gxf::DownstreamReceptiveSchedulingTerm
+- name: count_scheduling_term8
+  parameters:
+    count: 10
+  type: nvidia::gxf::CountSchedulingTerm
+name: TensorGenerator
+ui_property:
+  position:
+    x: 546.1895751953125
+    y: 153.82276916503906
+---
+components:
+- name: connection2
+  parameters:
+    source: TensorGenerator/double_buffer_transmitter1
+    target: TensorComparator0/double_buffer_receiver23
+  type: nvidia::gxf::Connection
+name: node0
+---
+name: gpu_resource_entity_0
+components:
+- type: nvidia::gxf::GPUDevice
+  name: gpu_resource_0
+  parameters:
+    dev_id: 0
+---
+EntityGroups:
+- name: entity_group_0
+  target:
+  - "TensorGenerator"
+  - "TensorComparator0"
+  - "UcxContext"
+  - "gpu_resource_entity_0"
+---

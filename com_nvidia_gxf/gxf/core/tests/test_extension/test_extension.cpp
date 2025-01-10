@@ -12,7 +12,7 @@ license agreement from NVIDIA CORPORATION is strictly prohibited.
 
 GXF_EXT_FACTORY_BEGIN()
 GXF_EXT_FACTORY_SET_INFO(kNullUid, 0x1b12ffebc2504ced, "SampleTestExtension",
-                         "Sample test extension to test API GxfRuntimeInfo", "NVIDIA", "0.1.0",
+                         "Sample test extension to test API GxfRuntimeInfo", "NVIDIA", "0.2.0",
                          "NVIDIA");
 
 GXF_EXT_FACTORY_END()

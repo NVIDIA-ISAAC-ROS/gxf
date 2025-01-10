@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #####################################################################################
-# Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2022-2024, NVIDIA CORPORATION. All rights reserved.
 
 # NVIDIA CORPORATION and its licensors retain all intellectual property
 # and proprietary rights in and to this software, related documentation
@@ -48,6 +48,8 @@ function generate_nvsci_package () {
     local ETC
     local include_path
     local l4t_core_path
+    local x86_extracted_path
+    local extracted_path
 
     echo "No of arguments passed - $#"
 
@@ -72,7 +74,7 @@ function generate_nvsci_package () {
 
     if [[ $nvsci_debian =~ $nvsci_version ]]; then
         if [[ $nvsci_debian =~ $platform ]]; then
-            echo "Creating nvsci pacakage for version - $nvsci_version, platform - $platform"
+            echo "Creating nvsci package for version - $nvsci_version, platform - $platform"
         else
             echo "Platform mismatch: Package name - $nvsci_debian, Platform - $platform"
             exit
@@ -86,25 +88,27 @@ function generate_nvsci_package () {
     if [[ $platform == "arm64" && $flavor == "linux" ]]; then
         echo "Platform = $platform && flavor = $flavor"
         # Get the include files from the x86_64 debian package
-        extract_debian_package $nvsci_x86_debian
-        echo "Extracted x86_64 path:" $extracted_path
-        include_path=$extracted_path/usr/include
+        # extract_debian_package $nvsci_x86_debian
+        x86_extracted_path=$(mktemp -d -t gxf-nvsci-XXXXXXXXXX)
+        dpkg -X $nvsci_x86_debian $x86_extracted_path
+        echo "Extracted x86_64 path:" $x86_extracted_path
+        include_path=$x86_extracted_path/usr/include
+
+        extracted_path=$(mktemp -d -t gxf-nvsci-XXXXXXXXXX)
 
         # Extract l4t-core debian packages which contains nvsci dependencies
         echo "l4t_core_debian - $l4t_core_debian"
-        extract_debian_package $l4t_core_debian
+        dpkg-deb -x $l4t_core_debian $extracted_path
         echo "Extracted l4t_core path:" $extracted_path
         l4t_core_path=$extracted_path/usr/lib/aarch64-linux-gnu/tegra
 
         # Extract arm64 debian package and copy the include file from x86_64 debian package
-        extract_debian_package $nvsci_debian
+        dpkg-deb -x $nvsci_debian $extracted_path
         echo "Extracted path:" $extracted_path
         echo "Copying include files from: "  $include_path
         cp -rf $include_path $extracted_path/usr/
+        rm -rf $extracted_path/usr/lib/python3
 
-        echo "l4t_core_path = $l4t_core_path"
-        cp -rf $l4t_core_path/{libnvrm_mem.so,libnvrm_gpu.so,libnvos.so,libnvsciipc.so,libnvrm_host1x.so,libnvrm_chip.so,libnvrm_sync.so,libnvsocsys.so} \
-            $extracted_path/usr/lib/aarch64-linux-gnu/tegra
         platform+="-$flavor"
         echo "Platform = $platform"
     else

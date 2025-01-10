@@ -58,7 +58,7 @@ class EpochScheduler : public Scheduler {
   gxf_result_t runAsync_abi() override;
   gxf_result_t stop_abi() override;
   gxf_result_t wait_abi() override;
-  gxf_result_t event_notify_abi(gxf_uid_t eid) override;
+  gxf_result_t event_notify_abi(gxf_uid_t eid, gxf_event_t event) override;
 
   // Runs the works with external thread. When budget is not positive, all nodes
   // are executed once.

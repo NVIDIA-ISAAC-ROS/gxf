@@ -1,0 +1,487 @@
+################################################################################
+# Copyright (c) 2024, NVIDIA CORPORATION. All rights reserved.
+#
+# NVIDIA Corporation and its licensors retain all intellectual property
+# and proprietary rights in and to this software, related documentation
+# and any modifications thereto.  Any use, reproduction, disclosure or
+# distribution of this software and related documentation without an express
+# license agreement from NVIDIA Corporation is strictly prohibited.
+#
+################################################################################
+
+required_files: [
+    # X86 rpm package files
+    "x86/opt/nvidia/graph-composer/extension-dev/app/libgxf_app.so",
+    "x86/opt/nvidia/graph-composer/config/target_x86_64.yaml",
+    "x86/opt/nvidia/graph-composer/container_builder",
+    "x86/opt/nvidia/graph-composer/container_builder.yaml",
+    "x86/opt/nvidia/graph-composer/graph_targets.yaml",
+    "x86/opt/nvidia/graph-composer/core/core_pybind.so",
+    "x86/opt/nvidia/graph-composer/extension-dev/lib/x86_64/libgxf_core.so",
+    "x86/opt/nvidia/graph-composer/extension-dev/lib/x86_64/libdefault_extension.lo",
+    "x86/opt/nvidia/graph-composer/graphs/sample_graph.yaml",
+    "x86/opt/nvidia/graph-composer/gxf_cli",
+    "x86/opt/nvidia/graph-composer/gxf_server",
+    "x86/opt/nvidia/graph-composer/gxe",
+    "x86/opt/nvidia/graph-composer/libgxf_core.so",
+    "x86/opt/nvidia/graph-composer/registry",
+    "x86/opt/nvidia/graph-composer/third-party-runtime/chardet-3.0.4.tar.gz",
+    "x86/opt/nvidia/graph-composer/third-party-runtime/python-certifi-2020.12.05.tar.gz"
+]
+
+files_no_exec: [
+    "x86/opt/nvidia/graph-composer/config/target_x86_64.yaml",
+    "x86/opt/nvidia/graph-composer/container_builder.yaml",
+    "x86/opt/nvidia/graph-composer/graph_targets.yaml",
+    "x86/opt/nvidia/graph-composer/extension-dev/app/application.hpp",
+    "x86/opt/nvidia/graph-composer/extension-dev/app/arg_parse.hpp",
+    "x86/opt/nvidia/graph-composer/extension-dev/app/arg.hpp",
+    "x86/opt/nvidia/graph-composer/extension-dev/app/config_parser.hpp",
+    "x86/opt/nvidia/graph-composer/extension-dev/app/driver.hpp",
+    "x86/opt/nvidia/graph-composer/extension-dev/app/extension_manager.hpp",
+    "x86/opt/nvidia/graph-composer/extension-dev/app/graph_entity.hpp",
+    "x86/opt/nvidia/graph-composer/extension-dev/app/graph_utils.hpp",
+    "x86/opt/nvidia/graph-composer/extension-dev/app/proxy_component.hpp",
+    "x86/opt/nvidia/graph-composer/extension-dev/app/segment.hpp",
+    "x86/opt/nvidia/graph-composer/extension-dev/app/worker.hpp",
+    "x86/opt/nvidia/graph-composer/extension-dev/BUILD",
+    "x86/opt/nvidia/graph-composer/extension-dev/LICENSE.txt",
+    "x86/opt/nvidia/graph-composer/extension-dev/README",
+    "x86/opt/nvidia/graph-composer/extension-dev/WORKSPACE",
+    "x86/opt/nvidia/graph-composer/extension-dev/common/assert.hpp",
+    "x86/opt/nvidia/graph-composer/extension-dev/common/backtrace.hpp",
+    "x86/opt/nvidia/graph-composer/extension-dev/common/byte.hpp",
+    "x86/opt/nvidia/graph-composer/extension-dev/common/expected.hpp",
+    "x86/opt/nvidia/graph-composer/extension-dev/common/fixed_map.hpp",
+    "x86/opt/nvidia/graph-composer/extension-dev/common/fixed_string.hpp",
+    "x86/opt/nvidia/graph-composer/extension-dev/common/fixed_vector.hpp",
+    "x86/opt/nvidia/graph-composer/extension-dev/common/iterator.hpp",
+    "x86/opt/nvidia/graph-composer/extension-dev/common/logger.hpp",
+    "x86/opt/nvidia/graph-composer/extension-dev/common/memory_utils.hpp",
+    "x86/opt/nvidia/graph-composer/extension-dev/common/nvtx_helper.hpp",
+    "x86/opt/nvidia/graph-composer/extension-dev/common/singleton.hpp",
+    "x86/opt/nvidia/graph-composer/extension-dev/common/strong_type.hpp",
+    "x86/opt/nvidia/graph-composer/extension-dev/common/type_name_gnuc.hpp",
+    "x86/opt/nvidia/graph-composer/extension-dev/common/type_name.hpp",
+    "x86/opt/nvidia/graph-composer/extension-dev/common/type_utils.hpp",
+    "x86/opt/nvidia/graph-composer/extension-dev/common/yaml_parser.hpp",
+    "x86/opt/nvidia/graph-composer/extension-dev/gxf/core/common_expected_macro.hpp",
+    "x86/opt/nvidia/graph-composer/extension-dev/gxf/core/component.hpp",
+    "x86/opt/nvidia/graph-composer/extension-dev/gxf/core/entity.hpp",
+    "x86/opt/nvidia/graph-composer/extension-dev/gxf/core/expected_macro.hpp",
+    "x86/opt/nvidia/graph-composer/extension-dev/gxf/core/expected.hpp",
+    "x86/opt/nvidia/graph-composer/extension-dev/gxf/core/filepath.hpp",
+    "x86/opt/nvidia/graph-composer/extension-dev/gxf/core/gxf_ext.h",
+    "x86/opt/nvidia/graph-composer/extension-dev/gxf/core/gxf.h",
+    "x86/opt/nvidia/graph-composer/extension-dev/gxf/core/handle.hpp",
+    "x86/opt/nvidia/graph-composer/extension-dev/gxf/core/parameter.hpp",
+    "x86/opt/nvidia/graph-composer/extension-dev/gxf/core/registrar.hpp",
+    "x86/opt/nvidia/graph-composer/extension-dev/gxf/core/resource.hpp",
+    "x86/opt/nvidia/graph-composer/extension-dev/gxf/core/parameter_parser.hpp",
+    "x86/opt/nvidia/graph-composer/extension-dev/gxf/core/parameter_parser_std.hpp",
+    "x86/opt/nvidia/graph-composer/extension-dev/gxf/core/parameter_registrar.hpp",
+    "x86/opt/nvidia/graph-composer/extension-dev/gxf/core/parameter_storage.hpp",
+    "x86/opt/nvidia/graph-composer/extension-dev/gxf/core/parameter_wrapper.hpp",
+    "x86/opt/nvidia/graph-composer/extension-dev/gxf/core/resource_manager.hpp",
+    "x86/opt/nvidia/graph-composer/extension-dev/gxf/core/resource_registrar.hpp",
+    "x86/opt/nvidia/graph-composer/extension-dev/gxf/core/type_registry.hpp",
+    "x86/opt/nvidia/graph-composer/extension-dev/gxf/logger/gxf_logger.hpp",
+    "x86/opt/nvidia/graph-composer/extension-dev/gxf/logger/logger.hpp",
+    "x86/opt/nvidia/graph-composer/extension-dev/gxf/std/new_component_allocator.hpp",
+    "x86/opt/nvidia/graph-composer/extension-dev/gxf/std/extension_factory_helper.hpp",
+    "x86/opt/nvidia/graph-composer/extension-dev/gxf/std/codelet.hpp",
+    "x86/opt/nvidia/graph-composer/extension-dev/gxf/std/allocator.hpp",
+    "x86/opt/nvidia/graph-composer/extension-dev/gxf/std/component_factory.hpp",
+    "x86/opt/nvidia/graph-composer/extension-dev/gxf/std/component_allocator.hpp",
+    "x86/opt/nvidia/graph-composer/extension-dev/gxf/std/default_extension.hpp",
+    "x86/opt/nvidia/graph-composer/extension-dev/gxf/std/extension.hpp",
+    "x86/opt/nvidia/graph-composer/extension-dev/build/registry_manifest.tpl",
+    "x86/opt/nvidia/graph-composer/extension-dev/build/toolchain/BUILD",
+    "x86/opt/nvidia/graph-composer/extension-dev/build/toolchain/toolchain.bzl",
+    "x86/opt/nvidia/graph-composer/extension-dev/build/toolchain/crosstool/BUILD",
+    "x86/opt/nvidia/graph-composer/extension-dev/build/toolchain/crosstool/BUILD.tpl",
+    "x86/opt/nvidia/graph-composer/extension-dev/build/toolchain/crosstool/cc_toolchain_config.bzl.tpl",
+    "x86/opt/nvidia/graph-composer/extension-dev/build/graph_extension.bzl",
+    "x86/opt/nvidia/graph-composer/extension-dev/build/BUILD",
+    "x86/opt/nvidia/graph-composer/extension-dev/build/registry.bzl",
+    "x86/opt/nvidia/graph-composer/extension-dev/build/third_party/yaml-cpp.BUILD",
+    "x86/opt/nvidia/graph-composer/graphs/sample_graph.yaml",
+    "x86/opt/nvidia/graph-composer/runtime/LICENSE.txt",
+    "x86/opt/nvidia/graph-composer/third-party-runtime/chardet-3.0.4.tar.gz",
+    "x86/opt/nvidia/graph-composer/third-party-runtime/python-certifi-2020.12.05.tar.gz",
+]
+
+file_map: [
+  {
+    src: "release/config/runtime/x86_64/rhel9",
+    dst: "x86/rhel9",
+  },
+  {
+    src: "registry/config/target_x86_64_rhel.yaml",
+    dst: "x86/opt/nvidia/graph-composer/config/target_x86_64.yaml",
+  },
+  {
+    src: "release/scripts/execute_graph.sh",
+    dst: "x86/opt/nvidia/graph-composer/execute_graph.sh",
+  },
+  {
+    src: "third_party/LICENSE.txt",
+    dst: "x86/opt/nvidia/graph-composer/runtime/LICENSE.txt",
+  },
+  {
+    src: "release/doc/NVIDIA_DeepStream_SDK_EULA.pdf",
+    dst: "x86/opt/nvidia/graph-composer/runtime/NVIDIA_DeepStream_SDK_EULA.pdf",
+  },
+  {
+    src: "container_builder/config/container_builder.yaml",
+    dst: "x86/opt/nvidia/graph-composer/container_builder.yaml"
+  },
+  {
+    src: "container_builder/config/graph_targets.yaml",
+    dst: "x86/opt/nvidia/graph-composer/graph_targets.yaml",
+  },
+  {
+    src: "release/extension-dev/extension-dev_BUILD",
+    dst: "x86/opt/nvidia/graph-composer/extension-dev/BUILD",
+  },
+  {
+    src: "gxf/app/application.hpp",
+    dst: "x86/opt/nvidia/graph-composer/extension-dev/app/application.hpp",
+  },
+  {
+    src: "gxf/app/arg_parse.hpp",
+    dst: "x86/opt/nvidia/graph-composer/extension-dev/app/arg_parse.hpp",
+  },
+  {
+    src: "gxf/app/arg.hpp",
+    dst: "x86/opt/nvidia/graph-composer/extension-dev/app/arg.hpp",
+  },
+  {
+    src: "gxf/app/config_parser.hpp",
+    dst: "x86/opt/nvidia/graph-composer/extension-dev/app/config_parser.hpp",
+  },
+  {
+    src: "gxf/app/driver.hpp",
+    dst: "x86/opt/nvidia/graph-composer/extension-dev/app/driver.hpp",
+  },
+  {
+    src: "gxf/app/extension_manager.hpp",
+    dst: "x86/opt/nvidia/graph-composer/extension-dev/app/extension_manager.hpp",
+  },
+  {
+    src: "gxf/app/graph_entity.hpp",
+    dst: "x86/opt/nvidia/graph-composer/extension-dev/app/graph_entity.hpp",
+  },
+  {
+    src: "gxf/app/graph_utils.hpp",
+    dst: "x86/opt/nvidia/graph-composer/extension-dev/app/graph_utils.hpp",
+  },
+  {
+    src: "gxf/app/proxy_component.hpp",
+    dst: "x86/opt/nvidia/graph-composer/extension-dev/app/proxy_component.hpp",
+  },
+  {
+    src: "gxf/app/segment.hpp",
+    dst: "x86/opt/nvidia/graph-composer/extension-dev/app/segment.hpp",
+  },
+  {
+    src: "gxf/app/worker.hpp",
+    dst: "x86/opt/nvidia/graph-composer/extension-dev/app/worker.hpp",
+  },
+  {
+    src: "release/extension-dev/generate_codelet.py",
+    dst: "x86/opt/nvidia/graph-composer/extension-dev/generate_codelet.py",
+  },
+  {
+    src: "release/extension-dev/install_dependencies_rhel.sh",
+    dst: "x86/opt/nvidia/graph-composer/extension-dev/install_dependencies.sh",
+  },
+  {
+    src: "release/extension-dev/LICENSE.txt",
+    dst: "x86/opt/nvidia/graph-composer/extension-dev/LICENSE.txt",
+  },
+  {
+    src: "release/extension-dev/README",
+    dst: "x86/opt/nvidia/graph-composer/extension-dev/README",
+  },
+  {
+    src: "release/extension-dev/extension-dev_WORKSPACE",
+    dst: "x86/opt/nvidia/graph-composer/extension-dev/WORKSPACE",
+  },
+  {
+    src: "common/assert.hpp",
+    dst: "x86/opt/nvidia/graph-composer/extension-dev/common/assert.hpp",
+  },
+  {
+    src: "common/backtrace.hpp",
+    dst: "x86/opt/nvidia/graph-composer/extension-dev/common/backtrace.hpp",
+  },
+  {
+    src: "common/byte.hpp",
+    dst: "x86/opt/nvidia/graph-composer/extension-dev/common/byte.hpp",
+  },
+  {
+    src: "common/expected.hpp",
+    dst: "x86/opt/nvidia/graph-composer/extension-dev/common/expected.hpp",
+  },
+  {
+    src: "common/fixed_map.hpp",
+    dst: "x86/opt/nvidia/graph-composer/extension-dev/common/fixed_map.hpp",
+  },
+  {
+    src: "common/fixed_string.hpp",
+    dst: "x86/opt/nvidia/graph-composer/extension-dev/common/fixed_string.hpp",
+  },
+  {
+    src: "common/fixed_vector.hpp",
+    dst: "x86/opt/nvidia/graph-composer/extension-dev/common/fixed_vector.hpp",
+  },
+  {
+    src: "common/iterator.hpp",
+    dst: "x86/opt/nvidia/graph-composer/extension-dev/common/iterator.hpp",
+  },
+  {
+    src: "common/logger.hpp",
+    dst: "x86/opt/nvidia/graph-composer/extension-dev/common/logger.hpp",
+  },
+  {
+    src: "common/memory_utils.hpp",
+    dst: "x86/opt/nvidia/graph-composer/extension-dev/common/memory_utils.hpp",
+  },
+  {
+    src: "common/nvtx_helper.hpp",
+    dst: "x86/opt/nvidia/graph-composer/extension-dev/common/nvtx_helper.hpp",
+  },
+  {
+    src: "common/singleton.hpp",
+    dst: "x86/opt/nvidia/graph-composer/extension-dev/common/singleton.hpp",
+  },
+  {
+    src: "common/strong_type.hpp",
+    dst: "x86/opt/nvidia/graph-composer/extension-dev/common/strong_type.hpp",
+  },
+  {
+    src: "common/type_name_gnuc.hpp",
+    dst: "x86/opt/nvidia/graph-composer/extension-dev/common/type_name_gnuc.hpp",
+  },
+  {
+    src: "common/type_name.hpp",
+    dst: "x86/opt/nvidia/graph-composer/extension-dev/common/type_name.hpp",
+  },
+  {
+    src: "common/type_utils.hpp",
+    dst: "x86/opt/nvidia/graph-composer/extension-dev/common/type_utils.hpp",
+  },
+  {
+    src: "common/yaml_parser.hpp",
+    dst: "x86/opt/nvidia/graph-composer/extension-dev/common/yaml_parser.hpp",
+  },
+  {
+    src: "gxf/core/common_expected_macro.hpp",
+    dst: "x86/opt/nvidia/graph-composer/extension-dev/gxf/core/common_expected_macro.hpp",
+  },
+  {
+    src: "gxf/core/component.hpp",
+    dst: "x86/opt/nvidia/graph-composer/extension-dev/gxf/core/component.hpp",
+  },
+  {
+    src: "gxf/core/entity.hpp",
+    dst: "x86/opt/nvidia/graph-composer/extension-dev/gxf/core/entity.hpp",
+  },
+  {
+    src: "gxf/core/expected_macro.hpp",
+    dst: "x86/opt/nvidia/graph-composer/extension-dev/gxf/core/expected_macro.hpp",
+  },
+  {
+    src: "gxf/core/expected.hpp",
+    dst: "x86/opt/nvidia/graph-composer/extension-dev/gxf/core/expected.hpp",
+  },
+  {
+    src: "gxf/core/filepath.hpp",
+    dst: "x86/opt/nvidia/graph-composer/extension-dev/gxf/core/filepath.hpp",
+  },
+  {
+    src: "gxf/core/gxf_ext.h",
+    dst: "x86/opt/nvidia/graph-composer/extension-dev/gxf/core/gxf_ext.h",
+  },
+  {
+    src: "gxf/core/gxf.h",
+    dst: "x86/opt/nvidia/graph-composer/extension-dev/gxf/core/gxf.h",
+  },
+  {
+    src: "gxf/core/handle.hpp",
+    dst: "x86/opt/nvidia/graph-composer/extension-dev/gxf/core/handle.hpp",
+  },
+  {
+    src: "gxf/core/parameter.hpp",
+    dst: "x86/opt/nvidia/graph-composer/extension-dev/gxf/core/parameter.hpp",
+  },
+  {
+    src: "gxf/core/parameter_parser.hpp",
+    dst: "x86/opt/nvidia/graph-composer/extension-dev/gxf/core/parameter_parser.hpp",
+  },
+  {
+    src: "gxf/core/parameter_parser_std.hpp",
+    dst: "x86/opt/nvidia/graph-composer/extension-dev/gxf/core/parameter_parser_std.hpp",
+  },
+  {
+    src: "gxf/core/parameter_storage.hpp",
+    dst: "x86/opt/nvidia/graph-composer/extension-dev/gxf/core/parameter_storage.hpp",
+  },
+  {
+    src: "gxf/core/parameter_wrapper.hpp",
+    dst: "x86/opt/nvidia/graph-composer/extension-dev/gxf/core/parameter_wrapper.hpp",
+  },
+  {
+    src: "gxf/core/parameter_registrar.hpp",
+    dst: "x86/opt/nvidia/graph-composer/extension-dev/gxf/core/parameter_registrar.hpp",
+  },
+  {
+    src: "gxf/core/registrar.hpp",
+    dst: "x86/opt/nvidia/graph-composer/extension-dev/gxf/core/registrar.hpp",
+  },
+  {
+    src: "gxf/core/resource.hpp",
+    dst: "x86/opt/nvidia/graph-composer/extension-dev/gxf/core/resource.hpp",
+  },
+  {
+    src: "gxf/core/resource_manager.hpp",
+    dst: "x86/opt/nvidia/graph-composer/extension-dev/gxf/core/resource_manager.hpp",
+  },
+  {
+    src: "gxf/core/resource_registrar.hpp",
+    dst: "x86/opt/nvidia/graph-composer/extension-dev/gxf/core/resource_registrar.hpp",
+  },
+  {
+    src: "gxf/core/type_registry.hpp",
+    dst: "x86/opt/nvidia/graph-composer/extension-dev/gxf/core/type_registry.hpp",
+  },
+  {
+    src: "gxf/logger/gxf_logger.hpp",
+    dst: "x86/opt/nvidia/graph-composer/extension-dev/gxf/logger/gxf_logger.hpp",
+  },
+  {
+    src: "gxf/logger/logger.hpp",
+    dst: "x86/opt/nvidia/graph-composer/extension-dev/gxf/logger/logger.hpp",
+  },
+  {
+    src: "gxf/std/component_allocator.hpp",
+    dst: "x86/opt/nvidia/graph-composer/extension-dev/gxf/std/component_allocator.hpp",
+  },
+  {
+    src: "gxf/std/default_extension.hpp",
+    dst: "x86/opt/nvidia/graph-composer/extension-dev/gxf/std/default_extension.hpp",
+  },
+  {
+    src: "gxf/std/extension.hpp",
+    dst: "x86/opt/nvidia/graph-composer/extension-dev/gxf/std/extension.hpp",
+  },
+  {
+    src: "gxf/std/new_component_allocator.hpp",
+    dst: "x86/opt/nvidia/graph-composer/extension-dev/gxf/std/new_component_allocator.hpp",
+  },
+  {
+    src: "gxf/std/extension_factory_helper.hpp",
+    dst: "x86/opt/nvidia/graph-composer/extension-dev/gxf/std/extension_factory_helper.hpp",
+  },
+  {
+    src: "gxf/std/codelet.hpp",
+    dst: "x86/opt/nvidia/graph-composer/extension-dev/gxf/std/codelet.hpp",
+  },
+  {
+    src: "gxf/std/allocator.hpp",
+    dst: "x86/opt/nvidia/graph-composer/extension-dev/gxf/std/allocator.hpp",
+  },
+  {
+    src: "gxf/std/component_factory.hpp",
+    dst: "x86/opt/nvidia/graph-composer/extension-dev/gxf/std/component_factory.hpp",
+  },
+  {
+    src: "gxf/std/receiver.hpp",
+    dst: "x86/opt/nvidia/graph-composer/extension-dev/gxf/std/receiver.hpp",
+  },
+  {
+    src: "gxf/std/resources.hpp",
+    dst: "x86/opt/nvidia/graph-composer/extension-dev/gxf/std/resources.hpp",
+  },
+  {
+    src: "gxf/std/transmitter.hpp",
+    dst: "x86/opt/nvidia/graph-composer/extension-dev/gxf/std/transmitter.hpp",
+  },
+  {
+    src: "gxf/std/gems/staging_queue/staging_queue_iterator.hpp",
+    dst: "x86/opt/nvidia/graph-composer/extension-dev/gxf/std/gems/staging_queue/staging_queue_iterator.hpp",
+  },
+  {
+    src: "gxf/std/gems/staging_queue/staging_queue.hpp",
+    dst: "x86/opt/nvidia/graph-composer/extension-dev/gxf/std/gems/staging_queue/staging_queue.hpp",
+  },
+  {
+    src: "gxf/std/gems/queue_thread/queue_thread.hpp",
+    dst: "x86/opt/nvidia/graph-composer/extension-dev/gxf/std/gems/queue_thread/queue_thread.hpp",
+  },
+  {
+    src: "release/extension-dev/build/yaml_loader.py",
+    dst: "x86/opt/nvidia/graph-composer/extension-dev/build/yaml_loader.py",
+  },
+  {
+    src: "registry/build/registry_manifest.tpl",
+    dst: "x86/opt/nvidia/graph-composer/extension-dev/build/registry_manifest.tpl",
+  },
+  {
+    src: "registry/core/dependency_manager.py",
+    dst: "x86/opt/nvidia/graph-composer/extension-dev/build/dependency_manager.py",
+  },
+  {
+    src: "release/extension-dev/build/toolchain/BUILD",
+    dst: "x86/opt/nvidia/graph-composer/extension-dev/build/toolchain/BUILD",
+  },
+  {
+    src: "release/extension-dev/build/toolchain/toolchain.bzl",
+    dst: "x86/opt/nvidia/graph-composer/extension-dev/build/toolchain/toolchain.bzl",
+  },
+  {
+    src: "release/extension-dev/build/toolchain/crosstool/BUILD",
+    dst: "x86/opt/nvidia/graph-composer/extension-dev/build/toolchain/crosstool/BUILD",
+  },
+  {
+    src: "release/extension-dev/build/toolchain/crosstool/BUILD.tpl",
+    dst: "x86/opt/nvidia/graph-composer/extension-dev/build/toolchain/crosstool/BUILD.tpl",
+  },
+  {
+    src: "release/extension-dev/build/toolchain/crosstool/cc_toolchain_config.bzl.tpl",
+    dst: "x86/opt/nvidia/graph-composer/extension-dev/build/toolchain/crosstool/cc_toolchain_config.bzl.tpl",
+  },
+  {
+    src: "release/extension-dev/build/graph_extension.bzl",
+    dst: "x86/opt/nvidia/graph-composer/extension-dev/build/graph_extension.bzl",
+  },
+  {
+    src: "release/extension-dev/build/build_BUILD",
+    dst: "x86/opt/nvidia/graph-composer/extension-dev/build/BUILD",
+  },
+  {
+    src: "release/extension-dev/build/registry.bzl",
+    dst: "x86/opt/nvidia/graph-composer/extension-dev/build/registry.bzl",
+  },
+  {
+    src: "release/extension-dev/build/third_party/yaml-cpp.BUILD",
+    dst: "x86/opt/nvidia/graph-composer/extension-dev/build/third_party/yaml-cpp.BUILD",
+  },
+  {
+    src: "gxf/sample/sample_graph.yaml",
+    dst: "x86/opt/nvidia/graph-composer/graphs/sample_graph.yaml",
+  },
+  {
+    src: "gxf/core/__init__.py",
+    dst: "x86/opt/nvidia/graph-composer/core/__init__.py",
+  },
+  {
+    src: "gxf/core/Gxf.py",
+    dst: "x86/opt/nvidia/graph-composer/core/Gxf.py",
+  },
+  {
+    src: "gxf/core/logger.py",
+    dst: "x86/opt/nvidia/graph-composer/core/logger.py",
+  },
+]

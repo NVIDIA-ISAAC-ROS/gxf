@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2021 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-FileCopyrightText: Copyright (c) 2021-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * SPDX-License-Identifier: Apache-2.0
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -124,6 +124,17 @@
     const auto _vb = exp_b;                                                                        \
     GXF_ASSERT(_va <= _vb, "Assert failed: %s <= %s.", std::to_string(_va).c_str(),                \
                std::to_string(_vb).c_str());                                                       \
+  }
+
+// Asserts that abs(A - B) <= abs_error. If not prints a panic message and aborts the program.
+#define GXF_ASSERT_NEAR(exp_a, exp_b, exp_abs_error)                                               \
+  {                                                                                                \
+    const auto _va = exp_a;                                                                        \
+    const auto _vb = exp_b;                                                                        \
+    const auto _verror = exp_abs_error;                                                            \
+    GXF_ASSERT(std::abs(_va - _vb) <= _verror, "Assert failed: abs(%s - %s) <= %s.",               \
+               std::to_string(_va).c_str(), std::to_string(_vb).c_str(),                           \
+               std::to_string(_verror).c_str());                                                   \
   }
 
 #endif  // NVIDIA_COMMON_ASSERT_HPP_

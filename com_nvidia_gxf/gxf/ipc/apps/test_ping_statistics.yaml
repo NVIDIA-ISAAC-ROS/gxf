@@ -1,0 +1,88 @@
+%YAML 1.2
+# SPDX-FileCopyrightText: Copyright (c) 2021 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+---
+name: tx
+components:
+- name: signal
+  type: nvidia::gxf::DoubleBufferTransmitter
+- type: nvidia::gxf::DownstreamReceptiveSchedulingTerm
+  name: nvidia::gxf::DownstreamReceptiveSchedulingTerm_tx
+  parameters:
+    transmitter: signal
+    min_size: 1
+- type: nvidia::gxf::PeriodicSchedulingTerm
+  name: nvidia::gxf::PeriodicSchedulingTerm_Tx
+  parameters:
+    recess_period: 1s
+- type: nvidia::gxf::CountSchedulingTerm
+  name: nvidia::gxf::CountSchedulingTerm_Tx
+  parameters:
+    count: 100
+- name: ping_tx
+  type: nvidia::gxf::PingTx
+  parameters:
+    signal: signal
+- name: step_count_tx
+  type: nvidia::gxf::test::StepCount
+  parameters:
+    expected_count: 100
+---
+name: rx
+components:
+- name: signal
+  type: nvidia::gxf::DoubleBufferReceiver
+- type: nvidia::gxf::MessageAvailableSchedulingTerm
+  name: nvidia::gxf::MessageAvailableSchedulingTerm_rx
+  parameters:
+    receiver: signal
+    min_size: 1
+- name: ping_rx
+  type: nvidia::gxf::PingRx
+  parameters:
+    signal: signal
+- name: step_count_rx
+  type: nvidia::gxf::test::StepCount
+  parameters:
+    expected_count: 100
+---
+name: connections
+components:
+- type: nvidia::gxf::Connection
+  parameters:
+    source: tx/signal
+    target: rx/signal
+---
+name: ipc
+components:
+- name: http_server
+  type: nvidia::gxf::HttpServer
+- name: grpc_server
+  type: nvidia::gxf::GrpcServer
+---
+name: scheduler
+components:
+- name: clock
+  type: nvidia::gxf::RealtimeClock
+- type: nvidia::gxf::GreedyScheduler
+  parameters:
+    max_duration_ms: 1000000
+    clock: clock
+- type: nvidia::gxf::JobStatistics
+  parameters:
+    clock: clock
+    codelet_statistics: true
+    server: ipc/http_server
+    event_history_count: 10

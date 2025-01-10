@@ -56,7 +56,7 @@ TEST_F(GxfRedirectLogTest, Error) {
 }
 
 TEST_F(GxfRedirectLogTest, Debug) {
-  // Default severity is INFO so debug level wont be logged.
+  // Default severity is INFO so debug level won't be logged.
   GXF_ASSERT_SUCCESS(GxfSetSeverity(context, GXF_SEVERITY_DEBUG));
   GXF_ASSERT_SUCCESS(GxfRedirectLog(context, pFile));
   GXF_LOG_DEBUG("%s", testString);

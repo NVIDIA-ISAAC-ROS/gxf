@@ -80,7 +80,7 @@ EOF
 )
 
 cat $PWD/all_tests_formatted | while read line; do
-    # Skipping extentions. Due to the failure:
+    # Skipping extensions. Due to the failure:
     # ERROR: unknown command line flag 'gtest_list_tests'
     if [[ $line =~ "extensions/" || $line =~ "_yaml" ]]; then
       continue
@@ -150,7 +150,7 @@ done
 
 throwErrors # failing a command if result is non-null
 
-# change all the classnames here to Jetson.<classname>, to seperate from bazel tests
+# change all the classnames here to Jetson.<classname>, to separate from bazel tests
 for file in $PWD/jetson_testlog/*
 do
     sed -i 's/classname="/&Jetson\./g' $file

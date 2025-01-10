@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2021-2023, NVIDIA CORPORATION. All rights reserved.
+Copyright (c) 2021-2024, NVIDIA CORPORATION. All rights reserved.
 
 NVIDIA CORPORATION and its licensors retain all intellectual property
 and proprietary rights in and to this software, related documentation
@@ -19,7 +19,9 @@ license agreement from NVIDIA CORPORATION is strictly prohibited.
 
 #include "gxf/core/gxf.h"
 #include "gxf/core/registrar.hpp"
+#include "gxf/std/entity_executor.hpp"
 #include "gxf/std/entity_resource_helper.hpp"
+#include "gxf/std/gems/utils/time.hpp"
 
 namespace nvidia {
 namespace gxf {
@@ -139,10 +141,15 @@ void MultiThreadScheduler::updateCondition(gxf_uid_t eid,
 }
 
 void MultiThreadScheduler::dispatcherThreadEntrance() {
+  pthread_setname_np(pthread_self(), "dispatcher");
+  uint64_t dispatcher_end = getCurrentTimeUs();
+  uint64_t dispatcher_begin = getCurrentTimeUs();
   while (state_ == State::kRunning) {
     gxf_uid_t eid = kNullUid;
     check_jobs_->waitForJob(eid);
-
+    dispatcher_begin = getCurrentTimeUs();
+    dispatcherWaitTime += (dispatcher_begin - dispatcher_end);
+    dispatcherExecCount++;
     if (kNullUid == eid) {
       GXF_LOG_INFO("Dispatcher thread has no more jobs to check");
       break;
@@ -192,6 +199,9 @@ void MultiThreadScheduler::dispatcherThreadEntrance() {
       } break;
       case SchedulingConditionType::NEVER: {
         // drops
+        const char* entityName = "UNKNOWN_NAME";
+        GxfEntityGetName(context(), eid, &entityName);
+        GXF_LOG_DEBUG("[E%05zu] Unscheduling entity [%s] from execution", eid, entityName);
       } break;
       default: {
         // an error occurred, clean up and exit
@@ -201,6 +211,8 @@ void MultiThreadScheduler::dispatcherThreadEntrance() {
         stopAllJobs();
       } break;
     }
+    dispatcher_end = getCurrentTimeUs();
+    dispatcherExecTime += (dispatcher_end - dispatcher_begin);
   }
 
   GXF_LOG_INFO("Dispatcher thread has stopped checking jobs");
@@ -272,6 +284,8 @@ bool MultiThreadScheduler::isJobMatchStrict(ThreadPool* pool, int64_t thread_num
 }
 
 void MultiThreadScheduler::workerThreadEntrance(ThreadPool* pool, int64_t thread_number) {
+  auto thread_name = std::string("WorkerThread-") + std::to_string(thread_number);
+  pthread_setname_np(pthread_self(), thread_name.c_str());
   if (pool == nullptr) {
     GXF_LOG_ERROR("workerThreadEntrance has nullptr for arg ThreadPool*, exiting thread");
     return;
@@ -285,14 +299,18 @@ void MultiThreadScheduler::workerThreadEntrance(ThreadPool* pool, int64_t thread
   }
   GXF_LOG_INFO("MultiThreadScheduler started worker thread [pool name: %s, thread uid: %ld]",
                pool_name.c_str(), thread_number);
+  uint64_t worker_begin = getCurrentTimeUs();
+  uint64_t worker_end = getCurrentTimeUs();
 
   // Start thread loop
   while (true) {
     gxf_uid_t eid = kNullUid;
     worker_jobs_->waitForJob(eid);
-
+    worker_begin = getCurrentTimeUs();
+    workerWaitTime += (worker_begin - worker_end);
+    workerExecCount++;
     const char* entityName = "UNKNOWN";
-    GxfParameterGetStr(context(), eid, kInternalNameParameterKey, &entityName);
+    GxfEntityGetName(context(), eid, &entityName);
 
     if (kNullUid == eid) {
       GXF_LOG_INFO("Worker Thread [pool name: %s, thread uid: %ld] exiting.",
@@ -321,7 +339,7 @@ void MultiThreadScheduler::workerThreadEntrance(ThreadPool* pool, int64_t thread
       if (!maybe_condition) {
         auto maybeEntity = nvidia::gxf::Entity::Shared(context(), eid);
         const char* entityName = "UNKNOWN";
-        GxfParameterGetStr(context(), eid, kInternalNameParameterKey, &entityName);
+        GxfEntityGetName(context(), eid, &entityName);
         GXF_LOG_WARNING("Error while executing entity E%zu named '%s': %s", eid, entityName,
                         GxfResultStr(maybe_condition.error()));
         // an error occurred
@@ -335,14 +353,19 @@ void MultiThreadScheduler::workerThreadEntrance(ThreadPool* pool, int64_t thread
     // else sends a notification to the dispatcher thread indicating job done
     if (state_ == State::kRunning) {
       check_jobs_->insert(eid, clock_.get()->timestamp(), kMaxSlipNs, 0);
+      worker_end = getCurrentTimeUs();
+      workerExecTime += (worker_end - worker_begin);
     } else {
       std::unique_lock<std::mutex> lock(state_change_mutex_);
       work_done_cv_.notify_one();
+      worker_end = getCurrentTimeUs();
+      workerExecTime += (worker_end - worker_begin);
     }
   }
 }
 
 void MultiThreadScheduler::asyncEventThreadEntrance() {
+  pthread_setname_np(pthread_self(), "async");
   while (true) {
     if (state_ != State::kRunning) {
       GXF_LOG_INFO("Event handler thread exiting.");
@@ -377,9 +400,9 @@ void MultiThreadScheduler::checkEndingCriteria(int64_t timestamp) {
   bool should_stop = false;
   {  // start of lock
     std::lock_guard<std::mutex> lock(conditions_mutex_);
-    // only print status counts when users enable stope on dealock timeout
+    // only print status counts when users enable stop on deadlock timeout
     if (stop_on_deadlock_timeout_.get() > 0) {
-      GXF_LOG_DEBUG("ready_count_: %ld, wait_time_count_: %ld, wait_event_count_: %ld, "
+      GXF_LOG_VERBOSE("ready_count_: %ld, wait_time_count_: %ld, wait_event_count_: %ld, "
         "wait_count_: %ld", ready_count_, wait_time_count_, wait_event_count_,
         wait_count_);
     }
@@ -387,8 +410,11 @@ void MultiThreadScheduler::checkEndingCriteria(int64_t timestamp) {
         stop_on_deadlock_ && ready_count_ == 0 && wait_time_count_ == 0 && wait_event_count_ == 0;
 
     // check if need to timeout the stop
-    gxf_result_t result = stop_on_deadlock_timeout(stop_on_deadlock_timeout_.get(),
-                          clock_.get()->timestamp(), should_stop);
+    // When recession period is non-zero accumulate it with stop_on_deadlock_timeout_.
+    // An entity may be available but due to the recession period it is not scheduled.
+    gxf_result_t result = stop_on_deadlock_timeout(stop_on_deadlock_timeout_.get() +
+                                                   check_recession_period_ms_.get(),
+                                                   clock_.get()->timestamp(), should_stop);
     if (result != GXF_SUCCESS) {
       GXF_LOG_ERROR("Failed to re-evaluate should_stop based on timeout");
     }
@@ -460,6 +486,9 @@ gxf_result_t MultiThreadScheduler::deinitialize() {
   event_notified_.reset(nullptr);
 
 
+  int64_t total_time =  clock_.get()->timestamp() - start_timestamp_;
+  (void)total_time;  // avoid unused variable warning
+  GXF_LOG_INFO("TOTAL EXECUTION TIME OF SCHEDULER : %f ms\n", total_time/1000000.0);
   return thread_error_code_;
 }
 
@@ -513,7 +542,7 @@ gxf_result_t MultiThreadScheduler::schedule_abi(gxf_uid_t eid) {
   if (!entity) {
     return ToResultCode(entity);
   }
-  auto codelets = entity->findAll<Codelet>();
+  auto codelets = entity->findAllHeap<Codelet>();
   if (!codelets) {
     return ToResultCode(codelets);
   }
@@ -540,7 +569,7 @@ gxf_result_t MultiThreadScheduler::unschedule_abi(gxf_uid_t eid) {
   if (!entity) {
     return ToResultCode(entity);
   }
-  auto codelets = entity->findAll<Codelet>();
+  auto codelets = entity->findAllHeap<Codelet>();
   if (!codelets) {
     return ToResultCode(codelets);
   }
@@ -608,7 +637,11 @@ gxf_result_t MultiThreadScheduler::stop_abi() {
   stopAllJobs();
 
   // dispatcher thread is responsible for cleaning up worker thread pool
-  if (dispatcher_thread_.joinable()) { dispatcher_thread_.join(); }
+  {
+    // lock to avoid double join() call with wait_abi()
+    std::unique_lock<std::mutex> lock(dispatcher_sync_mutex_);
+    if (dispatcher_thread_.joinable()) { dispatcher_thread_.join(); }
+  }
   GXF_LOG_INFO("Multithread scheduler stopped.");
   return thread_error_code_;
 }
@@ -623,13 +656,18 @@ gxf_result_t MultiThreadScheduler::wait_abi() {
     }
   }
 
-  if (dispatcher_thread_.joinable()) { dispatcher_thread_.join(); }
+  {
+    // lock to avoid double join() call with stop_abi()
+    std::unique_lock<std::mutex> lock(dispatcher_sync_mutex_);
+    if (dispatcher_thread_.joinable()) { dispatcher_thread_.join(); }
+  }
   GXF_LOG_INFO("Multithread scheduler finished.");
   return thread_error_code_;
 }
 
-gxf_result_t MultiThreadScheduler::event_notify_abi(gxf_uid_t eid) {
+gxf_result_t MultiThreadScheduler::event_notify_abi(gxf_uid_t eid, gxf_event_t event) {
   GXF_LOG_DEBUG("Received event done notification for entity %ld", eid);
+  if (event != GXF_EVENT_EXTERNAL) { return GXF_SUCCESS; }
   std::unique_lock<std::mutex> lock(event_notification_mutex_);
   event_notified_->pushEvent(eid);
   event_notification_cv_.notify_one();
@@ -661,16 +699,22 @@ void MultiThreadScheduler::stopAllJobs() {
   event_waiting_->clear();              // Clear the event waiting list
   unschedule_entities_->clear();        // Clear unscheduling requests
   event_notification_cv_.notify_one();  // Stops the async worker thread
+  GXF_LOG_INFO("*********************** DISPATCHER EXEC TIME : %f ms\n", dispatcherExecTime/1000.0);
+  GXF_LOG_INFO("*********************** DISPATCHER WAIT TIME : %f ms\n", dispatcherWaitTime/1000.0);
+  GXF_LOG_INFO("*********************** DISPATCHER COUNT : %ld\n", dispatcherExecCount);
+  GXF_LOG_INFO("*********************** WORKER EXEC TIME : %f ms \n", workerExecTime.load()/1000.0);
+  GXF_LOG_INFO("*********************** WORKER WAIT TIME : %f ms\n", workerWaitTime.load()/1000.0);
+  GXF_LOG_INFO("*********************** WORKER COUNT : %ld\n", workerExecCount.load());
 
   return;
 }
 
 gxf_result_t MultiThreadScheduler::stop_on_deadlock_timeout(const int64_t timeout,
                                             const int64_t now, bool& should_stop) {
-  // only print debug when enable stop_on_deadlock_timeout, i.e. timeout > 0.
+  // only print log messages when enable stop_on_deadlock_timeout, i.e. timeout > 0.
   // timeout = 0 is equivalent to stop_on_dealock without timeout
   if (timeout > 0) {
-    GXF_LOG_DEBUG("timeout: %ld, now: %ld, last_no_stop_ts_:%ld, should_stop: %d",
+    GXF_LOG_VERBOSE("timeout: %ld, now: %ld, last_no_stop_ts_:%ld, should_stop: %d",
                 timeout, now, last_no_stop_ts_, should_stop);
   }
 
@@ -694,11 +738,11 @@ gxf_result_t MultiThreadScheduler::stop_on_deadlock_timeout(const int64_t timeou
     return GXF_SUCCESS;
   }
 
-  // 2. If having trend to stop in this interation,
+  // 2. If having trend to stop in this iteration,
   //     2.1 toggle should_stop to false if still within timeout period
-  if (now - last_no_stop_ts_ < timeout * 1'000'000l) {
-    GXF_LOG_DEBUG("Onhold trend to stop on deadlock for [%ld] ms",
-                  (now - last_no_stop_ts_) / 1'000'000l);
+  if ((now - last_no_stop_ts_) / 1'000'000l <= timeout) {
+    GXF_LOG_VERBOSE("Onhold trend to stop on deadlock for [%ld] ms",
+                    (now - last_no_stop_ts_) / 1'000'000l);
     should_stop = false;
     // return with should_stop toggled to false
     return GXF_SUCCESS;

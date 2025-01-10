@@ -37,7 +37,7 @@ class MultiPingRx(Component):
     '''
     gxf_native_type: str = "nvidia::gxf::MultiPingRx"
 
-    _validation_info_parameters = {'receivers': {'key': 'receivers', 'headline': 'Receivers', 'description': 'A list of receivers which the entity can pop message entities', 'gxf_parameter_type': 'GXF_PARAMETER_TYPE_CUSTOM', 'rank': 0, 'shape': [1], 'flags': 'GXF_PARAMETER_FLAGS_NONE', 'handle_type': 'N/A', 'default': 'N/A'}}
+    _validation_info_parameters = {'receivers': {'key': 'receivers', 'headline': 'Receivers', 'description': 'A list of receivers which the entity can pop message entities', 'gxf_parameter_type': 'GXF_PARAMETER_TYPE_HANDLE', 'rank': 1, 'shape': [-1], 'flags': 'GXF_PARAMETER_FLAGS_NONE', 'handle_type': 'nvidia::gxf::Receiver', 'default': 'N/A'}}
 
     def __init__(self, name: str= "", **params):
         Component.__init__(self, type=self.get_gxf_type(), name=name, **params)

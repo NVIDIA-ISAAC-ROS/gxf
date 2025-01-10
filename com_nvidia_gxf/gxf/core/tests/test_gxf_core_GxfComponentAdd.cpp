@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
+Copyright (c) 2022-2024, NVIDIA CORPORATION. All rights reserved.
 
 NVIDIA CORPORATION and its licensors retain all intellectual property
 and proprietary rights in and to this software, related documentation
@@ -63,5 +63,5 @@ TEST_F(GxfComponentAdd_Test, MaxComponents) {
   for (auto i = 0; i < kMaxComponents; ++i) {
     GXF_ASSERT_EQ(GxfComponentAdd(context, eid, tid, "test", &cid),GXF_SUCCESS);
   }
-  GXF_ASSERT_EQ(GxfComponentAdd(context, eid, tid, "test", &cid), GXF_OUT_OF_MEMORY);
+  GXF_ASSERT_EQ(GxfComponentAdd(context, eid, tid, "test", &cid), GXF_ENTITY_MAX_COMPONENTS_LIMIT_EXCEEDED);
 }

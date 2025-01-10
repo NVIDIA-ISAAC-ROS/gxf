@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2021-2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-FileCopyrightText: Copyright (c) 2021-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * SPDX-License-Identifier: Apache-2.0
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -20,8 +20,8 @@
 #include <string>
 #include <vector>
 
+#include "gxf/core/parameter_parser_std.hpp"
 #include "gxf/python_codelet/py_codelet.hpp"
-#include "gxf/std/parameter_parser_std.hpp"
 
 namespace nvidia {
 namespace gxf {
@@ -129,6 +129,27 @@ std::string PyCodeletV0::getParams() {
     throw std::runtime_error(GxfResultStr(GXF_PARAMETER_NOT_INITIALIZED));
   }
   return maybe_codelet_params.value();
+}
+
+PyCodeletV0::~PyCodeletV0() noexcept {
+  // safely reset pycodelet which is a pybind object
+  pybind11::gil_scoped_acquire acquire;
+  pycodelet = pybind11::none();
+  pybind11::gil_scoped_release release_gil;
+}
+
+PyCodeletV0::PyCodeletV0() {
+  // static int gets initialized only once
+  // check whetther the python interpreter is initialized
+  static int initVal = Py_IsInitialized();
+  if ( initVal == 0 ) {
+    // static variables get initialized only once.
+    // initialize the python interpreter only it it is uninitialized
+    static pybind11::scoped_interpreter guard{};
+    // python interpreter immediately acquires the GIL guard, hence releasing it
+    static pybind11::gil_scoped_release release_gil_begin;
+    initVal = Py_IsInitialized();
+  }
 }
 
 }  // namespace gxf

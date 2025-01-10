@@ -1,5 +1,5 @@
 """
-Copyright (c) 2020-2023, NVIDIA CORPORATION. All rights reserved.
+Copyright (c) 2020-2024, NVIDIA CORPORATION. All rights reserved.
 
 NVIDIA CORPORATION and its licensors retain all intellectual property
 and proprietary rights in and to this software, related documentation
@@ -37,6 +37,7 @@ nv_gxf_cc_library(
     srcs = ["nppi_mul_c.cpp"],
     hdrs = ["nppi_mul_c.hpp"],
     deps = [
+        "//gxf/core:gxf_cpp_api",
         "//gxf/std",
         "//third_party:nppial",
     ],
@@ -72,7 +73,7 @@ register_extension(
     name = "register_npp_ext",
     extension = "npp",
     uuid = "98839b87-ddb5-4e77-b0df-44c1a5ad136e",
-    version = "2.3.0",
+    version = "2.6.0",
     headers = [
         "BUILD.public",
         "nppi_mul_c.hpp",

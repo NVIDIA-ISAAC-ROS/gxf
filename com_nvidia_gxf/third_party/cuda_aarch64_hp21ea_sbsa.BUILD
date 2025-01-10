@@ -19,5 +19,5 @@ load("@com_nvidia_gxf//third_party:cuda.bzl", "cuda_device_deps")
 
 cuda_device_deps(
     family = "aarch64_sbsa",
-    version = "12.1",
+    version = "12.2",
 )

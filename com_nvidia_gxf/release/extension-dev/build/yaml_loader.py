@@ -1,5 +1,5 @@
 ################################################################################
-# SPDX-FileCopyrightText: Copyright (c) 2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2022-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -45,7 +45,7 @@ class YamlLoader:
                 print("Yaml Loader: Invalid file, not a text file")
                 return None
             with open(file_path) as fp:
-                doc = copy.deepcopy(yaml.safe_load(fp))
+                doc = copy.deepcopy(yaml.full_load(fp))
                 return doc
         except yaml.YAMLError as exc:
             if hasattr(exc, 'problem_mark'):
@@ -61,7 +61,7 @@ class YamlLoader:
             return None
         try:
             with open(file_path) as fp:
-                docs = copy.deepcopy(list(yaml.load_all(fp, Loader=yaml.SafeLoader)))
+                docs = copy.deepcopy(list(yaml.full_load_all(fp, Loader=yaml.SafeLoader)))
                 return docs
         except yaml.YAMLError as exc:
              if hasattr(exc, 'problem_mark'):
@@ -74,7 +74,7 @@ class YamlLoader:
         """
 
         try:
-            doc = yaml.safe_load(yaml_string)
+            doc = yaml.full_load(yaml_string)
             return doc
         except yaml.YAMLError as exc:
             if hasattr(exc, 'problem_mark'):

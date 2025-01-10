@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2021-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-FileCopyrightText: Copyright (c) 2021-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * SPDX-License-Identifier: Apache-2.0
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -49,14 +49,15 @@ class __attribute__((visibility("hidden"))) PyCodeletV0 : public Codelet {
   /// @return string containing the codelet_params
   std::string getParams();
 
+  PyCodeletV0();
+  ~PyCodeletV0() noexcept;
+
  private:
   Parameter<std::string> codelet_name_;
   Parameter<std::string> codelet_filepath_;
   Parameter<std::string> codelet_params_;
 
-  template <typename S>
-  Expected<Handle<S>> getHandle(const char* name);
-  pybind11::object pycodelet;
+  pybind11::object pycodelet  = pybind11::none();
 };
 }  // namespace gxf
 }  // namespace nvidia

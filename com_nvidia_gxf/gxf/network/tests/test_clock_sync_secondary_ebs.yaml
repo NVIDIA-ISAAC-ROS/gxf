@@ -1,0 +1,79 @@
+%YAML 1.2
+# Copyright (c) 2023, NVIDIA CORPORATION.  All rights reserved.
+#
+# NVIDIA CORPORATION and its licensors retain all intellectual property
+# and proprietary rights in and to this software, related documentation
+# and any modifications thereto.  Any use, reproduction, disclosure or
+# distribution of this software and related documentation without an express
+# license agreement from NVIDIA CORPORATION is strictly prohibited.
+---
+name: client
+components:
+- name: channel_timestamp
+  type: nvidia::gxf::test::MockTransmitter
+- name: allocator
+  type: nvidia::gxf::test::MockAllocator
+- name: component_serializer
+  type: nvidia::gxf::StdComponentSerializer
+  parameters:
+    allocator: allocator
+- name: entity_serializer
+  type: nvidia::gxf::StdEntitySerializer
+  parameters:
+    component_serializers: [ component_serializer ]
+- name: tcp_client
+  type: nvidia::gxf::TcpClient
+  parameters:
+    transmitters: [ channel_timestamp ]
+    entity_serializer: entity_serializer
+    address: 127.0.0.1
+    port: 7000
+    timeout_period: 100ms
+    async_scheduling_term: async_st
+    max_duration_ms: 1000
+- name: async_st
+  type: nvidia::gxf::AsynchronousSchedulingTerm
+---
+name: clock_subscriber
+components:
+- name: input
+  type: nvidia::gxf::test::MockReceiver
+- type: nvidia::gxf::ClockSyncSecondary
+  parameters:
+    synthetic_clock: scheduler/clock
+    rx_timestamp: input
+    clock: scheduler/clock
+- type: nvidia::gxf::test::ClockChecker
+  parameters:
+    synthetic_clock: scheduler/clock
+    boolean_scheduling_term: boolean_scheduling_term
+    timestamps: [1100000000, 2200000000, 4400000000, 6600000000]
+- name: boolean_scheduling_term
+  type: nvidia::gxf::BooleanSchedulingTerm
+- type: nvidia::gxf::MessageAvailableSchedulingTerm
+  parameters:
+    receiver: input
+    min_size: 1
+---
+components:
+- type: nvidia::gxf::Connection
+  parameters:
+    source: client/channel_timestamp
+    target: clock_subscriber/input
+---
+name: scheduler
+components:
+- name: clock
+  type: nvidia::gxf::SyntheticClock
+- type: nvidia::gxf::EventBasedScheduler
+  parameters:
+    max_duration_ms: 10000
+    clock: clock
+    worker_thread_number: 2
+    stop_on_deadlock: true
+    stop_on_deadlock_timeout: 100
+- type: nvidia::gxf::JobStatistics
+  parameters:
+    clock: clock
+    codelet_statistics: true
+    json_file_path: '/tmp/test_tcp_server_source_statistics.json'

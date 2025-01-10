@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2021-2023, NVIDIA CORPORATION. All rights reserved.
+Copyright (c) 2021-2024, NVIDIA CORPORATION. All rights reserved.
 
 NVIDIA CORPORATION and its licensors retain all intellectual property
 and proprietary rights in and to this software, related documentation
@@ -7,11 +7,14 @@ and any modifications thereto. Any use, reproduction, disclosure or
 distribution of this software and related documentation without an express
 license agreement from NVIDIA CORPORATION is strictly prohibited.
 */
+#include <iostream>
 #include <Python.h>
+#include <pybind11/complex.h>
 #include <pybind11/embed.h>
 #include <pybind11/numpy.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
+#include <signal.h>
 #include <yaml-cpp/yaml.h>
 
 #include <thread>
@@ -22,6 +25,8 @@ license agreement from NVIDIA CORPORATION is strictly prohibited.
 #define MAX_EXT_COUNT 100
 #define MAX_COMP_COUNT 300
 #define MAX_PARAM_COUNT 500
+
+uint64_t s_signal_context;
 
 gxf_result_t GxfComponentAddByTypeName(gxf_context_t context, gxf_uid_t eid,
                                        const char* component_type_name, const char* component_name,
@@ -198,7 +203,7 @@ void destruct_component_info(gxf_component_info_t& info) {
 }
 
 /**
- * @brief Resize the dyamic memory allocted in component info
+ * @brief Resize the dyamic memory allocated in component info
  *
  * @param info gxf_component_info to be resized
  * @param count new number of expected parameters
@@ -206,6 +211,27 @@ void destruct_component_info(gxf_component_info_t& info) {
 void realloc_component_info(gxf_component_info_t& info, uint64_t count) {
   destruct_component_info(info);
   info = new_component_info(count);
+}
+
+template <typename T>
+std::variant<T,
+std::vector<T>,
+std::vector<std::vector<T>>,
+std::vector<std::vector<std::vector<T>>>> processDefaultValue(gxf_parameter_info_t info) {
+    if (info.rank == 0) {
+        T value = *static_cast<const T*>(info.default_value);
+        return value;
+    } else if (info.rank == 1 && info.shape[0] == -1) {
+        const std::vector<T> value = *static_cast<const std::vector<T>*>(info.default_value);
+        return value;
+    } else if (info.rank == 2 && info.shape[0] == -1 && info.shape[1] == -1) {
+        const std::vector<std::vector<T>> value = *static_cast<const std::vector<std::vector<T>>*>(info.default_value);
+        return value;
+    } else if (info.rank == 3 && info.shape[0] == -1 && info.shape[1] == -1 && info.shape[2] == -1){
+        const std::vector<std::vector<std::vector<T>>> value = *static_cast<const std::vector<std::vector<std::vector<T>>>*>(info.default_value);
+        return value;
+    }
+    return std::variant<T, std::vector<T>, std::vector<std::vector<T>>, std::vector<std::vector<std::vector<T>>>>{};
 }
 
 PYBIND11_MODULE(core_pybind, m) {
@@ -253,7 +279,7 @@ PYBIND11_MODULE(core_pybind, m) {
             GxfLoadExtensions(reinterpret_cast<gxf_context_t>(context), &info);
         if (result != GXF_SUCCESS) { throw pybind11::value_error(GxfResultStr(result)); }
       },
-      "Loads GXF extension libaries", pybind11::arg("context"),
+      "Loads GXF extension libraries", pybind11::arg("context"),
       pybind11::arg("extension_filenames") = std::vector<std::string>{},
       pybind11::arg("manifest_filenames") = std::vector<std::string>{},
       pybind11::arg("base_directory") = "");
@@ -440,40 +466,33 @@ PYBIND11_MODULE(core_pybind, m) {
         // Default value
         if (info.default_value) {
           if (info.type == GXF_PARAMETER_TYPE_INT8) {
-            int8_t value = *static_cast<const int8_t*>(info.default_value);
-            result["default"] = value;
+            result["default"] = processDefaultValue<int8_t>(info);
           } else if (info.type == GXF_PARAMETER_TYPE_INT16) {
-            int16_t value = *static_cast<const int16_t*>(info.default_value);
-            result["default"] = value;
+            result["default"] = processDefaultValue<int16_t>(info);
           } else if (info.type == GXF_PARAMETER_TYPE_INT32) {
-            int32_t value = *static_cast<const int32_t*>(info.default_value);
-            result["default"] = value;
+            result["default"] = processDefaultValue<int32_t>(info);
           } else if (info.type == GXF_PARAMETER_TYPE_INT64) {
-            int64_t value = *static_cast<const int64_t*>(info.default_value);
-            result["default"] = value;
+            result["default"] = processDefaultValue<int64_t>(info);
           } else if (info.type == GXF_PARAMETER_TYPE_UINT8) {
-            uint8_t value = *static_cast<const uint8_t*>(info.default_value);
-            result["default"] = value;
+            result["default"] = processDefaultValue<uint8_t>(info);
           } else if (info.type == GXF_PARAMETER_TYPE_UINT16) {
-            uint16_t value = *static_cast<const uint16_t*>(info.default_value);
-            result["default"] = value;
+            result["default"] = processDefaultValue<uint16_t>(info);
           } else if (info.type == GXF_PARAMETER_TYPE_UINT32) {
-            uint32_t value = *static_cast<const uint32_t*>(info.default_value);
-            result["default"] = value;
+            result["default"] = processDefaultValue<uint32_t>(info);
           } else if (info.type == GXF_PARAMETER_TYPE_UINT64) {
-            uint64_t value = *static_cast<const uint64_t*>(info.default_value);
-            result["default"] = value;
+            result["default"] = processDefaultValue<uint64_t>(info);
           } else if (info.type == GXF_PARAMETER_TYPE_FLOAT32) {
-            float value = *static_cast<const float*>(info.default_value);
-            result["default"] = value;
+            result["default"] = processDefaultValue<float>(info);
           } else if (info.type == GXF_PARAMETER_TYPE_FLOAT64) {
-            double value = *static_cast<const double*>(info.default_value);
-            result["default"] = value;
+            result["default"] = processDefaultValue<double>(info);
+          } else if (info.type == GXF_PARAMETER_TYPE_COMPLEX64) {
+            result["default"] = processDefaultValue<std::complex<float>>(info);
+          } else if (info.type == GXF_PARAMETER_TYPE_COMPLEX128) {
+            result["default"] = processDefaultValue<std::complex<double>>(info);
           } else if (info.type == GXF_PARAMETER_TYPE_STRING) {
             result["default"] = std::string(static_cast<const char*>(info.default_value));
           } else if (info.type == GXF_PARAMETER_TYPE_BOOL) {
-            bool value = *static_cast<const bool*>(info.default_value);
-            result["default"] = value;
+            result["default"] = processDefaultValue<bool>(info);
           } else if (info.type == GXF_PARAMETER_TYPE_FILE) {
             result["default"] = std::string(static_cast<const char*>(info.default_value));
           } else {
@@ -515,6 +534,12 @@ PYBIND11_MODULE(core_pybind, m) {
           } else if (info.type == GXF_PARAMETER_TYPE_FLOAT64) {
             double value = *static_cast<const double*>(info.numeric_max);
             result["max_value"] = value;
+          } else if (info.type == GXF_PARAMETER_TYPE_COMPLEX64) {
+            std::complex<float> value = *static_cast<const std::complex<float>*>(info.numeric_max);
+            result["max_value"] = value;
+          } else if (info.type == GXF_PARAMETER_TYPE_COMPLEX128) {
+            std::complex<double> value = *static_cast<const std::complex<double>*>(info.numeric_max);
+            result["max_value"] = value;
           }
         }
 
@@ -549,6 +574,12 @@ PYBIND11_MODULE(core_pybind, m) {
             result["min_value"] = value;
           } else if (info.type == GXF_PARAMETER_TYPE_FLOAT64) {
             double value = *static_cast<const double*>(info.numeric_min);
+            result["min_value"] = value;
+          } else if (info.type == GXF_PARAMETER_TYPE_COMPLEX64) {
+            std::complex<float> value = *static_cast<const std::complex<float>*>(info.numeric_min);
+            result["min_value"] = value;
+          } else if (info.type == GXF_PARAMETER_TYPE_COMPLEX128) {
+            std::complex<double> value = *static_cast<const std::complex<double>*>(info.numeric_min);
             result["min_value"] = value;
           }
         }
@@ -585,6 +616,12 @@ PYBIND11_MODULE(core_pybind, m) {
           } else if (info.type == GXF_PARAMETER_TYPE_FLOAT64) {
             double value = *static_cast<const double*>(info.numeric_step);
             result["step_value"] = value;
+          } else if (info.type == GXF_PARAMETER_TYPE_COMPLEX64) {
+            std::complex<float> value = *static_cast<const std::complex<float>*>(info.numeric_step);
+            result["step_value"] = value;
+          } else if (info.type == GXF_PARAMETER_TYPE_COMPLEX128) {
+            std::complex<double> value = *static_cast<const std::complex<double>*>(info.numeric_step);
+            result["step_value"] = value;
           }
         }
 
@@ -612,11 +649,31 @@ PYBIND11_MODULE(core_pybind, m) {
   });
   m.def("graph_run", [](uint64_t context) {
     pybind11::gil_scoped_release release_gil;
+    s_signal_context = context;
+    signal(SIGINT, [](int signum) {
+      GXF_LOG_ERROR("SIGINT received. Interrupting graph...");
+      gxf_result_t code = GxfGraphInterrupt(reinterpret_cast<gxf_context_t>(s_signal_context));
+      if (code != GXF_SUCCESS) {
+        GXF_LOG_ERROR("GxfGraphInterrupt Error: %s", GxfResultStr(code));
+        GXF_LOG_ERROR("Send interrupt once more to terminate immediately");
+        signal(SIGINT, SIG_DFL);
+      }
+    });
     gxf_result_t result = GxfGraphRun(reinterpret_cast<gxf_context_t>(context));
     if (result != GXF_SUCCESS) { throw pybind11::value_error(GxfResultStr(result)); }
   });
   m.def("graph_run_async", [](uint64_t context) {
     gxf_result_t result = GxfGraphRunAsync(reinterpret_cast<gxf_context_t>(context));
+    s_signal_context = context;
+    signal(SIGINT, [](int signum) {
+      GXF_LOG_ERROR("SIGINT received. Interrupting graph...");
+      gxf_result_t code = GxfGraphInterrupt(reinterpret_cast<gxf_context_t>(s_signal_context));
+      if (code != GXF_SUCCESS) {
+        GXF_LOG_ERROR("GxfGraphInterrupt Error: %s", GxfResultStr(code));
+        GXF_LOG_ERROR("Send interrupt once more to terminate immediately");
+        signal(SIGINT, SIG_DFL);
+      }
+    });
     if (result != GXF_SUCCESS) { throw pybind11::value_error(GxfResultStr(result)); }
   });
   m.def("graph_interrupt", [](uint64_t context) {
@@ -670,6 +727,8 @@ PYBIND11_MODULE(core_pybind, m) {
       return "nvidia::gxf::PrimitiveType::kUInt32";
     } else if (type.is(pybind11::dtype::of<std::uint64_t>())) {
       return "nvidia::gxf::PrimitiveType::kUInt64";
+    } else if (type.is(pybind11::dtype(pybind11::str("float16")))) {
+      return "nvidia::gxf::PrimitiveType::kFloat16";
     } else if (type.is(pybind11::dtype::of<std::float_t>())) {
       return "nvidia::gxf::PrimitiveType::kFloat32";
     } else if (type.is(pybind11::dtype::of<std::double_t>())) {
@@ -691,6 +750,7 @@ PYBIND11_MODULE(core_pybind, m) {
         std::cout << "num_entities" << num_entities << "\n";
         pybind11::list output;
         for (uint i = 0; i < num_entities; i++) { output.append(entities + i); }
+        delete[] entities;
         return output;
       },
       "Get all the entities of the context", pybind11::arg("context"),
@@ -1023,6 +1083,16 @@ PYBIND11_MODULE(core_pybind, m) {
       },
       "Decrease reference count of an entity", pybind11::arg("context"), pybind11::arg("eid"));
   m.def(
+      "entity_get_ref_count",
+      [](uint64_t context, gxf_uid_t eid) {
+        int64_t count = 0;
+        const gxf_result_t result =
+            GxfEntityGetRefCount(reinterpret_cast<gxf_context_t>(context), eid, &count);
+        if (result != GXF_SUCCESS) { throw pybind11::value_error(GxfResultStr(result)); }
+        return count;
+      },
+      "Return the reference count of an entity", pybind11::arg("context"), pybind11::arg("eid"));
+  m.def(
       "entity_get_state",
       [](uint64_t context, gxf_uid_t eid) {
         entity_state_t state;
@@ -1042,6 +1112,16 @@ PYBIND11_MODULE(core_pybind, m) {
       },
       "Notify entity on an event", pybind11::arg("context"), pybind11::arg("eid"));
   m.def(
+      "entity_notify_event_type",
+      [](uint64_t context, gxf_uid_t eid, gxf_event_t event) {
+        const gxf_result_t result =
+            GxfEntityNotifyEventType(reinterpret_cast<gxf_context_t>(context), eid, event);
+        if (result != GXF_SUCCESS) { throw pybind11::value_error(GxfResultStr(result)); }
+        return;
+      },
+      "Notify entity on an event", pybind11::arg("context"), pybind11::arg("eid"),
+       pybind11::arg("event"));
+  m.def(
       "component_add",
       [](uint64_t context, gxf_uid_t eid, gxf_tid_t tid, const char* name) {
         gxf_uid_t cid = kNullUid;
@@ -1056,7 +1136,7 @@ PYBIND11_MODULE(core_pybind, m) {
   pybind11::class_<GxfEntityCreateInfo>(m, "gxf_entity_create_info")
       .def(pybind11::init([](const char* name, uint32_t flags) {
              // doesn't work without copy of the char * variable
-             char name_copy[2048];
+             char name_copy[kMaxEntityNameSize];
              if((name == NULL) || (name[0] == '\0')){
               return new GxfEntityCreateInfo{NULL, flags};
              }
@@ -1340,6 +1420,18 @@ PYBIND11_MODULE(core_pybind, m) {
       "Gets the status of a entity. 0=ENTITY_NOT_STARTED\n, 1=ENTITY_START_PENDING\n,\
        2=ENTITY_STARTED\n, 3=ENTITY_TICK_PENDING\n, 4=ENTITY_STOP_PENDING\n",
       pybind11::arg("context"), pybind11::arg("eid") = GxfTidNull());
+
+  m.def(
+      "entity_get_name",
+      [](uint64_t context, gxf_uid_t eid) {
+        const char * entity_name = "UNKNOWN";
+        const gxf_result_t result =
+            GxfEntityGetName(reinterpret_cast<gxf_context_t>(context), eid, &entity_name);
+        if (result != GXF_SUCCESS) { throw pybind11::value_error(GxfResultStr(result)); }
+        return std::string(entity_name);
+      },
+      "Gets the name of a entity.",
+      pybind11::arg("context"), pybind11::arg("eid"));
 
   pybind11::class_<nvidia::gxf::Entity>(m, "MessageEntity")
       .def(pybind11::init([](gxf_context_t context) {

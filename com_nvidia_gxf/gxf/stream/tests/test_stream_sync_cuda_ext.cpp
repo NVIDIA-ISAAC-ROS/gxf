@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2022-2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-FileCopyrightText: Copyright (c) 2022-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * SPDX-License-Identifier: Apache-2.0
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -20,7 +20,7 @@
 GXF_EXT_FACTORY_BEGIN()
 
 GXF_EXT_FACTORY_SET_INFO(0x31bee146e13d4161, 0x8d6a37403048d618, "TestGxfStreamExtension",
-                         "Testing Gxf Stream related components", "Nvidia_Gxf", "0.2.0", "NVIDIA");
+                         "Testing Gxf Stream related components", "Nvidia_Gxf", "0.5.0", "NVIDIA");
 
 GXF_EXT_FACTORY_SET_DISPLAY_INFO("Test Stream Extension", "Stream", "GXF Test Stream Extension");
 

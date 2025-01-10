@@ -16,15 +16,22 @@
 """
 load("@rules_python//python:defs.bzl", "py_runtime_pair", "py_runtime")
 
+# Set the python version
+# py_runtime(
+#     name = "py_runtime_x_y",
+#     interpreter_path = "/usr/bin/pythonx.y",
+#     python_version = "PY3"
+# )
+
 py_runtime(
-    name = "py_runtime_3_7",
-    interpreter_path = "/usr/bin/python3.7",
+    name = "py_runtime_3_10_ubuntu_22_04",
+    interpreter_path = "/usr/bin/python3.10",
     python_version = "PY3"
 )
 
 py_runtime(
-    name = "py_runtime_3_8",
-    interpreter_path = "/usr/bin/python3.8",
+    name = "py_runtime_3_10_rhel9",
+    interpreter_path = "/usr/local/bin/python3.10",
     python_version = "PY3"
 )
 
@@ -32,8 +39,9 @@ py_runtime_pair(
     name = "runtime_pair",
     py2_runtime = None,
     py3_runtime = select({
-        "//engine/build:python3_7": ":py_runtime_3_7",
-        "//conditions:default": ":py_runtime_3_8",
+        "//engine/build:ubuntu_python3_10": ":py_runtime_3_10_ubuntu_22_04",
+        "//engine/build:rhel_python3_10": ":py_runtime_3_10_rhel9",
+        "//conditions:default": ":py_runtime_3_10_ubuntu_22_04",
     }),
 )
 

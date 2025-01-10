@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
+Copyright (c) 2022-2024, NVIDIA CORPORATION. All rights reserved.
 
 NVIDIA CORPORATION and its licensors retain all intellectual property
 and proprietary rights in and to this software, related documentation
@@ -31,18 +31,6 @@ void activateEntities(gxf_context_t context, std::vector<std::string> entities)
     GXF_ASSERT_SUCCESS(GxfEntityFind(context, entity.c_str(), &eid));
     GXF_LOG_WARNING("Activating %s eid is %ld", entity.c_str(), eid);
     GXF_ASSERT_SUCCESS(GxfEntityActivate(context, eid));
-  }
-}
-
-void activateEntities_with_null_context(gxf_context_t context, std::vector<std::string> entities)
-{
-  for(auto entity: entities)
-  {
-    gxf_uid_t eid = kNullUid;
-    GXF_ASSERT_SUCCESS(GxfEntityFind(context, entity.c_str(), &eid));
-    ASSERT_NE(eid,kNullUid);
-    GXF_LOG_WARNING("Activating %s eid is %ld", entity.c_str(), eid);
-    ASSERT_EQ(GxfEntityActivate(NULL, eid),GXF_CONTEXT_INVALID);
   }
 }
 
@@ -90,25 +78,30 @@ TEST(GxfEntityActivate,re_activating_already_activated_entities)
    GXF_ASSERT_SUCCESS(GxfGraphActivate(context));
    GXF_ASSERT_SUCCESS(GxfGraphRunAsync(context));
    std::this_thread::sleep_for(std::chrono::milliseconds(5));
-   std::vector<std::string> unit_graph {"cxn0", "rx0"};
+   std::vector<std::string> unit_graph {"tx0", "rx0"};
    deactivateEntities(context, unit_graph);
    std::this_thread::sleep_for(std::chrono::milliseconds(50));
    activateEntities(context, unit_graph);
    reactivateEntities(context, unit_graph);
 }
 
-TEST(GxfEntityActivate,Mandatory_parameters_not_set)
-{  gxf_context_t context = kNullContext;
-   GXF_ASSERT_SUCCESS(GxfContextCreate(&context));
-   GXF_ASSERT_SUCCESS(GxfLoadExtension(context, "gxf/std/libgxf_std.so"));
-   GXF_ASSERT_SUCCESS(GxfLoadExtension(context, "gxf/test/extensions/libgxf_test.so"));
-   gxf_uid_t eid = kNullUid;
-   GXF_ASSERT_SUCCESS(GxfEntityCreate(context, &eid));
-   gxf_tid_t rpi_tid{0xe9234c1ad5f8445c, 0xae9118bcda197032};  // RegisterParameterInterfaceTest
-   gxf_uid_t rpi_uid = kNullUid;
-   GXF_ASSERT_SUCCESS(GxfComponentAdd(context, eid, rpi_tid, "rpi", &rpi_uid));
-   GXF_ASSERT_EQ(GxfEntityActivate(context, eid), GXF_PARAMETER_MANDATORY_NOT_SET);
-   GXF_ASSERT_SUCCESS(GxfContextDestroy(context));
+TEST(GxfEntityActivate,Mandatory_parameters_not_set) {
+  gxf_context_t context = kNullContext;
+  GXF_ASSERT_SUCCESS(GxfContextCreate(&context));
+  constexpr const char* kExtensions[] = {
+    "gxf/std/libgxf_std.so",
+    "gxf/test/extensions/libgxf_test.so",
+  };
+  const GxfLoadExtensionsInfo info{kExtensions, 2, nullptr, 0, nullptr};
+  GXF_ASSERT_SUCCESS(GxfLoadExtensions(context, &info));
+  gxf_uid_t eid = kNullUid;
+  const GxfEntityCreateInfo entity_create_info = {0};
+  GXF_ASSERT_SUCCESS(GxfCreateEntity(context, &entity_create_info, &eid));
+  gxf_tid_t rpi_tid{0xe9234c1ad5f8445c, 0xae9118bcda197032};  // RegisterParameterInterfaceTest
+  gxf_uid_t rpi_uid = kNullUid;
+  GXF_ASSERT_SUCCESS(GxfComponentAdd(context, eid, rpi_tid, "rpi", &rpi_uid));
+  GXF_ASSERT_EQ(GxfEntityActivate(context, eid), GXF_PARAMETER_MANDATORY_NOT_SET);
+  GXF_ASSERT_SUCCESS(GxfContextDestroy(context));
 }
 
 TEST(GxfEntityActivate,null_uid)
@@ -120,7 +113,7 @@ TEST(GxfEntityActivate,null_uid)
    GXF_ASSERT_SUCCESS(GxfGraphActivate(context));
    GXF_ASSERT_SUCCESS(GxfGraphRunAsync(context));
    std::this_thread::sleep_for(std::chrono::milliseconds(5));
-   std::vector<std::string> unit_graph {"cxn0", "rx0"};
+   std::vector<std::string> unit_graph {"tx0", "rx0"};
    deactivateEntities(context, unit_graph);
    std::this_thread::sleep_for(std::chrono::milliseconds(5));
    activateEntities_with_null_uid(context,unit_graph);
@@ -135,7 +128,7 @@ TEST(GxfEntityActivate,valid_testcase)
    GXF_ASSERT_SUCCESS(GxfGraphActivate(context));
    GXF_ASSERT_SUCCESS(GxfGraphRunAsync(context));
    std::this_thread::sleep_for(std::chrono::milliseconds(5));
-   std::vector<std::string> unit_graph {"cxn0", "rx0"};
+   std::vector<std::string> unit_graph {"tx0", "rx0"};
    deactivateEntities(context, unit_graph);
    std::this_thread::sleep_for(std::chrono::milliseconds(5));
    activateEntities(context, unit_graph);
@@ -150,7 +143,7 @@ TEST(GxfEntityActivate,Mandatory_parameters_changed_after_activating_entities)
    gxf_tid_t rpi_tid{0xe9234c1ad5f8445c, 0xae9118bcda197032};  // RegisterParameterInterfaceTest
    gxf_uid_t rpi_uid = kNullUid;
    std::string entity_name="rx0";
-   std::vector<std::string> unit_graph {"cxn0", "rx0"};
+   std::vector<std::string> unit_graph {"tx0", "rx0"};
    gxf_uid_t entity_eid = kNullUid;
    GXF_ASSERT_SUCCESS(GxfContextCreate(&context));
    const GxfLoadExtensionsInfo info{nullptr, 0, &kGxeManifestFilename, 1, nullptr};

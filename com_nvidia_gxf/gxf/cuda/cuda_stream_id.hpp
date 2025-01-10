@@ -25,7 +25,7 @@ namespace gxf {
 
 // The Structure indicates cuda stream component ID.
 // Message entity carrying CudaStreamId indicates that Tensors will be or
-// has been proccessed by corresponding cuda stream. The handle could
+// has been processed by corresponding cuda stream. The handle could
 // be deduced by Handle<CudaStream>::Create(context, stream_cid).
 struct CudaStreamId {
   // component id of CudaStream

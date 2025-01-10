@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-FileCopyrightText: Copyright (c) 2022-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * SPDX-License-Identifier: Apache-2.0
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -27,7 +27,7 @@ namespace gxf {
 
 // Serializes and deserializes entity id. No component serializer used.
 
-class StdEntityIdSerializer : EntitySerializer {
+class StdEntityIdSerializer : public EntitySerializer {
  public:
 #pragma pack(push, 1)
   struct EntityHeader {
@@ -48,9 +48,9 @@ class StdEntityIdSerializer : EntitySerializer {
 
  private:
   // Sequence number for outgoing messages
-  uint64_t outgoing_sequence_number_;
+  uint64_t outgoing_sequence_number_{0};
   // Sequence number for incoming messages
-  uint64_t incoming_sequence_number_;
+  uint64_t incoming_sequence_number_{0};
 };
 
 }  // namespace gxf

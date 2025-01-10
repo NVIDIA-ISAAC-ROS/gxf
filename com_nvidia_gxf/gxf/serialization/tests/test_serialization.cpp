@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2021-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-FileCopyrightText: Copyright (c) 2021-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * SPDX-License-Identifier: Apache-2.0
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -20,7 +20,7 @@
 GXF_EXT_FACTORY_BEGIN()
   GXF_EXT_FACTORY_SET_INFO(0xc8dfd61abe545fd4, 0xf828df87e6b0162b, "TestSerializationExtension",
                            "Extension for testing serialization extension",
-                           "NVIDIA", "1.2.0", "NVIDIA");
+                           "NVIDIA", "1.5.0", "NVIDIA");
   GXF_EXT_FACTORY_SET_DISPLAY_INFO("Test Serialization Extension", "Serialization",
                                  "GXF Serialization Extension");
   GXF_EXT_FACTORY_ADD(0xdb9f4ca3f121471b, 0xb0a0d49b89a0dc19,

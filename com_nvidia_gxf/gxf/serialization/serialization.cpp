@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2021-2023, NVIDIA CORPORATION. All rights reserved.
+Copyright (c) 2021-2024, NVIDIA CORPORATION. All rights reserved.
 
 NVIDIA CORPORATION and its licensors retain all intellectual property
 and proprietary rights in and to this software, related documentation
@@ -23,7 +23,7 @@ GXF_EXT_FACTORY_BEGIN()
 
 GXF_EXT_FACTORY_SET_INFO(0xbc573c2f89b3d4b0, 0x80612da8b11fe79a, "SerializationExtension",
                          "Extension for serializing messages",
-                         "NVIDIA", "2.3.0", "NVIDIA");
+                         "NVIDIA", "2.6.0", "NVIDIA");
 
 GXF_EXT_FACTORY_SET_DISPLAY_INFO("Serialization Extension", "Serialization",
                                  "GXF Serialization Extension");

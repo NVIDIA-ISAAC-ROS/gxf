@@ -37,6 +37,10 @@ gxf_result_t DoubleBufferTransmitter::deinitialize() {
     GXF_LOG_ERROR("Bad Queue in DoubleBufferTransmitter");
     return GXF_CONTRACT_INVALID_SEQUENCE;
   }
+  if (size() != 0) {
+    GXF_LOG_WARNING("Unprocessed num of message %lu in queue: %s:%s", size(), entity().name(),
+                    name());
+  }
   queue_->popAll();
   queue_->sync();
   queue_->popAll();
@@ -52,7 +56,7 @@ gxf_result_t DoubleBufferTransmitter::pop_abi(gxf_uid_t* uid) {
 
   Entity entity = queue_->pop();
   if (entity.is_null()) {
-      GXF_LOG_ERROR("Receieved null entity in double buffer transmitter");
+      GXF_LOG_ERROR("Received null entity in double buffer transmitter");
     return GXF_FAILURE;
   }
 

@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2021-2023 NVIDIA CORPORATION & AFFILIATES. All rights
+ * SPDX-FileCopyrightText: Copyright (c) 2021-2024 NVIDIA CORPORATION & AFFILIATES. All rights
  * reserved. SPDX-License-Identifier: Apache-2.0
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -39,7 +39,6 @@ class TcpCodelet : public Codelet {
   gxf_result_t initialize() override;
   gxf_result_t deinitialize() override;
 
-  gxf_result_t start() override { return GXF_SUCCESS; }
   gxf_result_t tick() override;
   gxf_result_t stop() override;
 

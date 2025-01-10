@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
+Copyright (c) 2022-2024, NVIDIA CORPORATION. All rights reserved.
 
 NVIDIA CORPORATION and its licensors retain all intellectual property
 and proprietary rights in and to this software, related documentation
@@ -166,6 +166,11 @@ gxf_result_t StreamSync::allocate_sync_object(SyncType signaler, SyncType waiter
 }
 
 gxf_result_t StreamSync::setCudaStream(SyncType syncType, cudaStream_t stream) {
+  if (stream == NULL) {
+    GXF_LOG_ERROR("Invalid cuda stream");
+    return GXF_ARGUMENT_INVALID;
+  }
+
   if (syncType == SyncType::GXF_STREAM_SIGNALER_CUDA) {
     signaler_cuda_stream_ = std::move(stream);
   } else if (syncType == SyncType::GXF_STREAM_WAITER_CUDA) {

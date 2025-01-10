@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
+Copyright (c) 2022-2024, NVIDIA CORPORATION. All rights reserved.
 
 NVIDIA CORPORATION and its licensors retain all intellectual property
 and proprietary rights in and to this software, related documentation
@@ -28,6 +28,7 @@ TEST(GxfEntityFindAll,null_context)
     ASSERT_NE(eid_1,kNullUid);
     GXF_ASSERT_EQ(GxfEntityFindAll(NULL,&entities_count,entities_uid_holder), GXF_CONTEXT_INVALID);
     GXF_ASSERT_SUCCESS(GxfContextDestroy(context));
+    delete[] entities_uid_holder;
 }
 
 TEST(GxfEntityFindAll,Total_Entities_equal_to_max_entities)
@@ -57,8 +58,8 @@ TEST(GxfEntityFindAll,Total_Entities_equal_to_max_entities)
      {
        GXF_ASSERT_NE(entities_uid_holder[i],0);
      }
-
     GXF_ASSERT_SUCCESS(GxfContextDestroy(context));
+    delete[] entities_uid_holder;
 }
 
 TEST(GxfEntityFindAll,buffer_equal_to_zero)
@@ -83,6 +84,7 @@ TEST(GxfEntityFindAll,buffer_equal_to_zero)
 
    GXF_ASSERT_EQ(GxfEntityFindAll(context, &entities_count,entities_uid_holder),GXF_QUERY_NOT_ENOUGH_CAPACITY);
    GXF_ASSERT_SUCCESS(GxfContextDestroy(context));
+   delete[] entities_uid_holder;
 }
 
 TEST(GxfEntityFindAll,buffer_size_equal_to_total_entities_size)
@@ -110,8 +112,8 @@ TEST(GxfEntityFindAll,buffer_size_equal_to_total_entities_size)
     {
       ASSERT_NE(entities_uid_holder[i],0);
     }
-
    GXF_ASSERT_SUCCESS(GxfContextDestroy(context));
+   delete[] entities_uid_holder;
 }
 
 TEST(GxfEntityFindAll,buffer_size_more_than_total_entities_size)
@@ -139,8 +141,8 @@ TEST(GxfEntityFindAll,buffer_size_more_than_total_entities_size)
    {
      ASSERT_NE(entities_uid_holder[i],0);
    }
-
    GXF_ASSERT_SUCCESS(GxfContextDestroy(context));
+   delete[] entities_uid_holder;
 }
 
 TEST(GxfEntityFindAll,buffer_size_more_than_Total_Entities_size)
@@ -171,6 +173,7 @@ TEST(GxfEntityFindAll,buffer_size_more_than_Total_Entities_size)
      ASSERT_NE(entities_uid_holder[i],0);
    }
    GXF_ASSERT_SUCCESS(GxfContextDestroy(context));
+   delete[] entities_uid_holder;
 }
 
 TEST(GxfEntityFindAll,buffer_size_less_than_total_entities_size)
@@ -195,4 +198,5 @@ TEST(GxfEntityFindAll,buffer_size_less_than_total_entities_size)
 
    GXF_ASSERT_EQ(GxfEntityFindAll(context, &entities_count, entities_uid_holder),GXF_QUERY_NOT_ENOUGH_CAPACITY);
    GXF_ASSERT_SUCCESS(GxfContextDestroy(context));
+   delete[] entities_uid_holder;
 }

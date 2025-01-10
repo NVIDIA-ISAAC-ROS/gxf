@@ -20,8 +20,8 @@
 # set -ex
 
 UBUNTU_VERSION=$(lsb_release -rs)
-if [[ $UBUNTU_VERSION != "20.04" ]]; then
-  echo -e "Incompatible OS "$UBUNTU_VERSION" Please use Ubuntu 20.04"
+if [[ $UBUNTU_VERSION != "22.04" ]]; then
+  echo -e "Incompatible OS "$UBUNTU_VERSION" Please use Ubuntu 22.04"
   exit 1
 fi
 

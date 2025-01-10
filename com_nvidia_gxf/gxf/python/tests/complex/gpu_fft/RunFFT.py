@@ -14,6 +14,9 @@
  See the License for the specific language governing permissions and
  limitations under the License.
 """
+import ctypes
+import cupy as cp
+import cupyx.scipy.fft
 
 from gxf.core import MessageEntity
 from gxf.std import Allocator
@@ -25,9 +28,6 @@ from gxf.std import TensorDescription
 from gxf.std import Tensor
 from gxf.std import Transmitter
 from gxf.python_codelet import CodeletAdapter
-import ctypes
-import numpy as np
-import cupy
 
 
 def get_cupy_ndarray_from_tensor(tensor):
@@ -38,25 +38,26 @@ def get_cupy_ndarray_from_tensor(tensor):
     ctypes.pythonapi.PyCapsule_GetPointer.restype = ctypes.c_void_p
     ctypes.pythonapi.PyCapsule_GetPointer.argtypes = [
         ctypes.py_object, ctypes.c_char_p]
-    unowned_mem_ptr = cupy.cuda.UnownedMemory(
+    unowned_mem_ptr = cp.cuda.UnownedMemory(
         ctypes.pythonapi.PyCapsule_GetPointer(data_ptr, None), data_size, None)
-    mem_ptr = cupy.cuda.MemoryPointer(unowned_mem_ptr, 0)
-    cupy_array = cupy.ndarray(
-        shape=shape, dtype=data_type, memptr=mem_ptr, strides=strides, order='C')
+    mem_ptr = cp.cuda.MemoryPointer(unowned_mem_ptr, 0)
+    cupy_array = cp.ndarray(
+        shape=shape, dtype=data_type, memptr=mem_ptr, strides=strides, order="C")
     return cupy_array
 
-class RunFFT(CodeletAdapter):
-    """ Python codelet to receive a msg on tick()
 
-    Python implementation of TensorDescription.
-    Receives a message on the Reciever on every tick()
+class RunFFT(CodeletAdapter):
+    """ Python codelet to receive data and apply the FFT via CuPy
+
+    Receives a message on the Receiver on every tick()
     """
 
     def start(self):
         self.params = self.get_params()
-        self.rx = Receiver.get(self.context(), self.cid(), self.params[f"receiver0"])
-        self.tx = Transmitter.get(self.context(), self.cid(), self.params[f"transmitter0"])
-        self.allocator = Allocator.get(self.context(), self.cid(), self.params[f"allocator0"])
+        self.rx = Receiver.get(self.context(), self.cid(), self.params["receiver0"])
+        self.tx = Transmitter.get(self.context(), self.cid(), self.params["transmitter0"])
+        self.allocator = Allocator.get(self.context(), self.cid(), self.params["allocator0"])
+        self.use_dlpack = bool(self.params["use_dlpack"])
 
     def tick(self):
         in0 = self.rx.receive()
@@ -76,39 +77,44 @@ class RunFFT(CodeletAdapter):
         assert(tensor0.get_tensor_description().shape.rank()==SHAPE_RANK)
         assert(tensor0.get_tensor_description().bytes_per_element==BYTES_PER_ELEMENT)
 
-        # if tensor0 is on device copy it to host memory for comparision
+        # if tensor0 is on device copy it to host memory for comparison
         if tensor0.storage_type() == MemoryStorageType.kDevice:
-            tensor0 = get_cupy_ndarray_from_tensor(tensor0)
-            tensor0 = cupy.asarray(tensor0.get())
+            if self.use_dlpack:
+                tensor0 = cp.from_dlpack(tensor0)
+            else:
+                tensor0 = get_cupy_ndarray_from_tensor(tensor0)
+                tensor0 = cp.asarray(tensor0.get())
         else:
             raise RuntimeError("data is not on device!")
 
-        print("received tensor from src: ", tensor0[0::2] + 1j*tensor0[1::2])
+        print("First 10 elements of received tensor: ", tensor0[:10])
 
         # Form complex numpy array, again assuming interleaved data
-        # fft_tensor = cupy.fft.fft(tensor0[0::2] + 1j*tensor0[1::2]).astype(cupy.complex64)
-        fft_tensor = cupy.fft.fft(tensor0).astype(cupy.complex64)
-        print("FFT of received tensor")
-        print(fft_tensor)
+        fft_tensor = cupyx.scipy.fft.fft(tensor0)
+        print("First 10 elements of received tensor of FFT output:", fft_tensor[:10])
 
         cuda_msg = MessageEntity(self.context())
-        cuda_tensor_description = TensorDescription(
-            name="cuda_tensor",
-            storage_type=MemoryStorageType.kDevice,
-            shape=Shape([640]),
-            element_type=PrimitiveType.kComplex64,
-            bytes_per_element=8,
-            strides=[8]
-        )
 
-        cuda_tensor = Tensor.add_to_entity(cuda_msg, cuda_tensor_description.name)
-        cuda_tensor.reshape(cuda_tensor_description, self.allocator)
+        if self.use_dlpack:
+            cuda_tensor = Tensor.from_dlpack(fft_tensor)
+            Tensor.add_to_entity(cuda_msg, cuda_tensor, "cuda_tensor")
+        else:
+            cuda_tensor_description = TensorDescription(
+                name="cuda_tensor",
+                storage_type=MemoryStorageType.kDevice,
+                shape=Shape([640]),
+                element_type=PrimitiveType.kComplex64,
+                bytes_per_element=8,
+                strides=[8]
+            )
 
-        cupy_array = get_cupy_ndarray_from_tensor(cuda_tensor)
-        cupy_array[:] = fft_tensor
+            cuda_tensor = Tensor.add_to_entity(cuda_msg, cuda_tensor_description.name)
+            cuda_tensor.reshape(cuda_tensor_description, self.allocator)
+
+            cupy_array = get_cupy_ndarray_from_tensor(cuda_tensor)
+            cupy_array[:] = fft_tensor
 
         self.tx.publish(cuda_msg)
-
         return
 
     def stop(self):

@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+Copyright (c) 2018-2024, NVIDIA CORPORATION. All rights reserved.
 
 NVIDIA CORPORATION and its licensors retain all intellectual property
 and proprietary rights in and to this software, related documentation
@@ -35,11 +35,12 @@ TEST(Entity, Find) {
   ASSERT_EQ(GxfContextCreate(&context), GXF_SUCCESS);
 
   gxf_uid_t eid = kNullUid;
-  const GxfEntityCreateInfo entity_create_info = {0};
+  const GxfEntityCreateInfo entity_create_info = {"foo", 0};
   ASSERT_EQ(GxfCreateEntity(context, &entity_create_info, &eid), GXF_SUCCESS);
   ASSERT_NE(eid, kNullUid);
-
-  ASSERT_EQ(GxfParameterSetStr(context, eid, kInternalNameParameterKey, "foo"), GXF_SUCCESS);
+  const char * entity_name = "UNKNOWN";
+  ASSERT_EQ(GxfParameterGetStr(context, eid, kInternalNameParameterKey, &entity_name), GXF_SUCCESS);
+  ASSERT_EQ(std::string("foo"), std::string(entity_name));
 
   gxf_uid_t other = kNullUid;
   ASSERT_EQ(GxfEntityFind(context, "foo", &other), GXF_SUCCESS);

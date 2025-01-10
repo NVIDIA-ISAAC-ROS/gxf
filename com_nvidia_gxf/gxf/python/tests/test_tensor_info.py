@@ -16,10 +16,10 @@
 """
 import gxf.core
 import unittest
-import sys
 
 APP_YAML = "gxf/python/tests/test_tensor_info.yaml"
 MANIFEST_YAML = "gxf/python/tests/test_tensor_info_manifest.yaml"
+
 
 class TestTensorInfo(unittest.TestCase):
     '''

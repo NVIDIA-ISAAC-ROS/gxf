@@ -1,4 +1,4 @@
-# Copyright (c) 2021, NVIDIA CORPORATION.  All rights reserved.
+# Copyright (c) 2021-2024, NVIDIA CORPORATION.  All rights reserved.
 #
 # NVIDIA CORPORATION and its licensors retain all intellectual property
 # and proprietary rights in and to this software, related documentation
@@ -99,11 +99,11 @@ def registry_package(name, version, description, file_description, classifiers, 
         visibility=visibility,
     )
 
-    bin_name = "nvgraph_registry"
+    bin_name = "gxf_registry"
     cmd_gen_standalone_bin = "cp -r $(GENDIR)/registry/* registry/ &&" + \
                              "mv registry/README.public %s &&" % file_description + \
                              "touch registry/bindings/__init__.py &&" + \
-                             "pyinstaller --onefile registry/cli/registry_cli.py && " +\
+                             "pyinstaller --hidden-import pkg_resources.extern --onefile registry/cli/registry_cli.py && " +\
                              "cp dist/%s $(location %s) &&" % (bin_name, bin_name) +\
                              "echo Standalone binary generated at: $(location %s)" % bin_name
 

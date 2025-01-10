@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2020-2021, NVIDIA CORPORATION. All rights reserved.
+Copyright (c) 2020-2024, NVIDIA CORPORATION. All rights reserved.
 
 NVIDIA CORPORATION and its licensors retain all intellectual property
 and proprietary rights in and to this software, related documentation
@@ -38,7 +38,7 @@ class GxfParameterGetStr_Test : public ::testing::Test {
   gxf_context_t context = kNullContext;
   const GxfLoadExtensionsInfo info{nullptr, 0, &kGxeManifestFilename, 1, nullptr};
   gxf_uid_t eid = kNullUid;
-  const GxfEntityCreateInfo entity_create_info = {0};
+  const GxfEntityCreateInfo entity_create_info = {"test_entity", 0};
   gxf_tid_t tid = GxfTidNull();
   gxf_uid_t cid = kNullUid;
   char var1 = 'g';
@@ -60,4 +60,15 @@ TEST_F(GxfParameterGetStr_Test, NullArgument) {
 
 TEST_F(GxfParameterGetStr_Test, InvalidParameter) {
   GXF_ASSERT_EQ((GxfParameterGetStr(kNullContext,cid,"capacity",value)),GXF_CONTEXT_INVALID);
+}
+
+TEST_F(GxfParameterGetStr_Test, ValidEntityName) {
+  GXF_ASSERT_EQ(GxfParameterGetStr(context, eid, kInternalNameParameterKey, value), GXF_SUCCESS);
+  GXF_ASSERT_EQ(strcmp(*value, "test_entity"),0);
+}
+
+TEST_F(GxfParameterGetStr_Test, InValidEntityName) {
+  GXF_ASSERT_EQ(GxfParameterGetStr(context, 1, kInternalNameParameterKey, value),
+   GXF_PARAMETER_NOT_FOUND);
+  GXF_ASSERT_NE(strcmp(*value, "test_entity"),0);
 }

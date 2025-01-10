@@ -1,0 +1,43 @@
+%YAML 1.2
+# Copyright (c) 2022, NVIDIA CORPORATION.  All rights reserved.
+#
+# NVIDIA CORPORATION and its licensors retain all intellectual property
+# and proprietary rights in and to this software, related documentation
+# and any modifications thereto.  Any use, reproduction, disclosure or
+# distribution of this software and related documentation without an express
+# license agreement from NVIDIA CORPORATION is strictly prohibited.
+---
+name: test
+components:
+- name: param_holder
+  type: nvidia::gxf::test::TestConfigurationSet
+  parameters:
+    bool_value: True
+    uint64_value: 100
+    string_value: "string"
+    string_5_value: "ab"
+    int_vector_4_value: [0, 1, 2, 3]
+- type: nvidia::gxf::PeriodicSchedulingTerm
+  parameters:
+    recess_period: 2s
+---
+name: ipc
+components:
+- name: http_server
+  type: nvidia::gxf::HttpServer
+- name: grpc_server
+  type: nvidia::gxf::GrpcServer
+---
+name: scheduler
+components:
+- name: clock
+  type: nvidia::gxf::RealtimeClock
+- type: nvidia::gxf::GreedyScheduler
+  parameters:
+    max_duration_ms: 1000000
+    clock: clock
+- type: nvidia::gxf::test::EntityMonitor
+- type: nvidia::gxf::JobStatistics
+  parameters:
+    clock: clock
+    codelet_statistics: true

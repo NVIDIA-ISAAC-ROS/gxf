@@ -15,19 +15,16 @@
  limitations under the License.
 """
 from gxf.python_codelet import CodeletAdapter
-from gxf.core import MessageEntity
 from gxf.std import BooleanSchedulingTerm
 from gxf.std import Clock
 from gxf.std import Receiver
-from gxf.std import Transmitter
 
-import yaml
 
 class TestBooleanSchedulingTerm(CodeletAdapter):
     """ Python codelet to receive a msg on tick()
 
     Python implementation of Ping Rx.
-    Receives a message on the Reciever on every tick()
+    Receives a message on the Receiver on every tick()
     """
 
     def start(self):

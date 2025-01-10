@@ -1,0 +1,77 @@
+%YAML 1.2
+# SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+---
+dependencies:
+- extension: StandardExtension
+  uuid: 8ec2d5d6-b5df-48bf-8dee-0252606fdd7e
+  version: 2.6.0
+- extension: TestHelperExtension
+  uuid: 1b99ffeb-c250-4ced-8117-62ac05969a50
+  version: 2.6.0
+- extension: SampleExtension
+  uuid: a6ad78b6-1682-11ec-9621-0242ac130002
+  version: 1.6.0
+---
+name: tx0
+components:
+- name: signal
+  type: nvidia::gxf::test::MockTransmitter
+- type: nvidia::gxf::DownstreamReceptiveSchedulingTerm
+  parameters:
+    transmitter: signal
+    min_size: 1
+- type: nvidia::gxf::PingTx
+  parameters:
+    signal: signal
+    trigger_interrupt_after_ms: 500
+---
+name: rx0
+components:
+- name: signal
+  type: nvidia::gxf::test::MockReceiver
+  parameters:
+    # for interrupt exit test
+    ignore_unreceived_entities: true
+- type: nvidia::gxf::MessageAvailableSchedulingTerm
+  parameters:
+    receiver: signal
+    min_size: 1
+- type: nvidia::gxf::PingRx
+  parameters:
+    signal: signal
+- type: nvidia::gxf::CountSchedulingTerm
+  parameters:
+    count: 10
+---
+components:
+- type: nvidia::gxf::Connection
+  parameters:
+    source: tx0/signal
+    target: rx0/signal
+---
+components:
+- type: nvidia::gxf::MultiThreadScheduler
+  parameters:
+    check_recession_period_ms: 100
+    clock: misc/clock
+    stop_on_deadlock: true
+    stop_on_deadlock_timeout: 3000
+    worker_thread_number: 3
+---
+name: misc
+components:
+- name: clock
+  type: nvidia::gxf::RealtimeClock

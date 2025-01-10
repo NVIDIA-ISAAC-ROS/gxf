@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2020 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-FileCopyrightText: Copyright (c) 2020-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * SPDX-License-Identifier: Apache-2.0
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -41,6 +41,9 @@
 
 DEFINE_string(app, "", "GXF app file to execute");
 DEFINE_string(manifest, "", "GXF extension manifest");
+DEFINE_int32(severity, 3,
+             "Set log severity levels: 0=None, 1=Error, 2=Warning, 3=Info,"
+             " 4=Debug, 5=Verbose. Default: Info");
 
 // Split strings
 std::vector<std::string> SplitStrings(const std::string& list_of_files) {
@@ -60,7 +63,7 @@ gxf_result_t LoadApplication(gxf_context_t context, const std::string& list_of_f
   const auto filenames = SplitStrings(list_of_files);
 
   if (filenames.empty()) {
-    GXF_LOG_ERROR("Atleast one application file has to be specified using -app");
+    GXF_LOG_ERROR("At least one application file has to be specified using -app");
     return GXF_FILE_NOT_FOUND;
   }
 
@@ -109,6 +112,8 @@ int main(int argc, char **argv) {
   gxf_context_t context;
   GXF_LOG_INFO("Creating context");
   GXF_ASSERT_SUCCESS(GxfContextCreate(&context));
+  GXF_LOG_INFO("Setting Log Level");
+  GXF_ASSERT_SUCCESS(GxfSetSeverity(context, static_cast<gxf_severity_t>(FLAGS_severity)));
 
   const char* manifest_filename = FLAGS_manifest.c_str();
   const GxfLoadExtensionsInfo load_ext_info{nullptr, 0, &manifest_filename, 1, nullptr};
@@ -116,8 +121,6 @@ int main(int argc, char **argv) {
   GXF_ASSERT_SUCCESS(GxfLoadExtensions(context, &load_ext_info));
   GXF_LOG_INFO("Loading graph file %s", FLAGS_app.c_str());
   GXF_ASSERT_SUCCESS(LoadApplication(context, FLAGS_app.c_str()));
-  GXF_LOG_INFO("Setting Log Level to DEBUG...");
-  GXF_ASSERT_SUCCESS(GxfSetSeverity(context, gxf_severity_t::GXF_SEVERITY_DEBUG));
   GXF_LOG_INFO("Initializing...");
   GXF_ASSERT_SUCCESS(GxfGraphActivate(context));
   GXF_LOG_INFO("Running...");

@@ -31,7 +31,7 @@ def main(args):
         all_tests = [line.rstrip() for line in all_tests]
     unit_tests = [line for line in all_tests if not line.endswith("_yaml")]
     failed_unit_tests = []
-    for test in []:
+    for test in unit_tests:
         print("================================================================================")
         print(f"RUNNING {test}")
         print("================================================================================")

@@ -1,5 +1,5 @@
 """
- SPDX-FileCopyrightText: Copyright (c) 2021-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ SPDX-FileCopyrightText: Copyright (c) 2021-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  SPDX-License-Identifier: Apache-2.0
 
  Licensed under the Apache License, Version 2.0 (the "License");
@@ -43,6 +43,11 @@ def _list_to_string(list_ip):
   str = str[:-2] + "]"
   return str
 
+def _get_license_filepath(ctx):
+  if ctx.file.license_file != None:
+    return ctx.file.license_file.path
+  return "None"
+
 def _get_file_paths(f_list):
   files = []
   for f in f_list:
@@ -70,7 +75,11 @@ def _get_python_binding_paths(ctx):
 def _get_python_src_paths(ctx):
   deps = []
   for d in ctx.attr.python_sources:
-    deps.append(d.files.to_list()[0].path)
+    if ctx.attr.arch == "x86_64":
+      deps.append(d.files.to_list()[0].path)
+    else:
+      deps.append(d.files.to_list()[0].short_path)
+
   return deps
 
 def _verify_platform_config(ctx):
@@ -86,15 +95,15 @@ def _verify_platform_config(ctx):
   if ctx.attr.platform["os"] not in ["linux", "qnx"]:
     fail("platform config does not match the requirement. "
     + "\"os\" has to be one of: \"linux\"")
-  if ctx.attr.platform["distribution"] not in ["ubuntu_20.04", "qnx_sdp_7.1"]:
+  if ctx.attr.platform["distribution"] not in ["ubuntu_22.04", "qnx_sdp_7.1", "rhel9"]:
     fail("platform config does not match the requirement. "
-    + "\"distribution\" has to be one of: \"ubuntu_20.04\", \"qnx_sdp_7.1\"")
+    + "\"distribution\" has to be one of: \"ubuntu_22.04\", \"qnx_sdp_7.1\", \"rhel9\"")
 
 def _get_substitutions(ctx):
   subs = {"{NAME}": ctx.label.name[9:len(ctx.label.name)-4],
           "{EXTENSION_LIBRARY}": ctx.attr.extension.files.to_list()[0].path,
           "{VERSION}": ctx.attr.version,
-          "{LICENSE_FILE}": ctx.file.license_file.path,
+          "{LICENSE_FILE}": _get_license_filepath(ctx),
           "{UUID}": ctx.attr.uuid,
           "{URL}": ctx.attr.url,
           "{GIT_REPOSITORY}": ctx.attr.git_repository,
@@ -113,6 +122,7 @@ def _get_substitutions(ctx):
           "{BINARIES}": _list_to_string(_get_file_paths(ctx.files.binaries)),
           "{DATA}": _list_to_string(_get_file_paths(ctx.files.data)),
           "{PYTHON_ALIAS}": ctx.attr.python_alias,
+          "{NAMESPACE}": ctx.attr.namespace,
           "{PYTHON_BINDINGS}": _list_to_string(_get_python_binding_paths(ctx)),
           "{PYTHON_SOURCES}": _list_to_string(_get_python_src_paths(ctx)),
           "{DEPENDENCIES}": _ngc_deps_to_string(ctx),
@@ -190,6 +200,9 @@ def _register_ext_impl(ctx):
   for binary in ctx.attr.binaries:
       action_inputs += binary.files.to_list()
 
+  if ctx.file.license_file != None:
+      action_inputs.append(ctx.file.license_file)
+
   ctx.actions.run(
       outputs = [metadata_output],
       inputs = action_inputs,
@@ -224,7 +237,7 @@ register_ext_rule = rule(
             mandatory = True),
     "license_file": attr.label(
             allow_single_file = ["LICENSE"],
-            mandatory = True),
+            mandatory = False),
     "uuid": attr.string(
             doc = "uuid of the extension",
             mandatory = True),
@@ -238,7 +251,7 @@ register_ext_rule = rule(
             doc = "deployment priority of extension",
             default = "P0"),
     "platform": attr.string_dict(
-            doc = "deployment plaform specs",
+            doc = "deployment platform specs",
             mandatory = True),
     "cuda": attr.string(
             doc = "cuda compute stack version"),
@@ -271,6 +284,8 @@ register_ext_rule = rule(
     "data": attr.label_list(
             doc = "extension data files",
             allow_files = True),
+    "namespace": attr.string(
+            doc = "namespace of the extension. e.g gxf, deepstream, etc"),
     "python_alias": attr.string(
             doc = "python alias for python bindings"),
     "python_bindings": attr.label_list(
@@ -292,9 +307,9 @@ def register_extension(
         extension,
         uuid,
         version,
-        license_file,
         url,
         priority,
+        license_file = None,
         license = None,
         platform_config = {},
         compute_dependencies = [],
@@ -318,14 +333,16 @@ def register_extension(
 
   # Use platform default config if it's not explicitly set
   if not platform_config:
-    X86_LINUX_UB_20 = { "arch" : "x86_64", "os": "linux", "distribution" : "ubuntu_20.04"}
+    X86_LINUX_UB_20 = { "arch" : "x86_64", "os": "linux", "distribution" : "ubuntu_22.04"}
+    X86_LINUX_RHEL = { "arch" : "x86_64", "os": "linux", "distribution" : "rhel9"}
     platform_config = select({
         "//conditions:default": X86_LINUX_UB_20,
         "@com_extension_dev//build:platform_x86_64": X86_LINUX_UB_20,
+        "@com_extension_dev//build:platform_x86_64_rhel9": X86_LINUX_RHEL,
         "@com_extension_dev//build:cpu_aarch64": {
             "arch" : "aarch64",
             "os": "linux",
-            "distribution" : "ubuntu_20.04",
+            "distribution" : "ubuntu_22.04",
         },
     })
 

@@ -1,0 +1,108 @@
+Copyright (c) 2019-2022, NVIDIA CORPORATION. All rights reserved.
+
+NVIDIA CORPORATION and its licensors retain all intellectual property
+and proprietary rights in and to this software, related documentation
+and any modifications thereto. Any use, reproduction, disclosure or
+distribution of this software and related documentation without an express
+license agreement from NVIDIA CORPORATION is strictly prohibited.
+---
+
+diff --git BUILD.bzip2 BUILD.bzip2
+index 458a406..ce92a37 100644
+--- BUILD.bzip2
++++ BUILD.bzip2
+@@ -9,7 +9,6 @@ alias(
+     name = "bz2lib",
+     visibility = ["//visibility:public"],
+     actual = selects.with_or({
+-        ("@platforms//os:osx", "@platforms//os:ios", "@platforms//os:watchos", "@platforms//os:tvos"): ":bz2lib_system",
+         "//conditions:default": ":bz2lib_source",
+     })
+ )
+@@ -29,6 +28,9 @@ cc_library(
+     hdrs = [
+         "bzlib.h",
+     ],
++    copts = [
++        "-Wno-maybe-uninitialized",
++    ],
+     includes = ["."],
+ )
+
+diff --git BUILD.boost BUILD.boost
+index 0696c8f..917e281 100644
+--- BUILD.boost
++++ BUILD.boost
+@@ -213,7 +213,7 @@ boost_library(
+     }),
+     exclude_src = ["libs/fiber/src/numa/**/*.cpp"],
+     linkopts = selects.with_or({
+-        ("@platforms//os:linux", "@platforms//os:osx", "@platforms//os:ios", "@platforms//os:watchos", "@platforms//os:tvos"): ["-lpthread"],
++        ("@platforms//os:linux", "@platforms//os:osx", "@platforms//os:ios", "@platforms//os:watchos", "@platforms//os:tvos"): ["-pthread"],
+         "//conditions:default": [],
+     }),
+     visibility = ["//visibility:public"],
+@@ -343,10 +343,7 @@ boost_library(
+     ],
+     copts = ["-Iexternal/boost/libs/atomic/src"],
+     exclude_src = ["libs/atomic/src/wait_on_address.cpp"] + BOOST_ATOMIC_SSE_SRCS,
+-    deps = BOOST_ATOMIC_DEPS + select({
+-        "@platforms//cpu:x86_64": [":atomic_sse"],
+-        "//conditions:default": [],
+-    }),
++    deps = BOOST_ATOMIC_DEPS,
+ )
+
+ boost_library(
+@@ -422,7 +422,7 @@ boost_library(
+     }),
+     linkopts = select({
+         "@platforms//os:android": [],
+-        "//conditions:default": ["-lpthread"],
++        "//conditions:default": ["-pthread"],
+     }) + select({
+         ":asio_io_uring": ["-luring"],
+         "//conditions:default": [],
+@@ -1027,7 +1027,7 @@ boost_library(
+     name = "interprocess",
+     linkopts = select({
+         "@platforms//os:linux": [
+-            "-lpthread",
++            "-pthread",
+             "-lrt",
+         ],
+         "//conditions:default": [],
+@@ -1979,7 +1979,7 @@ boost_library(
+         ":windows_x86_64": [],
+     }),
+     linkopts = selects.with_or({
+-        ("@platforms//os:linux", "@platforms//os:osx", "@platforms//os:ios", "@platforms//os:watchos", "@platforms//os:tvos"): ["-lpthread"],
++        ("@platforms//os:linux", "@platforms//os:osx", "@platforms//os:ios", "@platforms//os:watchos", "@platforms//os:tvos"): ["-pthread"],
+         ":windows_x86_64": [],
+         "@platforms//os:android": [],
+     }),
+diff --git BUILD.lzma BUILD.lzma
+index 06731cb..82aafb9 100644
+--- BUILD.lzma
++++ BUILD.lzma
+@@ -168,7 +168,7 @@ cc_library(
+     ],
+     linkopts = select({
+         "@platforms//os:android": [],
+-        "//conditions:default": ["-lpthread"],
++        "//conditions:default": ["-pthread"],
+     }),
+     linkstatic = select({
+         "@platforms//os:windows": True,
+diff --git BUILD.zstd BUILD.zstd
+index a01c959..aa4d753 100644
+--- BUILD.zstd
++++ BUILD.zstd
+@@ -17,6 +17,7 @@ cc_library(
+         ":linux_x86_64": ["lib/decompress/huf_decompress_amd64.S"],
+         "//conditions:default": [],
+     }),
++    copts = ["-Wno-maybe-uninitialized"],
+     hdrs = [
+         "lib/zdict.h",
+         "lib/zstd.h",

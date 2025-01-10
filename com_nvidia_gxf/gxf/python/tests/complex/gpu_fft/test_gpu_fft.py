@@ -1,5 +1,5 @@
 """
- SPDX-FileCopyrightText: Copyright (c) 2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ SPDX-FileCopyrightText: Copyright (c) 2022-2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  SPDX-License-Identifier: Apache-2.0
 
  Licensed under the Apache License, Version 2.0 (the "License");
@@ -19,6 +19,11 @@ import gxf.core
 import unittest
 
 MANIFEST_YAML = "gxf/python/tests/complex/gpu_fft/test_gpu_fft_manifest.yaml"
+APP_YAML = "gxf/python/tests/complex/gpu_fft/test_gpu_fft.yaml"
+
+# the following YAML file will be generated while running the tests
+DLPACK_APP_YAML = APP_YAML.replace(".yaml", "_dlpack.yaml")
+
 
 class TestGPUfft(unittest.TestCase):
     '''
@@ -47,7 +52,25 @@ class TestGPUfft(unittest.TestCase):
         self.assertIsNotNone(context)
         # gxf.core.gxf_set_severity(context, 5)
         gxf.core.load_extensions(context, manifest_filenames=[MANIFEST_YAML])
-        gxf.core.graph_load_file(context, "gxf/python/tests/complex/gpu_fft/test_gpu_fft.yaml")
+        gxf.core.graph_load_file(context, APP_YAML)
+        gxf.core.graph_activate(context)
+        gxf.core.graph_run(context)
+        gxf.core.graph_deactivate(context)
+        gxf.core.context_destroy(context)
+
+    def test_basic_app_dlpack(self):
+        with open(APP_YAML, 'rt') as in_file, open(DLPACK_APP_YAML, 'wt') as out_file:
+            # write a version of the YAML, but with `use_dlpack: 1` instead
+            yaml = in_file.read()
+            yaml = yaml.replace("use_dlpack: 0", "use_dlpack: 1")
+            # print(yaml)
+            out_file.write(yaml)
+
+        context = gxf.core.context_create()
+        self.assertIsNotNone(context)
+        # gxf.core.gxf_set_severity(context, 5)
+        gxf.core.load_extensions(context, manifest_filenames=[MANIFEST_YAML])
+        gxf.core.graph_load_file(context, DLPACK_APP_YAML)
         gxf.core.graph_activate(context)
         gxf.core.graph_run(context)
         gxf.core.graph_deactivate(context)

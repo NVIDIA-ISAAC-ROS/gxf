@@ -72,7 +72,7 @@ class Metric : public Component {
   // Fixes the aggregated value to the last recorded sample.
   Expected<void> setFixedAggregationFunction();
 
-  // Resets the agggregated value to an uninitialized value
+  // Resets the aggregated value to an uninitialized value
   Expected<void> reset();
 
  private:

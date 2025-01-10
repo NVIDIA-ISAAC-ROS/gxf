@@ -48,7 +48,7 @@ FirstFitAllocatorBase::expected_t<void> FirstFitAllocatorBase::allocate(const in
   // Compute the memory used
   size_ = size;
   last_layer_first_index_ = 1;
-  // Given size < 2^30, we are guarenteed that last_layer_first_index_ won't overflow.
+  // Given size < 2^30, we are guaranteed that last_layer_first_index_ won't overflow.
   while (last_layer_first_index_ < size) last_layer_first_index_ *= 2;
   // Allocate the memory and check it worked
   tree_.reset(new(std::nothrow) Memory[last_layer_first_index_ * 2]);
@@ -115,7 +115,7 @@ FirstFitAllocatorBase::expected_t<int32_t> FirstFitAllocatorBase::acquire(const 
       // The next available spot is on the left side.
       idx *= 2;
     } else if (ptr[2*idx].right + ptr[2*idx+1].left >= size) {
-      // There is an availble spot in between both children.
+      // There is an available spot in between both children.
       index += ptr[2*idx].size - ptr[2*idx].right;
       update(index, index + size, /* free = */ 0);
       // Store the size allocated that starts at the given index.

@@ -1,5 +1,5 @@
 #! /usr/env/python
-# Copyright (c) 2021-2023, NVIDIA CORPORATION.  All rights reserved.
+# Copyright (c) 2021-2024, NVIDIA CORPORATION.  All rights reserved.
 #
 # NVIDIA CORPORATION and its licensors retain all intellectual property
 # and proprietary rights in and to this software, related documentation
@@ -147,7 +147,7 @@ class PublicNGCRepository(Repository):
                 has_failed = True
 
         if has_failed:
-            logger.warning("Some extensions failed to sync. Check logs at /tmp/nvgraph_registry.log")
+            logger.warning("Some extensions failed to sync. Check logs at /tmp/gxf_registry.log")
 
         return self._db.update_dependencies()
 
@@ -479,7 +479,7 @@ class NGCRepository(Repository):
                 has_failed = True
 
         if has_failed:
-            logger.warning("Some extensions failed to sync. Check logs at /tmp/nvgraph_registry.log")
+            logger.warning("Some extensions failed to sync. Check logs at /tmp/gxf_registry.log")
 
         return self._db.update_dependencies()
 

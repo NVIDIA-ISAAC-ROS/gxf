@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2021-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-FileCopyrightText: Copyright (c) 2021-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * SPDX-License-Identifier: Apache-2.0
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -35,7 +35,7 @@ namespace gxf {
 //
 // Components will be serialized in the order they are added to the entity
 // Components without serializers will be skipped
-// Each component will be preceeded by a component header and the name of the component
+// Each component will be preceded by a component header and the name of the component
 // The component itself will be serialized with a component serializer
 // An entity header will be added at the beginning
 class StdEntitySerializer : EntitySerializer {
@@ -62,7 +62,7 @@ class StdEntitySerializer : EntitySerializer {
   #pragma pack(pop)
 
   gxf_result_t registerInterface(Registrar* registrar) override;
-  gxf_result_t initialize() override { return GXF_SUCCESS; }
+  gxf_result_t initialize() override;
   gxf_result_t deinitialize() override { return GXF_SUCCESS; }
 
   gxf_result_t serialize_entity_abi(gxf_uid_t eid, Endpoint* endpoint, uint64_t* size) override;
@@ -93,9 +93,9 @@ class StdEntitySerializer : EntitySerializer {
   // Table that caches type ID with a valid component serializer
   std::unordered_map<gxf_tid_t, Handle<ComponentSerializer>, TidHash> serializer_cache_;
   // Sequence number for outgoing messages
-  uint64_t outgoing_sequence_number_;
+  uint64_t outgoing_sequence_number_ = 0;
   // Sequence number for incoming messages
-  uint64_t incoming_sequence_number_;
+  uint64_t incoming_sequence_number_ = 0;
 };
 
 }  // namespace gxf

@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2020-2022, NVIDIA CORPORATION. All rights reserved.
+Copyright (c) 2020-2024, NVIDIA CORPORATION. All rights reserved.
 
 NVIDIA CORPORATION and its licensors retain all intellectual property
 and proprietary rights in and to this software, related documentation
@@ -70,10 +70,6 @@ gxf_result_t Broadcast::tick() {
       return GXF_PARAMETER_OUT_OF_RANGE;
   }
 
-  return GXF_SUCCESS;
-}
-
-gxf_result_t Broadcast::stop() {
   return GXF_SUCCESS;
 }
 

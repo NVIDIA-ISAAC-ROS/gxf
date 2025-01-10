@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2021, NVIDIA CORPORATION. All rights reserved.
+Copyright (c) 2021-2024, NVIDIA CORPORATION. All rights reserved.
 
 NVIDIA CORPORATION and its licensors retain all intellectual property
 and proprietary rights in and to this software, related documentation
@@ -7,17 +7,21 @@ and any modifications thereto. Any use, reproduction, disclosure or
 distribution of this software and related documentation without an express
 license agreement from NVIDIA CORPORATION is strictly prohibited.
 */
-#include "gxf/cuda/cuda_common.hpp"
+
 #include "gxf/cuda/cuda_stream_pool.hpp"
 
 #include <memory>
 #include <utility>
 
+#include "gxf/core/common_expected_macro.hpp"
+#include "gxf/cuda/cuda_common.hpp"
+#include "gxf/cuda/cuda_stream.hpp"
+
 namespace nvidia {
 namespace gxf {
 
 namespace {
-constexpr uint32_t kDefaultStreamFlags = cudaStreamDefault;
+constexpr uint32_t kDefaultStreamFlags = cudaStreamNonBlocking;
 constexpr int32_t kDefaultStreamPriority = 0;
 constexpr uint32_t kDefaultReservedSize = 1;
 constexpr uint32_t kDefaultMaxSize = 0;
@@ -38,7 +42,7 @@ gxf_result_t CudaStreamPool::registerInterface(Registrar* registrar) {
       "Create CUDA streams with priority.", kDefaultStreamPriority);
   result &= registrar->parameter(
       reserved_size_, "reserved_size", "Reserved Stream Size",
-      "Reserve serveral CUDA streams before 1st request coming", kDefaultReservedSize);
+      "Reserve several CUDA streams before 1st request coming", kDefaultReservedSize);
   result &= registrar->parameter(
       max_size_, "max_size", "Maximum Stream Size",
       "The maximum stream size for the pool to allocate, unlimited by default", kDefaultMaxSize);
@@ -112,7 +116,7 @@ gxf_result_t CudaStreamPool::allocate_abi(uint64_t size, int32_t type, void** po
   }
   std::unique_lock<std::mutex> lock(mutex_);
   if (max_size_.get() && streams_.size() >= (size_t)max_size_.get()) {
-    GXF_LOG_ERROR("CudaStreamPool reached capcity(%u), could not allocate more streams",
+    GXF_LOG_ERROR("CudaStreamPool reached capacity(%u), could not allocate more streams",
                   max_size_.get());
     return GXF_OUT_OF_MEMORY;
   }
@@ -150,7 +154,7 @@ gxf_result_t CudaStreamPool::free_abi(void* pointer) {
   std::unique_lock<std::mutex> lock(mutex_);
   auto iter = streams_.find(entity->eid());
   if (iter == streams_.end()) {
-    GXF_LOG_ERROR("Failed to find cuda steram eid: %05zu in allocated streams.", entity->eid());
+    GXF_LOG_ERROR("Failed to find cuda stream eid: %05zu in allocated streams.", entity->eid());
     return GXF_ARGUMENT_OUT_OF_RANGE;
   }
   Entity stream_entity = std::move(*(iter->second));

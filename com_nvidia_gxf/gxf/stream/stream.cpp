@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2022-2023, NVIDIA CORPORATION. All rights reserved.
+Copyright (c) 2022-2024, NVIDIA CORPORATION. All rights reserved.
 
 NVIDIA CORPORATION and its licensors retain all intellectual property
 and proprietary rights in and to this software, related documentation
@@ -14,7 +14,7 @@ license agreement from NVIDIA CORPORATION is strictly prohibited.
 GXF_EXT_FACTORY_BEGIN()
 
 GXF_EXT_FACTORY_SET_INFO(0x918e6ad78e1a43aa, 0x9b49251d4b6072b0, "StreamExtension",
-                         "Stream related components in Gxf ", "Nvidia_Gxf", "0.2.0", "NVIDIA");
+                         "Stream related components in Gxf ", "Nvidia_Gxf", "0.5.0", "NVIDIA");
 
 GXF_EXT_FACTORY_SET_DISPLAY_INFO("Stream Extension", "Stream", "GXF Stream Extension");
 

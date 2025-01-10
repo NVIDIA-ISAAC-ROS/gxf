@@ -11,8 +11,10 @@ import time
 from typing import List
 from result import Ok, Err, Result
 from registry.core.core_interface import Registry
+import registry.core.logger as log
 from registry.core.utils import Extension_Obj, Component_Obj
 
+logger = log.get_logger("Registry")
 
 class QueryMaker:
     """ Query maker class, its purpose is to access
@@ -47,7 +49,7 @@ class QueryMaker:
             return extn_loaded
         self._comp_list = []
         for i, extn in enumerate(self._extn_list):
-            print(
+            logger.debug(
                 f'{i+1}/{len(self._extn_list)} => Fetching components for {extn.name}.')
             eid = extn.id
             res_comp_list = self.registry.get_component_list(eid)

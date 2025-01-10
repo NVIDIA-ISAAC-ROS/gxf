@@ -10,6 +10,7 @@ license agreement from NVIDIA CORPORATION is strictly prohibited.
 #include "gtest/gtest.h"
 
 #include "gxf/core/expected.hpp"
+#include "gxf/core/expected_macro.hpp"
 #include "gxf/core/handle.hpp"
 #include "gxf/std/tensor.hpp"
 #include "gxf/std/timestamp.hpp"

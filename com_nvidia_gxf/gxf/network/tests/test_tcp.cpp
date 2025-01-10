@@ -9,7 +9,9 @@ license agreement from NVIDIA CORPORATION is strictly prohibited.
 */
 #include "gtest/gtest.h"
 
+#include <chrono>
 #include <cstring>
+#include <thread>
 #include <utility>
 
 #include "gxf/network/tcp_client_socket.hpp"
@@ -184,7 +186,7 @@ TEST(TestTcp, ServerToClientAsync) {
   ASSERT_EQ(GxfGetSharedContext(context1, &shared_context), GXF_SUCCESS);
 
   gxf_context_t context2;
-  ASSERT_EQ(GxfContextCreate1(shared_context, &context2), GXF_SUCCESS);
+  ASSERT_EQ(GxfContextCreateShared(shared_context, &context2), GXF_SUCCESS);
 
   ASSERT_EQ(GxfLoadExtensions(context1, &kExtensionInfo), GXF_SUCCESS);
 
@@ -421,6 +423,83 @@ TEST(TestTcp, ServerReceiverPush) {
 
   ASSERT_EQ(GxfContextDestroy(context1), GXF_SUCCESS);
   ASSERT_EQ(GxfContextDestroy(context2), GXF_SUCCESS);
+}
+
+TEST(TestTcp, ServerUnconnectedInterrupt) {
+  using namespace std::chrono_literals;
+  gxf_context_t context;
+  ASSERT_EQ(GxfContextCreate(&context), GXF_SUCCESS);
+
+  ASSERT_EQ(GxfLoadExtensions(context, &kExtensionInfo), GXF_SUCCESS);
+
+  ASSERT_EQ(
+      GxfGraphLoadFile(context, "gxf/network/tests/test_tcp_server_unconnected_interrupt.yaml"),
+      GXF_SUCCESS);
+
+  ASSERT_EQ(GxfGraphActivate(context), GXF_SUCCESS);
+  ASSERT_EQ(GxfGraphRunAsync(context), GXF_SUCCESS);
+  std::this_thread::sleep_for(1s);
+  ASSERT_EQ(GxfGraphInterrupt(context), GXF_SUCCESS);
+  ASSERT_EQ(GxfGraphWait(context), GXF_SUCCESS);
+  ASSERT_EQ(GxfGraphDeactivate(context), GXF_SUCCESS);
+  ASSERT_EQ(GxfContextDestroy(context), GXF_SUCCESS);
+}
+
+TEST(TestTcp, ClientUnconnectedInterrupt) {
+  using namespace std::chrono_literals;
+  gxf_context_t context;
+  ASSERT_EQ(GxfContextCreate(&context), GXF_SUCCESS);
+
+  ASSERT_EQ(GxfLoadExtensions(context, &kExtensionInfo), GXF_SUCCESS);
+
+  ASSERT_EQ(
+      GxfGraphLoadFile(context, "gxf/network/tests/test_tcp_client_unconnected_interrupt.yaml"),
+      GXF_SUCCESS);
+
+  ASSERT_EQ(GxfGraphActivate(context), GXF_SUCCESS);
+  ASSERT_EQ(GxfGraphRunAsync(context), GXF_SUCCESS);
+  std::this_thread::sleep_for(1s);
+  ASSERT_EQ(GxfGraphInterrupt(context), GXF_SUCCESS);
+  ASSERT_EQ(GxfGraphWait(context), GXF_SUCCESS);
+  ASSERT_EQ(GxfGraphDeactivate(context), GXF_SUCCESS);
+  ASSERT_EQ(GxfContextDestroy(context), GXF_SUCCESS);
+}
+
+TEST(TestTcp, ClientServerConnectedInterrupt) {
+  using namespace std::chrono_literals;
+
+  gxf_context_t context1;
+  ASSERT_EQ(GxfContextCreate(&context1), GXF_SUCCESS);
+
+  gxf_context_t context2;
+  ASSERT_EQ(GxfContextCreate(&context2), GXF_SUCCESS);
+
+  ASSERT_EQ(GxfLoadExtensions(context1, &kExtensionInfo), GXF_SUCCESS);
+  ASSERT_EQ(GxfLoadExtensions(context2, &kExtensionInfo), GXF_SUCCESS);
+
+  ASSERT_EQ(
+      GxfGraphLoadFile(context1, "gxf/network/tests/test_tcp_client_connected_interrupt.yaml"),
+      GXF_SUCCESS);
+  ASSERT_EQ(
+      GxfGraphLoadFile(context2, "gxf/network/tests/test_tcp_server_connected_interrupt.yaml"),
+      GXF_SUCCESS);
+
+  ASSERT_EQ(GxfGraphActivate(context1), GXF_SUCCESS);
+  ASSERT_EQ(GxfGraphActivate(context2), GXF_SUCCESS);
+
+  ASSERT_EQ(GxfGraphRunAsync(context1), GXF_SUCCESS);
+  ASSERT_EQ(GxfGraphRunAsync(context2), GXF_SUCCESS);
+  std::this_thread::sleep_for(200ms);
+
+  // Interrupt client graph while it's attempting to deserialize messages from server.
+  GxfGraphInterrupt(context1);
+  GxfGraphWait(context1);
+  GxfGraphDeactivate(context1);
+  GxfContextDestroy(context1);
+
+  GxfGraphWait(context2);
+  GxfGraphDeactivate(context2);
+  GxfContextDestroy(context2);
 }
 
 }  // namespace gxf

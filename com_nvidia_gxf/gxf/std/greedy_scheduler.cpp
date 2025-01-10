@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2020-2021,2023 NVIDIA CORPORATION. All rights reserved.
+Copyright (c) 2020-2024 NVIDIA CORPORATION. All rights reserved.
 
 NVIDIA CORPORATION and its licensors retain all intellectual property
 and proprietary rights in and to this software, related documentation
@@ -17,6 +17,7 @@ license agreement from NVIDIA CORPORATION is strictly prohibited.
 
 #include "common/fixed_vector.hpp"
 #include "common/memory_utils.hpp"
+#include "gxf/std/entity_executor.hpp"
 #include "gxf/std/greedy_scheduler.hpp"
 
 namespace nvidia {
@@ -45,12 +46,6 @@ gxf_result_t GreedyScheduler::registerInterface(Registrar* registrar) {
       "periodic entity exists to break the dead end. Should be disabled when scheduling conditions "
       "can be changed by external actors, for example by clearing queues manually.",
       true);
-  result &= registrar->parameter(
-      check_recession_period_us_, "check_recession_period_us",
-      "Duration to sleep before checking the condition of entities again [us]",
-      "The duration for which the scheduler would wait (in us) when all entities are not "
-      "ready to run yet.",
-      0l);
   result &= registrar->parameter(
       check_recession_period_ms_, "check_recession_period_ms",
       "Duration to sleep before checking the condition of next iteration [ms]",
@@ -98,7 +93,7 @@ gxf_result_t GreedyScheduler::schedule_abi(gxf_uid_t eid) {
   if (!entity) {
     return ToResultCode(entity);
   }
-  auto codelets = entity->findAll<Codelet>();
+  auto codelets = entity->findAllHeap<Codelet>();
   if (!codelets) {
     return ToResultCode(codelets);
   }
@@ -123,7 +118,7 @@ gxf_result_t GreedyScheduler::unschedule_abi(gxf_uid_t eid) {
   if (!entity) {
     return ToResultCode(entity);
   }
-  auto codelets = entity->findAll<Codelet>();
+  auto codelets = entity->findAllHeap<Codelet>();
   if (!codelets) {
     return ToResultCode(codelets);
   }
@@ -209,8 +204,6 @@ gxf_result_t GreedyScheduler::runAsync_abi() {
                           "max_duration=%ld).", start, now, max_duration_ns);
           thread_error_code_ = executor_->deactivateAll();  // Stop all the entities
           break;
-        } else {
-          clock_handle->sleepFor(check_recession_period_us_ * kUsToNs);
         }
       }
 
@@ -246,7 +239,7 @@ gxf_result_t GreedyScheduler::runAsync_abi() {
 
         if (!maybe_condition) {
           const char* entityName = "UNKNOWN";
-          GxfParameterGetStr(context(), eid, kInternalNameParameterKey, &entityName);
+          GxfEntityGetName(context(), eid, &entityName);
           GXF_LOG_WARNING("Error while executing entity %zu named '%s': %s", eid, entityName,
                           GxfResultStr(maybe_condition.error()));
           // an error occurred
@@ -289,6 +282,8 @@ gxf_result_t GreedyScheduler::runAsync_abi() {
               return;
             }
           } break;
+          default:
+            break;
         }
       }
 
@@ -407,8 +402,10 @@ gxf_result_t GreedyScheduler::wait_abi() {
   return thread_error_code_;
 }
 
-gxf_result_t GreedyScheduler::event_notify_abi(gxf_uid_t eid) {
+gxf_result_t GreedyScheduler::event_notify_abi(gxf_uid_t eid, gxf_event_t event) {
   GXF_LOG_DEBUG("Received event done notification for entity %ld", eid);
+  if (event != GXF_EVENT_EXTERNAL) { return GXF_SUCCESS; }
+
   std::unique_lock<std::mutex> lock(event_mutex_);
   event_notified_->pushEvent(eid);
   event_notification_cv_.notify_one();
@@ -444,7 +441,7 @@ gxf_result_t GreedyScheduler::stop_on_deadlock_timeout(const int64_t timeout, co
     return GXF_SUCCESS;
   }
 
-  // 2. If having trend to stop in this interation,
+  // 2. If having trend to stop in this iteration,
   //     2.1 toggle should_stop to false if still within timeout period
   if (now - last_no_stop_ts_ < timeout * 1'000'000l) {
     GXF_LOG_DEBUG("Onhold trend to stop on deadlock for [%ld] ms",

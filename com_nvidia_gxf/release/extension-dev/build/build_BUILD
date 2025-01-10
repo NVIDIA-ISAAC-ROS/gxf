@@ -1,5 +1,5 @@
 """
-SPDX-FileCopyrightText: Copyright (c) 2021 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+SPDX-FileCopyrightText: Copyright (c) 2021-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 SPDX-License-Identifier: Apache-2.0
 
 Licensed under the Apache License, Version 2.0 (the "License");
@@ -21,6 +21,12 @@ config_setting(
     name = "platform_x86_64",
     define_values = {"target_platform": "x86_64"},
     visibility = ["//visibility:public"],
+)
+
+config_setting(
+  name = "platform_x86_64_rhel9",
+  define_values = {"target_platform": "x86_64_rhel9"},
+  visibility = ["//visibility:public"],
 )
 
 config_setting(

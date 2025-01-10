@@ -28,10 +28,10 @@ class PyCodeletV0(Component):
 
     _validation_info_parameters = {'codelet_name': {'key': 'codelet_name', 'headline': 'Codelet Name', 'description': 'Name of the python codelet', 'gxf_parameter_type': 'GXF_PARAMETER_TYPE_STRING', 'rank': 0, 'shape': [1], 'flags': 'GXF_PARAMETER_FLAGS_NONE', 'handle_type': 'N/A', 'default': 'N/A'}, 'codelet_file': {'key': 'codelet_file', 'headline': 'Absolute Codelet File Path', 'description': 'Absolute path to the file containing the codelet implementation', 'gxf_parameter_type': 'GXF_PARAMETER_TYPE_STRING', 'rank': 0, 'shape': [1], 'flags': 'GXF_PARAMETER_FLAGS_NONE', 'handle_type': 'N/A', 'default': 'N/A'}, 'codelet_params': {'key': 'codelet_params', 'headline': 'Params', 'description': 'Codelet params', 'gxf_parameter_type': 'GXF_PARAMETER_TYPE_STRING', 'rank': 0, 'shape': [1], 'flags': 'GXF_PARAMETER_FLAGS_OPTIONAL', 'handle_type': 'N/A', 'default': 'N/A'}}
 
-    def __init__(self, name, codelet, **params):
+    def __init__(self, name, codelet, codelet_file="None", **params):
         backend_params = {
             'codelet_name': codelet.__name__,
-            'codelet_file': "None",
+            'codelet_file': codelet_file,
             'codelet_params': params,
         }
         Component.__init__(self, type=self.get_gxf_type(), name=name, **backend_params)

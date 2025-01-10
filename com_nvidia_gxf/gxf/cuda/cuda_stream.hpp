@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2021 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-FileCopyrightText: Copyright (c) 2021-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * SPDX-License-Identifier: Apache-2.0
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -33,8 +33,6 @@
 namespace nvidia {
 namespace gxf {
 
-class CudaStreamPool;
-
 // Holds and provides access to cudaStream_t. CudaStream is allocated and
 // recycled by CudaStreamPool
 class CudaStream {
@@ -58,8 +56,8 @@ class CudaStream {
   Expected<void> record(Handle<CudaEvent> event, Entity input_entity,
                         SyncedCallback synced_cb = nullptr);
   // Record event on the stream for an async callback.
-  // The callback would be delayed untill CudaStreamSync ticks.
-  // The Callback usually is used to recyle dependent resources.
+  // The callback would be delayed until CudaStreamSync ticks.
+  // The Callback usually is used to recycle dependent resources.
   // If record failed, callback would not be called. User need to check return results.
   Expected<void> record(cudaEvent_t event, EventDestroy cb);
 
@@ -86,7 +84,7 @@ class CudaStream {
   int dev_id_ = 0;
   cudaStream_t stream_ = 0;
 
-  // store all recorded event with destory functions.
+  // store all recorded event with destroy functions.
   std::queue<CudaEvent::EventPtr> recorded_event_queue_;
   // event is defined for for synchronization of stream
   CudaEvent::EventPtr sync_event_;

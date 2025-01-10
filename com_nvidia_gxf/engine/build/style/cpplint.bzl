@@ -1,5 +1,5 @@
 '''
- SPDX-FileCopyrightText: Copyright (c) 2019-2020 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ SPDX-FileCopyrightText: Copyright (c) 2019-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  SPDX-License-Identifier: Apache-2.0
 
  Licensed under the Apache License, Version 2.0 (the "License");
@@ -43,7 +43,7 @@ def _is_source_label(file):
         if filename.endswith("." + extension):
             return True
 
-    # In the rare case that we need to pass a shared library as a dependeny we ignore it. This
+    # In the rare case that we need to pass a shared library as a dependency we ignore it. This
     # is for example currently happening for the yolo package.
     if filename.endswith(".so"): return True
 

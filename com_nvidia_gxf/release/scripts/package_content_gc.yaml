@@ -1,0 +1,59 @@
+################################################################################
+# Copyright (c) 2024, NVIDIA CORPORATION. All rights reserved.
+#
+# NVIDIA Corporation and its licensors retain all intellectual property
+# and proprietary rights in and to this software, related documentation
+# and any modifications thereto.  Any use, reproduction, disclosure or
+# distribution of this software and related documentation without an express
+# license agreement from NVIDIA Corporation is strictly prohibited.
+#
+################################################################################
+
+required_files: [
+    # X86 debian package files
+    "x86/opt/nvidia/graph-composer/composer",
+    "x86/opt/nvidia/graph-composer/third-party/chardet-3.0.4.tar.gz",
+    "x86/opt/nvidia/graph-composer/third-party/python-certifi-2020.12.05.tar.gz",
+]
+
+files_no_exec: [
+    "x86/DEBIAN/control",
+    "x86/usr/share/applications/composer.desktop",
+    "x86/opt/nvidia/graph-composer/third-party/chardet-3.0.4.tar.gz",
+    "x86/opt/nvidia/graph-composer/third-party/python-certifi-2020.12.05.tar.gz",
+]
+
+file_map: [
+  {
+    src: "release/config/gc/x86_64/ubuntu2204/preinst",
+    dst: "x86/DEBIAN/preinst",
+  },
+  {
+    src: "release/config/dev/x86_64/ubuntu2204/templates",
+    dst: "x86/DEBIAN/templates",
+  },
+  {
+    src: "release/config/gc/x86_64/ubuntu2204/postinst",
+    dst: "x86/DEBIAN/postinst",
+  },
+  {
+    src: "release/config/gc/x86_64/ubuntu2204/prerm",
+    dst: "x86/DEBIAN/prerm",
+  },
+  {
+    src: "release/config/gc/x86_64/ubuntu2204/control",
+    dst: "x86/DEBIAN/control",
+  },
+  {
+    src: "release/config/dev/x86_64/ubuntu2204/composer.desktop",
+    dst: "x86/usr/share/applications/composer.desktop",
+  },
+    {
+    src: "third_party/LICENSE.txt",
+    dst: "x86/opt/nvidia/graph-composer/LICENSE.txt",
+  },
+  {
+    src: "release/doc/NVIDIA_DeepStream_SDK_EULA.pdf",
+    dst: "x86/opt/nvidia/graph-composer/NVIDIA_DeepStream_SDK_EULA.pdf",
+  },
+]

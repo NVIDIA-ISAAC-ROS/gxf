@@ -4,468 +4,193 @@
 // It will help to give developers faster feedback and for code reviewers
 // to verify the compliance of the commit
 //
-// Copyright (c) 2021-2023, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2021-2024, NVIDIA CORPORATION. All rights reserved.
 //
 // NVIDIA CORPORATION and its licensors retain all intellectual property
 // and proprietary rights in and to this software, related documentation
 // and any modifications thereto. Any use, reproduction, disclosure or
 // distribution of this software and related documentation without an express
 // license agreement from NVIDIA CORPORATION is strictly prohibited.
-
-@Library('ci-groovkins-lib@25cd83ef576328887aba92e10da1fb851b1a4350')
-import com.nvidia.isaac.ci.Notify
-import com.nvidia.isaac.ci.utils.Bazel
-import com.nvidia.isaac.ci.utils.Nodes
-import com.nvidia.isaac.ci.utils.Docker
+@Library('ci-groovkins-lib@5049eebe095b22f589cf601c8c508feda21313b7')
 import com.nvidia.isaac.ci.utils.WorkflowScriptUtil
-import com.nvidia.isaac.ci.isaac.DockerImageUtil
-
-import com.google.gerrit.extensions.api.changes.ReviewInput
-import com.nvidia.isaac.ci.gerrit_http.GerritRestHandler
 import com.nvidia.isaac.ci.utils.dto.BaseCredentialsConfig
+//  Pipeline specific configs
+env.REPO_NAME = 'gxf'
+String driver_version_cuda_12_6 = '560.35.03'
+String driver_version_cuda_12_2 = '535.104.05'
+String jetpack_version = 'jetpack60'
+String jetpack_61_version = 'jetpack61'
+String build_folder = 'engine/build'
+String image_pull_secret = 'urm'
+String artifactory_secret = 'vault-artifactory'
+String enable_kaniko_cache = 'true'
+String jp_tag = 'jp-6.0'
+String jp_60_tag = 'jp-6.0 && 64GB'
+String jp_61_tag = 'jp-6.1'
+//  Base images
+String base_image_12_2 = ''
+String base_image_12_6 = ''
+String base_image_arm = ''
+String base_image_arm_61 = ''
+//  Remote Execution configs
+Boolean enable_re = false
+String re_config = '--config=remote_exec_rpt'
+//  Post section
+Boolean enable_slack = true
 
 def utils_credentials = BaseCredentialsConfig.from_default()
-utils_credentials.ngc_credentials_id = 'vault-ngc'
-
 pipeline_utils = new WorkflowScriptUtil(this, utils_credentials)
-bazel_utils = new Bazel(this, utils_credentials)
-docker_utils = new Docker(this, utils_credentials)
-
-def build_image(String cuda_version='11_8') {
-    def gxf_build_container
-
-    def opts = readJSON text: env.CUDA_OPTIONS
-    for (opt in opts) {
-        String cuda = opt.cuda
-        String docker_file = opt.docker
-        if (cuda == cuda_version) {
-            gxf_build_container = docker.build("${DOCKER_IMAGE}:${cuda}-${BUILD_NUMBER}",
-                "-f ${docker_file} engine/build")
-        }
-    }
-    return gxf_build_container
-}
-
-// Generate docker arguments.
-String get_docker_args(Boolean nvidia_runtime=false, String cache_folder='gxf', String username, String private_key) {
-    def runtime = ''
-    if(nvidia_runtime) {
-        runtime = env.RUNTIME
-    }
-    def (cpus, first_cpu, last_cpu) = Nodes.getCPUsLimit(this)
-    def docker_groups = pipeline_utils.get_docker_groups()
-    String bazel_local_cache = "/var/cache/bazel/${cache_folder}/${env.EXECUTOR_NUMBER}"
-    sh "mkdir -p ${bazel_local_cache}"
-    return "--stop-timeout 3 --cpus ${cpus} --cpuset-cpus ${first_cpu}-${last_cpu} \
-        -v ${private_key}:/home/${username}/.ssh/id_rsa:ro \
-        -v ${bazel_local_cache}:/tmp/.cache/bazel ${DOCKER_ARGUMENTS} ${docker_groups} ${runtime}"
-}
-
-def run_in_ci_docker(String container_with_tag, Boolean nvidia_runtime=false, String config, Closure command_closure) {
-    script {
-        withCredentials([[$class: 'VaultSSHUserPrivateKeyBinding', credentialsId: 'vault-svc-ssh',
-            usernameVariable : 'USERNAME', privateKeyVariable : 'PRIVATE_KEY'
-            ]]) {
-            docker_utils.run_in_container(container_with_tag, get_docker_args(nvidia_runtime, "gxf/${config}", USERNAME, PRIVATE_KEY)) {
-                dir(WORKSPACE) {
-                    sh "echo build --remote_cache=http://${NODE_NAME}:8080 >> ~/.bazelrc"
-                    sh "echo build --repository_cache=/tmp/.cache/bazel/repository_cache >> ~/.bazelrc"
-                    command_closure()
-                    try {
-                        bazel_utils.cleanCache("/tmp/.cache/bazel", 75)
-                    } catch (Exception e) {
-                        print e
-                    }
-                }
-            }
-        }
-    }
-}
-
-// Global variable
-GerritRestHandler GERRIT_SERVER
-def NOTIFIER
-
+blossom.init()
+common.init()
+gxf.init()
 pipeline {
     agent none
-    environment {
-        DOCKER_ARGUMENTS = '-v /etc/passwd:/etc/passwd:ro -e HOME=/tmp'
-        SCORE = 0
-        ARTIFACTORY_URL_X86 = "https://urm.nvidia.com/artifactory/sw-isaac-gfx-generic-local/x86_tests"
-        ARTIFACTORY_URL_JETSON = "https://urm.nvidia.com/artifactory/sw-isaac-gfx-generic-local/jetson_tests"
-        RUNTIME = '--runtime=nvidia'
-        NGC_REGISTRY_CREDENTIALS = 'vault-ngc'
-        DOCKER_IMAGE = 'nvcr.io/nvidian/isaac-sdk/gxf-build'
-        CUDA_OPTIONS = '[{"cuda":"11_8", "config":"--config=x86_64_cuda_11_8", "label":"gxf && cuda-11.8", "docker":"engine/build/docker/cuda11_8.dockerfile", "enable_ci": true},\
-                         {"cuda":"12_1", "config":"--config=x86_64_cuda_12_1", "label":"gxf && cuda-12.1", "docker":"engine/build/docker/cuda12_1.dockerfile", "enable_ci": true}]'
-        JETPACK_OPTIONS = '[{"version":"jetpack51", "label":"gxf && jp-5.1", "enable_ci": true}]'
-    }
-    parameters {
-        string(
-          name: 'REF',
-          description: "CL to build. Use a full REF",
-        )
-    }
     options {
-        ansiColor('xterm')
-        timestamps()
-        timeout(time: 8, unit: 'HOURS')
-        buildDiscarder(logRotator(numToKeepStr: '500', daysToKeepStr: '30'))
+        timeout(time: 3, unit: 'HOURS')
         parallelsAlwaysFailFast()
     }
+    environment {
+        ENABLE_LWS = 'false'
+    }
+    parameters {
+        string(name: 'GERRIT_REFSPEC', defaultValue: 'refs/heads/master')
+    }
     stages {
-        stage("Pre-Build Actions") {
-            agent { node {label 'gxf && agent'} }
-            stages {
-                stage("Validate arguments") {
-                    steps {
-                        script {
-                            if (!params.REF) {
-                                error("Missing parameter: REF")
-                            }
-
-                            WorkflowScriptUtil pipeline_utils = new WorkflowScriptUtil(this, BaseCredentialsConfig.from_default())
-
-                            env.GIT_AUTHOR = pipeline_utils.get_commit_author()
-                            env.GIT_SHORT = pipeline_utils.get_short_commit_desc()
-
-                            GERRIT_SERVER = pipeline_utils.build_gerrit_client(params.REF)
-
-                            currentBuild.displayName = "#${BUILD_NUMBER}"
-                            currentBuild.description = "${env.GIT_AUTHOR}: ${env.GIT_SHORT}. ${GERRIT_SERVER.refspec_.get_cl_url()}"
-
-                            NOTIFIER = new Notify(this, GERRIT_SERVER.refspec_.get_cl_url())
-                            env.WIP_STATUS = GIT_SHORT.contains("WIP") || GERRIT_SERVER.get_change().response_object.workInProgress != null
-
-                            try {
-                                pipeline_utils.abortPreviousRunningBuilds('REF',  GERRIT_SERVER.refspec_.change_id)
-                            } catch (err) {
-                                echo err.getMessage()
-                            }
-                        }
-                    }
-                }
-                stage("Notify gerrit of running pipeline") {
-                    steps {
-                        script {
-                            GERRIT_SERVER.set_review(new ReviewInput().message(
-                                "CI build started, see progress at ${RUN_DISPLAY_URL}"
-                            ).label('CI-Verified', 0))
-                        }
-                    }
-                }
+        stage('Environment Setup') { steps { script {
+            blossom.run_container("${env.DOCKER_BASE}/gxf-development-build-checker:shared", image_pull_secret) {
+                checkout scm
+                blossom.add_safe_directory()
+                common.get_commit_information()
+                if (!enable_re) { re_config = '' }
+                sh 'git apply --check release/patch/release_build.patch'
             }
-            post {
-                always {cleanWs disableDeferredWipeout: true, deleteDirs: true}
-            }
+        }}}
+        stage('Build Base Images') {
+            steps { script {
+                parallel(
+                'X86-CUDA-12.2': {
+                    base_image_12_2 = "${env.DOCKER_BASE}/${env.IMAGE_PREFIX}-x86_64_cuda_12_2:${env.BUILD_NUMBER}-ci"
+                    blossom.build_image("${build_folder}/docker/cuda12_2.dockerfile", build_folder, base_image_12_2, enable_kaniko_cache)
+                },
+                'X86-CUDA-12.6': {
+                    base_image_12_6 = "${env.DOCKER_BASE}/${env.IMAGE_PREFIX}-x86_64_cuda_12_6:${env.BUILD_NUMBER}-ci"
+                    blossom.build_image("${build_folder}/docker/cuda12_6.dockerfile", build_folder, base_image_12_6, enable_kaniko_cache)
+                },
+                'ARM-60': {
+                    base_image_arm = "${env.DOCKER_BASE}/${env.IMAGE_PREFIX}-arm:${env.BUILD_NUMBER}-ci"
+                    blossom.run_on_static_node(jp_tag) {
+                        checkout scm
+                        withCredentials([
+                            usernamePassword(credentialsId: 'vault-ngc', usernameVariable: 'NGC_USERNAME', passwordVariable: 'NGC_PASSWORD'),
+                            usernamePassword(credentialsId: 'vault-artifactory', usernameVariable: 'URM_USERNAME', passwordVariable: 'URM_PASSWORD')
+                            ]) {
+                            sh  "docker login -u '${NGC_USERNAME}' -p ${NGC_PASSWORD} nvcr.io"
+                            sh "docker login -u '${URM_USERNAME}' -p ${URM_PASSWORD} urm.nvidia.com"
+                        }
+                        common.docker_login('vault-artifactory', 'urm.nvidia.com')
+                        sh "docker build -t ${base_image_arm} -f ${build_folder}/docker/arm64/jp60.dockerfile ${build_folder} && docker push ${base_image_arm}"
+                    }
+                },
+                'ARM-61': {
+                    base_image_arm_61 = "${env.DOCKER_BASE}/${env.IMAGE_PREFIX}-arm61:${env.BUILD_NUMBER}-ci"
+                    blossom.run_on_static_node(jp_tag) {
+                        checkout scm
+                        withCredentials([
+                            usernamePassword(credentialsId: 'vault-ngc', usernameVariable: 'NGC_USERNAME', passwordVariable: 'NGC_PASSWORD'),
+                            usernamePassword(credentialsId: 'vault-artifactory', usernameVariable: 'URM_USERNAME', passwordVariable: 'URM_PASSWORD')
+                            ]) {
+                            sh  "docker login -u '${NGC_USERNAME}' -p ${NGC_PASSWORD} nvcr.io"
+                            sh "docker login -u '${URM_USERNAME}' -p ${URM_PASSWORD} urm.nvidia.com"
+                        }
+                        common.docker_login('vault-artifactory', 'urm.nvidia.com')
+                        sh "docker build -t ${base_image_arm_61} -f ${build_folder}/docker/arm64/jp61.dockerfile ${build_folder} && docker push ${base_image_arm_61}"
+                    }
+                })
+            }}
         }
-        stage("Lint") {
-            agent { node { label 'gxf && cuda-11.8' } }
-            steps {
-                script {
-                    def gxf_build_container = build_image("11_8")
-                    run_in_ci_docker(gxf_build_container.imageName(), false, "lint") {
-                        sh "bazel test --config=lint ..."
-                    }
+        stage('Bazel') { steps { script {
+            parallel(
+            'Lint': {
+                blossom.run_container(base_image_12_6, image_pull_secret) {
+                    def cpu_cores = blossom.get_cpu_cores()
+                    common.bazel_lint(re_config, cpu_cores)
                 }
-            }
-            post {
-                failure {
-                    script {
-                        GERRIT_SERVER.set_review(new ReviewInput().message(
-                            "❌ Linter checks failed. ${RUN_DISPLAY_URL}"
-                        ).label('CI-Verified', -1))
-                        NOTIFIER.slack("${env.GIT_AUTHOR}", "❌ ${env.GIT_SHORT} failed linter checks",
-                            currentBuild.currentResult.toLowerCase(), "danger")
-                    }
+            },
+            'Copyright-Check': {
+                blossom.run_container(base_image_12_6, image_pull_secret) {
+                    def cpu_cores = blossom.get_cpu_cores()
+                    sh "git config --global --add safe.directory ${WORKSPACE}"
+                    sh "echo ${WORKSPACE}"
+                    pipeline_utils.enable_ssh() {
+                        checkout scm
+                        sh "bazel run //engine/build/style/copyright_checker:check_commit --local_cpu_resources=${cpu_cores} ${re_config} || { echo 'Copyright check failed. You can fix the format with `bazel run //engine/build/style/copyright_checker:check_commit -- --fix`'; exit 1; }"
+                        }
+                        }
+                },
+            'X86-CUDA-12.2': {
+                blossom.run_container(base_image_12_2, image_pull_secret, driver_version_cuda_12_2) {
+                    String config = '--config=x86_64_cuda_12_2'
+                    def cpu_cores = blossom.get_cpu_cores()
+                    common.bazel_build("${config} ${re_config}", cpu_cores)
+                    common.bazel_test(config, cpu_cores)
                 }
-                always {cleanWs disableDeferredWipeout: true, deleteDirs: true}
-            }
-        }
-        stage("Public Build") {
-            agent { node { label 'gxf && cuda-11.8' } }
-            steps {
-                script {
-                    def gxf_build_container = build_image("11_8")
-                    run_in_ci_docker(gxf_build_container.imageName(), false, "lint") {
-                        sh "git apply --check release/patch/release_build.patch"
-                    }
+            },
+            'X86-CUDA-12.6': {
+                blossom.run_container(base_image_12_6, image_pull_secret, driver_version_cuda_12_6) {
+                    String config = '--config=x86_64_cuda_12_6'
+                    def cpu_cores = blossom.get_cpu_cores()
+                    common.bazel_build("${config} ${re_config}", cpu_cores)
+                    common.bazel_test(config, cpu_cores)
                 }
-            }
-            post {
-                failure {
-                    script {
-                        GERRIT_SERVER.set_review(new ReviewInput().message(
-                            "❌ Public build patch failed. ${RUN_DISPLAY_URL}"
-                        ).label('CI-Verified', -1))
-                        NOTIFIER.slack("${env.GIT_AUTHOR}", "❌ ${env.GIT_SHORT} failed public build patch",
-                            currentBuild.currentResult.toLowerCase(), "danger")
-                    }
+            },
+            'HP21EA_SBSA': {
+                String config = '--config=hp21ea_sbsa'
+                blossom.run_container(base_image_12_2, image_pull_secret) {
+                    def cpu_cores = blossom.get_cpu_cores()
+                    common.bazel_build("${config} ${re_config}", cpu_cores)
                 }
-                always {cleanWs disableDeferredWipeout: true, deleteDirs: true}
-            }
-        }
-
-        stage("Build") {
-            when { environment name: 'WIP_STATUS', value: "false" }
-            agent { node { label 'gxf && agent' } }
-            steps {
-                script {
-                    def stages = [:]
-                    def jps = readJSON text: env.JETPACK_OPTIONS
-                    for (jp in jps) {
-                        String jp_version = jp.version
-                        if (! jp.enable_ci) {
-                          continue;
-                        }
-                        stages["Jetson ${jp_version}"] = {
-                            node (label: 'gxf && cuda-11.8') {
-                                stage("Jetson Build on x86"){
-                                    cleanWs disableDeferredWipeout: true, deleteDirs: true
-                                    def vault_secret = [
-                                        [path: '/secrets/artifactory', engineVersion: 1, secretValues: [
-                                            [envVar: 'ARTIFACTORY_USER', vaultKey: 'user'],
-                                            [envVar: 'ARTIFACTORY_PASS', vaultKey: 'password']]]
-                                        ]
-                                    withVault([vaultSecrets: vault_secret]) {
-                                        checkout scm
-                                        def gxf_build_container = build_image("11_8")
-                                        run_in_ci_docker(gxf_build_container.imageName(), false, "${jp_version}") {
-                                            sh """
-                                            bazel build --config=${jp_version} --config=cxx17 ...
-                                            bazel build --config=${jp_version} ...
-                                            chmod +x engine/build/scripts/build_upload_tests.sh
-                                            ./engine/build/scripts/build_upload_tests.sh -d ${jp_version} \
-                                                -a ${env.ARTIFACTORY_URL_JETSON}/${BUILD_NUMBER}-${jp_version} -u u$ARTIFACTORY_USER -p $ARTIFACTORY_PASS
-                                            """
-                                        }
-                                    }
-                                    cleanWs disableDeferredWipeout: true, deleteDirs: true
-                                }
-                            }
-                        }
-                    }
-
-                    def opts = readJSON text: env.CUDA_OPTIONS
-                    for (opt in opts) {
-                        String cuda_version = opt.cuda
-                        String bazel_config = opt.config
-                        String gpu_node = opt.label
-                        if (! opt.enable_ci) {
-                          continue;
-                        }
-
-                        stages["x86 CUDA ${cuda_version}"] = {
-                            node (label: gpu_node) {
-                                stage("Build CUDA ${cuda_version}") {
-                                    String error_message = ""
-                                    checkout scm
-                                    try {
-                                        def gxf_build_container = build_image("${cuda_version}")
-                                        run_in_ci_docker(gxf_build_container.imageName(), true, "${bazel_config}") {
-                                            sh """
-                                            bazel build ${bazel_config} --config=cxx17 ...
-                                            bazel build ${bazel_config} ...
-                                            """
-                                        }
-                                    } catch (e) {
-                                        error_message = e
-                                        env.SCORE = -1
-                                        currentBuild.result = 'FAILURE'
-                                    }
-                                    cleanWs disableDeferredWipeout: true, deleteDirs: true
-                                    if(error_message != "") {
-                                        GERRIT_SERVER.set_review(new ReviewInput().message(
-                                            "❌ Build errors. ${RUN_DISPLAY_URL}"
-                                        ).label('CI-Verified', -1))
-                                        NOTIFIER.slack("${env.GIT_AUTHOR}", "❌ ${env.GIT_SHORT} not built",
-                                            currentBuild.currentResult.toLowerCase(), "danger")
-                                        error("x86 Stage failed to build")
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    stages["Build ARM image"] = {
-                        node (label: 'jp-5.1') {
-                            stage("Build") {
-                                checkout scm
-                                docker.withRegistry('https://nvcr.io',  NGC_REGISTRY_CREDENTIALS) {
-                                    docker.build("nvcr.io/nvidian/isaac-sdk/gxf-arm:${BUILD_NUMBER}",
-                                    "-f engine/build/docker/arm64/jp51.Dockerfile engine/build").push()
-                                }
-                            }
-                        }
-                    }
-
-                    parallel stages
+            },
+            'HP21GA_SBSA': {
+                String config = '--config=hp21ga_sbsa'
+                blossom.run_container(base_image_12_6, image_pull_secret) {
+                    def cpu_cores = blossom.get_cpu_cores()
+                    common.bazel_build("${config} ${re_config}", cpu_cores)
                 }
-            }
-        }
-         stage("Test") {
-            when { environment name: 'WIP_STATUS', value: "false" }
-            agent { node { label 'gxf && agent' } }
-            steps {
-                script {
-                    def stages = [:]
-                    def jps = readJSON text: env.JETPACK_OPTIONS
-                    for (jp in jps) {
-                        String jp_version = jp.version
-                        if (! jp.enable_ci) {
-                          continue;
-                        }
-                        String jp_node = jp.label
-                        stages["Jetson ${jp_version}"] = {
-                            node (label: jp_node) {
-                                stage("Jetson Run"){
-                                    String error_message = ""
-                                    def vault_secret = [
-                                        [path: '/secrets/artifactory', engineVersion: 1, secretValues: [
-                                            [envVar: 'ARTIFACTORY_USER', vaultKey: 'user'],
-                                            [envVar: 'ARTIFACTORY_PASS', vaultKey: 'password']]]
-                                        ]
-                                    withVault([vaultSecrets: vault_secret]) {
-                                        docker.withRegistry('https://nvcr.io',  NGC_REGISTRY_CREDENTIALS) {
-                                          docker.image("nvcr.io/nvidian/isaac-sdk/gxf-arm:${BUILD_NUMBER}").inside('--user root --runtime nvidia') {
-                                              checkout scm
-                                              sh "rm -rf jetson_artifactory"
-                                              sh "chmod +x engine/build/scripts/download_run_tests.sh"
-                                              try {
-                                                sh "./engine/build/scripts/download_run_tests.sh \
-                                                    u$ARTIFACTORY_USER $ARTIFACTORY_PASS ${env.ARTIFACTORY_URL_JETSON}/${BUILD_NUMBER}-${jp_version} \
-                                                    ${BUILD_NUMBER}-${jp_version}"
-                                              } catch (Exception e) {
-                                                  error_message = e
-                                                  env.SCORE=-1
-                                              }
-                                              try {
-                                                  archiveArtifacts artifacts: 'jetson_artifactory/jetson_testlog/*.xml'
-                                                  junit 'jetson_artifactory/jetson_testlog/*.xml'
-                                              } catch (Exception e) {
-                                                  print e
-                                                  env.SCORE=-1
-                                              }
-                                              sh "rm -rf *"
-                                           }
-                                        }
-                                    }
-                                    cleanWs disableDeferredWipeout: true, deleteDirs: true
-                                    if (error_message != "") { error(error_message) }
-                                }
-                            }
-                        }
-                    }
-
-                    def opts = readJSON text: env.CUDA_OPTIONS
-                    for (opt in opts) {
-                        String cuda_version = opt.cuda
-                        String bazel_config = opt.config
-                        String gpu_node = opt.label
-                        if (! opt.enable_ci) {
-                          continue;
-                        }
-
-                        stages["x86 CUDA ${cuda_version}"] = {
-                            node (label: gpu_node) {
-                                stage("Test CUDA ${cuda_version}") {
-                                    cleanWs disableDeferredWipeout: true, deleteDirs: true
-                                    checkout scm
-                                    def BAZEL_TESTS_FAILED = "false"
-                                    def gxf_build_container = build_image("${cuda_version}")
-                                    def vault_secret = [
-                                        [path: '/secrets/artifactory', engineVersion: 1, secretValues: [
-                                            [envVar: 'ARTIFACTORY_USER', vaultKey: 'user'],
-                                            [envVar: 'ARTIFACTORY_PASS', vaultKey: 'password']]]
-                                        ]
-                                    withVault([vaultSecrets: vault_secret]) {
-                                        run_in_ci_docker(gxf_build_container.imageName(), true, "${bazel_config}") {
-                                            sh "rm -rf $WORKSPACE/bazel_testlog* bazel_tests_directory bazel_testlog"
-                                            try {
-                                                sh "bazel test ${bazel_config} --nocache_test_results --test_output=errors --test_tag_filters=-performance ..."
-                                            }
-                                            catch (Exception e) {
-                                                sh "echo Bazel tests failed"
-                                                BAZEL_TESTS_FAILED = "true"
-                                            }
-
-                                            sh "chmod +x engine/build/scripts/bazel_tests_upload.sh"
-                                            sh "./engine/build/scripts/bazel_tests_upload.sh \
-                                                u$ARTIFACTORY_USER $ARTIFACTORY_PASS \
-                                                ${env.ARTIFACTORY_URL_X86}/${BUILD_NUMBER}-${cuda_version}.tar"
-                                            sh "cp -r bazel_tests_directory $WORKSPACE/bazel_testlog-${cuda_version}"
-
-                                        }
-                                    }
-                                    archiveArtifacts artifacts: "bazel_testlog-${cuda_version}/*/test.xml"
-                                    junit testResults: "bazel_testlog-${cuda_version}/*/test.xml",
-                                        allowEmptyResults: true
-                                    cleanWs disableDeferredWipeout: true, deleteDirs: true
-                                    if(BAZEL_TESTS_FAILED == 'true') {
-                                        GERRIT_SERVER.set_review(new ReviewInput().message(
-                                                "❌ Build failed tests. ${RUN_DISPLAY_URL}"
-                                            ).label('CI-Verified', -1))
-                                            NOTIFIER.slack("${env.GIT_AUTHOR}", "❌ ${env.GIT_SHORT} failed tests",
-                                            currentBuild.currentResult.toLowerCase(), "danger")
-                                        env.SCORE = -1
-                                        error("x86 Test Stage failed to build")
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    parallel stages
+            },
+            'JETPACK60': {
+                blossom.run_container(base_image_12_2, image_pull_secret) {
+                    String config = '--config=jetpack60'
+                    def cpu_cores = blossom.get_cpu_cores()
+                    common.bazel_limit_cpu_usage(cpu_cores)
+                    common.bazel_build("${config}", cpu_cores)
+                    gxf.upload_tests('engine/build/scripts/build_upload_tests.sh', 'jetpack60', artifactory_secret)
                 }
-            }
-        }
+            },
+            'JETPACK61': {
+                blossom.run_container(base_image_12_6, image_pull_secret) {
+                    String config = '--config=jetpack61'
+                    def cpu_cores = blossom.get_cpu_cores()
+                    common.bazel_limit_cpu_usage(cpu_cores)
+                    common.bazel_build("${config}", cpu_cores)
+                    gxf.upload_tests('engine/build/scripts/build_upload_tests.sh', 'jetpack61', artifactory_secret)
+                }
+            })
+        }}}
+        stage('Jetpack Tests') { steps { script {
+            parallel(
+            'JETPACK60': {
+                blossom.run_on_static_node(jp_60_tag) {
+                    checkout scm
+                    gxf.run_tests_on_jetson(base_image_arm, jetpack_version, artifactory_secret, '')
+                }
+            },
+            'JETPACK61': {
+                blossom.run_on_static_node(jp_61_tag) {
+                    checkout scm
+                    gxf.run_tests_on_jetson(base_image_arm_61, jetpack_61_version, artifactory_secret, '')
+                }
+            })
+        }}}
     }
-    post {
-        success {
-            node ('gxf && agent'){
-                script {
-                    if (env.WIP_STATUS == "false") {
-                        GERRIT_SERVER.set_review(new ReviewInput().message(
-                            "Build successful. ${RUN_DISPLAY_URL}"
-                        ).label('CI-Verified', +1))
-                        NOTIFIER.slack("${env.GIT_AUTHOR}", "✅ ${env.GIT_SHORT} Build successful", currentBuild.currentResult.toLowerCase(), "good")
-                    } else {
-                        GERRIT_SERVER.set_review(new ReviewInput().message(
-                            "Build skipped (WIP),but Lint is successful. ${RUN_DISPLAY_URL}"
-                        ).label('CI-Verified', 0))
-                        NOTIFIER.slack("${env.GIT_AUTHOR}", "✅ ${env.GIT_SHORT} Build skipped (WIP),but Lint is successful.", currentBuild.currentResult.toLowerCase(), "good")
-                    }
-                }
-            }
-        }
-        failure {
-            node ('gxf && agent'){
-                script {
-                    if (env.SCORE == 0) {
-                        GERRIT_SERVER.set_review(new ReviewInput().message(
-                            "Failed to provide score. See log for details ${RUN_DISPLAY_URL}"
-                        ).label('CI-Verified', -1))
-                        NOTIFIER.slack("${env.GIT_AUTHOR}", "❌ Failed to provide score for ${env.GIT_SHORT}", currentBuild.currentResult.toLowerCase(), "danger")
-                    }
-                }
-            }
-        }
-        unstable {
-            node ('gxf && agent'){
-                script {
-                  GERRIT_SERVER.set_review(new ReviewInput().message(
-                        "Build passed, but some tests failed. See log for details ${RUN_DISPLAY_URL}"
-                    ).label('CI-Verified', -1))
-                    NOTIFIER.slack("${env.GIT_AUTHOR}", "❌ Build passed, but some tests failed for ${env.GIT_SHORT}", currentBuild.currentResult.toLowerCase(), "danger")
-                }
-            }
-        }
-        aborted {
-            node ('gxf && agent'){
-                script {
-                    GERRIT_SERVER.set_review(new ReviewInput().message(
-                        "Build canceled. See log for details ${RUN_DISPLAY_URL}"
-                    ).label('CI-Verified', -1))
-                }
-            }
-        }
-    }
+    post { always { script { common.post_actions_dev(env.GERRIT_REFSPEC, enable_slack, env.GIT_AUTHOR, env.GIT_SHORT) } } }
 }

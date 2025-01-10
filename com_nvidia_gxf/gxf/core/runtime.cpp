@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2021-2023, NVIDIA CORPORATION. All rights reserved.
+Copyright (c) 2021-2024, NVIDIA CORPORATION. All rights reserved.
 
 NVIDIA CORPORATION and its licensors retain all intellectual property
 and proprietary rights in and to this software, related documentation
@@ -10,14 +10,16 @@ license agreement from NVIDIA CORPORATION is strictly prohibited.
 
 #include "gxf/core/runtime.hpp"
 
-#include <inttypes.h>
 #include <unistd.h>
 
 #include <algorithm>
+#include <cinttypes>
 #include <cstdlib>
 #include <memory>
 #include <set>
 #include <string>
+#include <unordered_map>
+#include <utility>
 #include <vector>
 
 namespace nvidia {
@@ -45,16 +47,15 @@ gxf_context_t Runtime::context() {
 }
 
 gxf_result_t SharedContext::create(gxf_context_t context) {
-  parameters_ = std::make_unique<ParameterStorage>(context);
-  warden_.setParameterStorage(parameters_.get());
+  parameters_ = std::make_shared<ParameterStorage>(context);
+  warden_.setParameterStorage(parameters_);
   warden_.createDefaultEntityGroup(this->getNextId());
-  registrar_.setParameterStorage(parameters_.get());
+  registrar_.setParameterStorage(parameters_);
   registrar_.setParameterRegistrar(&parameter_registrar_);
   resource_registrar_ = std::make_shared<ResourceRegistrar>(context);
   resource_manager_ = std::make_shared<ResourceManager>(context);
   registrar_.setResourceManager(resource_manager_);
-  // Caution: passing shared_ptr wihtout refCount increase
-  registrar_.setResourceRegistrar(resource_registrar_.get());
+  registrar_.setResourceRegistrar(resource_registrar_);
 
   extension_loader_.initialize(context);
 
@@ -75,7 +76,7 @@ gxf_result_t SharedContext::initialize(Runtime* rt) {
   if (code != GXF_SUCCESS) {
     return code;
   }
-  code = rt->GxfSetParameterStorage(parameters_.get());
+  code = rt->GxfSetParameterStorage(parameters_);
   if (code != GXF_SUCCESS) {
     return code;
   }
@@ -87,8 +88,7 @@ gxf_result_t SharedContext::initialize(Runtime* rt) {
   if (code!= GXF_SUCCESS) {
     return code;
   }
-  // Caution: passing shared_ptr without refCount increase
-  code = rt->GxfSetResourceRegistrar(resource_registrar_.get());
+  code = rt->GxfSetResourceRegistrar(resource_registrar_);
   if (code!= GXF_SUCCESS) {
     return code;
   }
@@ -105,7 +105,7 @@ gxf_result_t SharedContext::destroy() {
   if (code != GXF_SUCCESS) {
     return code;
   }
-  parameters_.release();
+  parameters_.reset();
   return ToResultCode(extension_loader_.unloadAll());
 }
 
@@ -121,6 +121,14 @@ gxf_result_t SharedContext::removeComponentPointers(
   return GXF_SUCCESS;
 }
 
+gxf_result_t SharedContext::removeSingleComponentPointer(gxf_uid_t& cid) {
+  // Remove component pointer from the global objects_ map
+  std::unique_lock<std::shared_timed_mutex> lock(global_object_mutex_);
+    objects_.erase(cid);
+  return GXF_SUCCESS;
+}
+
+
 gxf_result_t SharedContext::addComponent(gxf_uid_t cid, void* raw_pointer) {
   std::unique_lock<std::shared_timed_mutex> lock(global_object_mutex_);
   objects_[cid] = raw_pointer;
@@ -128,13 +136,47 @@ gxf_result_t SharedContext::addComponent(gxf_uid_t cid, void* raw_pointer) {
   return GXF_SUCCESS;
 }
 
-gxf_result_t SharedContext::findComponentPointer(gxf_uid_t uid,
+gxf_result_t SharedContext::findComponentPointer(gxf_context_t context, gxf_uid_t uid,
                                                  void** pointer) {
-  std::shared_lock<std::shared_timed_mutex> lock(global_object_mutex_);
+  *pointer = nullptr;
+  std::unordered_map<gxf_uid_t, void*>::iterator it;
+  {
+    std::shared_lock<std::shared_timed_mutex> lock(global_object_mutex_);
+    it = objects_.find(uid);
+  }
 
-  const auto it = objects_.find(uid);
-  if (it == objects_.end()) return GXF_ENTITY_COMPONENT_NOT_FOUND;
-  *pointer = it->second;
+  if (it != objects_.end()) {
+    *pointer = it->second;
+    return GXF_SUCCESS;
+  }
+
+  // Component not found in shared context, search for it using entity item
+  gxf_uid_t eid = kNullUid;
+  auto result = GxfComponentEntity(context, uid, &eid);
+  if (result != GXF_SUCCESS) { return result; }
+
+  EntityItem* item_ptr = nullptr;
+  result = GxfEntityGetItemPtr(context, eid, reinterpret_cast<void**>(&item_ptr));
+  if (result != GXF_SUCCESS) {
+    GXF_LOG_ERROR("Could not find Entity Item for Entity %lu, component %lu", eid, uid);
+    return result;
+  }
+  std::shared_lock<std::shared_mutex> item_lock(item_ptr->entity_item_mutex_);
+  bool found_comp_ptr = false;
+  for (auto comp : item_ptr->components) {
+    if (uid == comp.value().cid) {
+      *pointer = comp.value().raw_pointer;
+      found_comp_ptr = true;
+      break;
+    }
+  }
+  if (found_comp_ptr == false) {
+    GXF_LOG_ERROR("Could not find component pointer for Entity %lu, component %lu", eid, uid);
+    return GXF_ENTITY_COMPONENT_NOT_FOUND;
+  }
+  // This line is needed ideally, but giving perf degradation in some cases
+  // Uncomment after thorough analysis
+  // addComponent(uid, *pointer);
   return GXF_SUCCESS;
 }
 
@@ -207,7 +249,6 @@ gxf_result_t Runtime::destroy() {
     if (code != GXF_SUCCESS) {
       return code;
     }
-
     delete shared_context_;
     shared_context_ = nullptr;
   }
@@ -229,7 +270,7 @@ gxf_result_t Runtime::GxfRegisterComponent(gxf_tid_t tid, const char* name, cons
     return result.error();
   }
 
-  if (std::strcmp(base, "") == 0) {
+  if (base == nullptr || std::strcmp(base, "") == 0) {
     parameter_registrar_->addParameterlessType(tid, std::string(name));
     return GXF_SUCCESS;
   }
@@ -241,7 +282,9 @@ gxf_result_t Runtime::GxfRegisterComponent(gxf_tid_t tid, const char* name, cons
   }
 
   // Non nvidia::gxf::Component elements do not have any parameters
-  if (!type_registry_->is_base(tid, kComponentTid)) {
+  auto base_result = type_registry_->is_base(tid, kComponentTid);
+  if (!base_result) { return base_result.error(); }
+  if (!base_result.value()) {
     parameter_registrar_->addParameterlessType(tid, std::string(name));
     return GXF_SUCCESS;
   }
@@ -265,11 +308,12 @@ gxf_result_t Runtime::GxfRegisterComponent(gxf_tid_t tid, const char* name, cons
   // set Registrar.ParameterRegistrar != nullptr & a mock Registrar.ParameterStorage
   // This is not the stage to populate ParameterStorage, so
   // Use a temporary parameter storage for component registration
-  ParameterStorage tmp_param_storage(context());
-  registrar_->setParameterStorage(&tmp_param_storage);
+  std::shared_ptr<ParameterStorage> tmp_param_storage =
+    std::make_shared<ParameterStorage>(context());
+  registrar_->setParameterStorage(tmp_param_storage);
 
   Component* component = reinterpret_cast<Component*>(raw_pointer.value());
-  component->internalSetup(nullptr, 0, 1);
+  component->internalSetup(nullptr, 0, 1, nullptr);
   // Resource: register component type and its member Resource<Handle<T>> types
   // set Registrar.ResourceRegistrar != nullptr && Registrar.ResourceManager == nullptr
   // ResourceManager is not ready till now, will connect it after register stage
@@ -278,7 +322,7 @@ gxf_result_t Runtime::GxfRegisterComponent(gxf_tid_t tid, const char* name, cons
   const auto registration_result = component->registerInterface(registrar_);
   result = extension_loader_->deallocate(tid, component);
 
-    // Reset parameter storage used by runtime
+  // Reset parameter storage used by runtime
   registrar_->setParameterStorage(parameters_);
   registrar_->setResourceManager(resource_manager_);
 
@@ -287,12 +331,26 @@ gxf_result_t Runtime::GxfRegisterComponent(gxf_tid_t tid, const char* name, cons
     return registration_result;
   }
 
-    if (!result) {
-      GXF_LOG_VERBOSE("Failed to deallocate component: %s", name);
-      return result.error();
-    }
+  if (!result) {
+    GXF_LOG_VERBOSE("Failed to deallocate component: %s", name);
+    return result.error();
+  }
 
+  GXF_LOG_VERBOSE("Successfully registered component [%s] with base type [%s]", name, base);
   return GXF_SUCCESS;
+}
+
+
+gxf_result_t Runtime::GxfRegisterComponentInExtension(const gxf_tid_t& component_tid,
+                                                      const gxf_tid_t& extension_tid) {
+  Expected<void> result = extension_loader_->registerRuntimeComponent(component_tid, extension_tid);
+  if (!result) { return ToResultCode(result); }
+
+  gxf_component_info_t info;
+  result = extension_loader_->getComponentInfo(component_tid, &info);
+  if (!result) { return ToResultCode(result); }
+
+  return GxfRegisterComponent(component_tid, info.type_name, info.base_name);
 }
 
 // Gets version information about Runtime and list of loaded Extensions.
@@ -325,7 +383,10 @@ gxf_result_t Runtime::GxfComponentInfo(const gxf_tid_t tid, gxf_component_info_t
   if (!result) {
     return ToResultCode(result);
   }
-  const bool is_component = type_registry_->is_base(tid, kComponentTid);
+
+  auto base_result = type_registry_->is_base(tid, kComponentTid);
+  if (!base_result) { return base_result.error(); }
+  const bool is_component = base_result.value();
   // Fills Parameter Information
   if (!result || info->is_abstract || !is_component) {
     // Abstract components and pure base type components(Ex: Tensor) don't have parameters
@@ -417,7 +478,6 @@ gxf_result_t Runtime::loadExtensionImpl(Extension& extension) {
     GXF_LOG_VERBOSE("Error: Could not load extension");
     return code;
   }
-  GXF_LOG_VERBOSE("Loaded extension");
   return code;
 }
 
@@ -587,15 +647,15 @@ gxf_result_t Runtime::GxfGraphSaveToFile(const char* filename) {
   return GXF_SUCCESS;
 }
 
-gxf_result_t Runtime::GxfCreateEntity(const GxfEntityCreateInfo& info, gxf_uid_t& eid) {
-  std::unique_lock<std::shared_timed_mutex> lock(mutex_);
+gxf_result_t Runtime::GxfCreateEntity(const GxfEntityCreateInfo& info, gxf_uid_t& eid,
+                                      void** item_ptr) {
   if (info.entity_name) {
     // Entity names should be unique.
     // Check whether there is already an entity existing with the same name
     gxf_uid_t eidExisting = kNullUid;
     const gxf_result_t result = GxfEntityFind(info.entity_name, &eidExisting);
     if (result == GXF_SUCCESS) {
-      GXF_LOG_ERROR("There is already an entity with the name '%s' eid [E%05zu]",
+      GXF_LOG_ERROR("There is already an entity with the name '%s' eid [E%05" PRId64 "]",
                     info.entity_name, eidExisting);
       return GXF_ARGUMENT_INVALID;
     }
@@ -613,26 +673,21 @@ gxf_result_t Runtime::GxfCreateEntity(const GxfEntityCreateInfo& info, gxf_uid_t
   }
 
   // Create an entity name if none was given
-  const std::string entity_name =
-      info.entity_name ? info.entity_name : ("__entity_" + std::to_string(eid));
+  std::string entity_name = (info.entity_name && info.entity_name[0] != '\0')
+                                      ? info.entity_name
+                                      : ("__entity_" + std::to_string(eid));
 
-  GXF_LOG_VERBOSE("[E%05zu] CREATE ENTITY '%s'", eid, entity_name.c_str());
-
-  const gxf_result_t result_1 = warden_->create(eid);
+  GXF_LOG_VERBOSE("[E%05" PRId64 "] CREATE ENTITY '%s'", eid, entity_name.c_str());
+  const gxf_result_t result_1 = warden_->create(eid, reinterpret_cast<EntityItem**>(item_ptr),
+                                                entity_name);
   if (result_1 != GXF_SUCCESS) {
     return result_1;
   }
 
-  // Set the name of the entity
-  const gxf_result_t result_2 =
-      ::GxfParameterSetStr(context(), eid, kInternalNameParameterKey, entity_name.c_str());
-  if (result_2 != GXF_SUCCESS) {
-    return result_2;
-  }
-
   // Add the entity to the program if desired
   if ((info.flags & GXF_ENTITY_CREATE_PROGRAM_BIT) != 0) {
-    const auto result_3 = program_.addEntity(eid);
+    void* item = item_ptr == nullptr ? nullptr : *(item_ptr);
+    const auto result_3 = program_.addEntity(eid, static_cast<EntityItem*>((item)));
     if (!result_3) {
       return ToResultCode(result_3);
     }
@@ -645,7 +700,7 @@ gxf_result_t Runtime::GxfCreateEntityGroup(const char* name, gxf_uid_t* gid) {
   *gid = shared_context_->getNextId();
   const gxf_result_t result = warden_->createEntityGroup(*gid, name);
   if (result != GXF_SUCCESS) {
-    GXF_LOG_ERROR("Failed to create EntityGroup [gid: %05zu, name: %s]", *gid, name);
+    GXF_LOG_ERROR("Failed to create EntityGroup [gid: %05" PRId64 ", name: %s]", *gid, name);
     return result;
   }
   return GXF_SUCCESS;
@@ -657,9 +712,10 @@ gxf_result_t Runtime::GxfUpdateEntityGroup(gxf_uid_t gid, gxf_uid_t eid) {
     return result;
   }
   const char* entity_name = "UNKNOWN";
-  this->GxfParameterGetStr(eid, kInternalNameParameterKey, &entity_name);
-  GXF_LOG_DEBUG("Entity [eid: %05zu, name: %s] updated its EntityGroup to [gid: %05zu]",
-                eid, entity_name, gid);
+  GxfEntityGetName(eid, &entity_name);
+  GXF_LOG_DEBUG(
+      "Entity [eid: %05" PRId64 ", name: %s] updated its EntityGroup to [gid: %05" PRId64 "]",
+      eid, entity_name, gid);
   return GXF_SUCCESS;
 }
 
@@ -673,13 +729,14 @@ gxf_result_t Runtime::GxfEntityIsValid(gxf_uid_t eid, bool* valid) {
 }
 
 gxf_result_t Runtime::GxfEntityActivate(gxf_uid_t eid) {
-  GXF_LOG_VERBOSE("[E%05zu] ENTITY ACTIVATE", eid);
+  GXF_LOG_VERBOSE("[E%05" PRId64 "] ENTITY ACTIVATE ", eid);
 
   auto entity = nvidia::gxf::Entity::Shared(context(), eid);
   if (!entity) {
     return ToResultCode(entity);
   }
 
+  GXF_LOG_VERBOSE("[E%05" PRId64 "] WARDEN INITIALIZE", eid);
   const gxf_result_t code1 = warden_->initialize(eid);
   if (code1 != GXF_SUCCESS) {
     GXF_LOG_ERROR("Could not initialize entity '%s' (E%" PRId64 "): %s",
@@ -687,6 +744,7 @@ gxf_result_t Runtime::GxfEntityActivate(gxf_uid_t eid) {
     return code1;
   }
 
+  GXF_LOG_VERBOSE("[E%05" PRId64 "] ENTITY EXECUTOR ACTIVATE", eid);
   const gxf_result_t code2 = entity_executor_.activate(context(), eid);
   if (code2 != GXF_SUCCESS) {
     GXF_LOG_ERROR("Could not activate entity '%s' (E%" PRId64 "): %s",
@@ -694,18 +752,20 @@ gxf_result_t Runtime::GxfEntityActivate(gxf_uid_t eid) {
     return code2;
   }
 
+  GXF_LOG_VERBOSE("[E%05" PRId64 "] SCHEDULE ENTITY '%s' ", eid, entity->name());
   const auto code3 = program_.scheduleEntity(eid);
   if (!code3) {
     GXF_LOG_ERROR("Could not schedule entity '%s' (E%" PRId64 ") for execution: %s",
                   entity->name(), eid, GxfResultStr(code3.error()));
     return ToResultCode(code3);
   }
+  GXF_LOG_VERBOSE("[E%05" PRId64 "] ENTITY ACTIVATED '%s' ", eid, entity->name());
 
   return GXF_SUCCESS;
 }
 
 gxf_result_t Runtime::GxfEntityDeactivate(gxf_uid_t eid) {
-  GXF_LOG_VERBOSE("[E%05zu] ENTITY DEACTIVATE", eid);
+  GXF_LOG_VERBOSE("[E%05" PRId64 "] ENTITY DEACTIVATE", eid);
 
   auto entity = nvidia::gxf::Entity::Shared(context(), eid);
   if (!entity) {
@@ -744,13 +804,13 @@ gxf_result_t Runtime::GxfEntityDestroyImpl(gxf_uid_t eid) {
   // count to increase to 1 then again to 0 on exit causing
   // a call to this method again leading to an infinite loop.
 
-  GXF_LOG_VERBOSE("[E%05zu] ENTITY DESTROY", eid);
-
   const char* entity_name = nullptr;
-  gxf_result_t code = GxfParameterGetStr(eid, kInternalNameParameterKey, &entity_name);
+  gxf_result_t code = GxfEntityGetName(eid, &entity_name);
   if (code != GXF_SUCCESS) {
     GXF_LOG_ERROR("Failed to obtain name of entity (E%" PRId64 "): %s", eid, GxfResultStr(code));
   }
+
+  GXF_LOG_VERBOSE("[E%05" PRId64 "] ENTITY DESTROY '%s'", eid, entity_name);
 
   // Collects component ids for clean up later
   auto cids = warden_->getEntityComponents(eid);
@@ -803,13 +863,14 @@ gxf_result_t Runtime::GxfEntityDestroyImpl(gxf_uid_t eid) {
     GXF_LOG_ERROR("Failed to clear parameters for entity '%s' (E%" PRId64 "): %s", entity_name, eid,
                   GxfResultStr(result.error()));
   }
+  warden_->removeEntityRefCount(eid);
   return ToResultCode(result);
 }
 
 gxf_result_t Runtime::GxfEntityDestroy(gxf_uid_t eid) {
   // Check reference count
   int64_t count = 0;  // FIXME
-  const auto code = GxfParameterGetInt64(eid, kCorePropertyRefCount, &count);
+  const auto code = GxfEntityGetRefCount(eid, &count);
   if (code == GXF_PARAMETER_NOT_FOUND) {
     count = 0;
   } else if (code != GXF_SUCCESS) {
@@ -840,7 +901,7 @@ gxf_result_t Runtime::GxfEntityFindAll(uint64_t* num_entities, gxf_uid_t* entiti
   (*num_entities) = entities_vector.size();
 
   if (max_entities < entities_vector.size()) {
-    GXF_LOG_ERROR("Entities buffer capacity %li, but application contains %li entities",
+    GXF_LOG_ERROR("Entities buffer capacity %" PRIu64 ", but application contains %zu entities",
                   max_entities, entities_vector.size());
     return GXF_QUERY_NOT_ENOUGH_CAPACITY;
   }
@@ -852,21 +913,13 @@ gxf_result_t Runtime::GxfEntityFindAll(uint64_t* num_entities, gxf_uid_t* entiti
 }
 
 gxf_result_t Runtime::GxfEntityRefCountInc(gxf_uid_t eid) {
-  std::unique_lock<std::recursive_mutex> lock(ref_count_mutex_);
-  return GxfParameterInt64Add(eid, kCorePropertyRefCount, +1, nullptr);
+  return warden_->incEntityRefCount(eid);
 }
 
 gxf_result_t Runtime::GxfEntityRefCountDec(gxf_uid_t eid) {
   int64_t value = 0;
-  std::unique_lock<std::recursive_mutex> lock(ref_count_mutex_);
-  const gxf_result_t result = GxfParameterInt64Add(eid, kCorePropertyRefCount, -1, &value);
-  if (result != GXF_SUCCESS) {
-    return result;
-  }
-  if (value < 0) {
-    GXF_LOG_ERROR("[E%05zu] Ref count for the entity < 0. Count: %ld", eid, value);
-    return GXF_REF_COUNT_NEGATIVE;
-  }
+  const auto code = warden_->decEntityRefCount(eid, value);
+  if (code != GXF_SUCCESS) { return code; }
   if (value == 0) {
     return GxfEntityDestroyImpl(eid);
   } else {
@@ -874,27 +927,42 @@ gxf_result_t Runtime::GxfEntityRefCountDec(gxf_uid_t eid) {
   }
 }
 
+gxf_result_t Runtime::GxfEntityGetRefCount(gxf_uid_t eid, int64_t* count) const {
+  if (count == nullptr) return GXF_ARGUMENT_NULL;
+  return warden_->getEntityRefCount(eid, count);
+}
+
 gxf_result_t Runtime::GxfEntityGetStatus(gxf_uid_t eid, gxf_entity_status_t* entity_status) {
-  const gxf_result_t code = entity_executor_.getEntityStatus(eid, entity_status);
-  if (code != GXF_SUCCESS) {
-    GXF_LOG_VERBOSE("[E%05zu] Entity status query failed", eid);
+  auto result = entity_executor_.getEntityStatus(eid, entity_status);
+  if (!result) {
+    GXF_LOG_VERBOSE("[E%05" PRId64 "] Entity status query failed with error %s", eid,
+                    GxfResultStr(ToResultCode(result)));
   }
-  return code;
+  return ToResultCode(result);
+}
+
+gxf_result_t Runtime::GxfEntityGetName(gxf_uid_t eid, const char** entity_name) {
+  auto result = warden_->getEntityName(eid, entity_name);
+  if (!result) {
+    GXF_LOG_VERBOSE("[E%05" PRId64 "] Entity name query failed with error %s", eid,
+                    GxfResultStr(result));
+  }
+  return result;
 }
 
 gxf_result_t Runtime::GxfEntityGetState(gxf_uid_t eid, entity_state_t* b_status) {
   entity_state_t entity_behavior_status;
   const gxf_result_t code1 = entity_executor_.getEntityBehaviorStatus(eid, entity_behavior_status);
   if (code1 != GXF_SUCCESS) {
-    GXF_LOG_VERBOSE("[E%05zu] Cannot query the node's behavior status", eid);
+    GXF_LOG_VERBOSE("[E%05" PRId64 "] Cannot query the node's behavior status", eid);
     return code1;
   }
   *b_status = entity_behavior_status;
   return GXF_SUCCESS;
 }
 
-gxf_result_t Runtime::GxfEntityEventNotify(gxf_uid_t eid) {
-  return ToResultCode(program_.entityEventNotify(eid));
+gxf_result_t Runtime::GxfEntityNotifyEventType(gxf_uid_t eid, gxf_event_t event) {
+  return ToResultCode(program_.entityEventNotify(eid, event));
 }
 
 gxf_result_t Runtime::GxfComponentTypeName(gxf_tid_t tid, const char** name) {
@@ -906,6 +974,22 @@ gxf_result_t Runtime::GxfComponentTypeName(gxf_tid_t tid, const char** name) {
   } else {
     return result.error();
   }
+}
+
+gxf_result_t Runtime::GxfComponentTypeNameFromUID(gxf_uid_t cid, const char** name) {
+  gxf_tid_t tid = GxfTidNull();
+  auto code = GxfComponentType(cid, &tid);
+  if (code != GXF_SUCCESS) {
+    GXF_LOG_ERROR("Could not find component type for component [C%05" PRId64 "]", cid);
+    return code;
+  }
+
+  code = GxfComponentTypeName(tid, name);
+  if (code != GXF_SUCCESS) {
+    GXF_LOG_ERROR("Could not find component type name for component [C%05" PRId64 "]", cid);
+  }
+
+  return code;
 }
 
 gxf_result_t Runtime::GxfComponentTypeId(const char* name, gxf_tid_t* tid) {
@@ -932,10 +1016,27 @@ gxf_result_t Runtime::GxfComponentEntity(gxf_uid_t cid, gxf_uid_t* eid) {
   }
 }
 
-gxf_result_t Runtime::GxfComponentAdd(gxf_uid_t eid, gxf_tid_t tid, const char* name,
-                                      gxf_uid_t* out_cid) {
-  std::unique_lock<std::shared_timed_mutex> lock(mutex_);
+gxf_result_t Runtime::GxfEntityGetItemPtr(gxf_uid_t eid, void** ptr) {
+  const Expected<EntityItem*> result = warden_->getEntityPtr(eid);
+  if (result) {
+    *ptr = reinterpret_cast<void*>(result.value());
+    return GXF_SUCCESS;
+  } else {
+    return result.error();
+  }
+}
 
+gxf_result_t Runtime::GxfComponentIsBase(gxf_tid_t derived, gxf_tid_t base, bool* result) {
+  auto code = type_registry_->is_base(derived, base);
+  if (!code) { return code.error(); }
+
+  *result = code.value();
+  return GXF_SUCCESS;
+}
+
+
+gxf_result_t Runtime::GxfComponentAdd(gxf_uid_t eid, gxf_tid_t tid, const char* name,
+                                      gxf_uid_t* out_cid, void** comp_ptr) {
   // FIXME(dweikersdorfer) Add this check back.
   // // Special case: System
   // if (tid == sys_tid_ && state_ == State::RUNNING) {
@@ -943,11 +1044,16 @@ gxf_result_t Runtime::GxfComponentAdd(gxf_uid_t eid, gxf_tid_t tid, const char* 
   //   return GXF_FAILURE;
   // }
 
-  // Find entity
-  gxf_result_t code = warden_->isValid(eid);
-  if (code != GXF_SUCCESS) {
-    return code;
+  gxf_tid_t codelet_tid;
+  auto static_code = GxfComponentTypeId(TypenameAsString<Codelet>(), &codelet_tid);
+  if (static_code != GXF_SUCCESS) {
+    GXF_LOG_ERROR("Standard extension has not been loaded!");
+    return static_code;
   }
+
+  // Verify entity
+  auto code = warden_->isValid(eid);
+  if (code != GXF_SUCCESS) { return code; }
 
   // Allocate component
   Expected<void*> raw_pointer = extension_loader_->allocate(tid);
@@ -956,22 +1062,26 @@ gxf_result_t Runtime::GxfComponentAdd(gxf_uid_t eid, gxf_tid_t tid, const char* 
   }
 
   const gxf_uid_t cid = shared_context_->getNextId();
-  GXF_LOG_VERBOSE("[E%05zu] COMPONENT CREATE: C%05zu (type=%016lx%016lx)", eid, cid, tid.hash1,
-                 tid.hash2);
-
   Component* component = nullptr;
-  if (type_registry_->is_base(tid, component_tid_)) {
+  Expected<bool> base_result = false;
+
+  auto type_name = type_registry_->name(tid);
+  if (!type_name) { return ToResultCode(type_name); }
+  GXF_LOG_VERBOSE("[E%05" PRId64 "] COMPONENT CREATE: C%05" PRId64 " (type=%s) name: %s",
+                  eid, cid, type_name.value(), name);
+
+  base_result = type_registry_->is_base(tid, component_tid_);
+
+  if (!base_result) { return base_result.error(); }
+  if (base_result.value()) {
+    std::unique_lock<std::shared_timed_mutex> lock(mutex_);
     component = reinterpret_cast<Component*>(raw_pointer.value());
-    component->internalSetup(context(), eid, cid);
+    component->internalSetup(context(), eid, cid, registrar_);
     // use Registrar public member to pass arguments for each component
     // for Registrar.parameter() and Registrar.resource() in Component::registerInterface()
     registrar_->tid = tid;
     registrar_->cid = cid;
-    // Parameters: create Parameter backend and connect to frontend(user end)
-    // set Registrar.ParameterRegistrar == nullptr & Registrar.ParameterStorage != nullptr
-    // Parameters have already been registered when extension was loaded
     registrar_->setParameterRegistrar(nullptr);
-    // Resources: connect ResourceManager to each codelet class member Resource<Handle<T>>
     // set Registrar.ResourceRegistrar = nullptr && Registrar.ResourceManager != nullptr
     // Resources have already been registered when extension was loaded
     registrar_->setResourceRegistrar(nullptr);
@@ -983,6 +1093,10 @@ gxf_result_t Runtime::GxfComponentAdd(gxf_uid_t eid, gxf_tid_t tid, const char* 
   }
 
   if (name) {
+    if (strlen(name) >= kMaxComponentNameSize) {
+      GXF_LOG_ERROR("Component name exceeds max limit of %d characters", kMaxComponentNameSize);
+      return GXF_ENTITY_COMPONENT_NAME_EXCEEDS_LIMIT;
+    }
     GxfParameterSetStr(cid, kInternalNameParameterKey, name);
   } else {
     GxfParameterSetStr(cid, kInternalNameParameterKey, "");
@@ -993,12 +1107,93 @@ gxf_result_t Runtime::GxfComponentAdd(gxf_uid_t eid, gxf_tid_t tid, const char* 
     return code;
   }
 
-  code = shared_context_->addComponent(cid, raw_pointer.value());
-  if (code != GXF_SUCCESS) {
-    return code;
-  }
+  // code = shared_context_->addComponent(cid, raw_pointer.value());
+  // if (code != GXF_SUCCESS) {
+  //   return code;
+  // }
 
   *out_cid = cid;
+  *comp_ptr = (raw_pointer.value());
+  return GXF_SUCCESS;
+}
+
+gxf_result_t Runtime::GxfComponentAddWithItem(void* item_ptr, gxf_tid_t tid, const char* name,
+                                               gxf_uid_t* out_cid, void** comp_ptr) {
+  EntityItem* item = static_cast<EntityItem*>(item_ptr);
+  gxf_uid_t eid = item->uid;
+  return GxfComponentAdd(eid, tid, name, out_cid, comp_ptr);
+}
+
+gxf_result_t Runtime::GxfComponentRemove(gxf_uid_t eid, gxf_tid_t tid, const char * name) {
+  gxf_uid_t cid = kNullUid;
+  Expected<EntityItem*> entity_item = warden_->getEntityPtr(eid);
+  if (!entity_item) { return ToResultCode(entity_item); }
+  void* ptr;
+  auto result = warden_->findComponent(context(), entity_item.value(), tid, name,
+                                       nullptr, type_registry_, &cid, &ptr);
+  if (result != GXF_SUCCESS || cid == kNullUid) {
+    const char* entity_name = "UNKNOWN";
+    GxfEntityGetName(eid, &entity_name);
+    const char* component_type = "UNKNOWN";
+    GxfComponentTypeName(tid, &component_type);
+    GXF_LOG_ERROR("Failed to find component with name %s , type id %s from entity %s.",
+    name, component_type, entity_name);
+    return result;
+  }
+  return GxfComponentRemove(cid);
+}
+
+gxf_result_t Runtime::GxfComponentRemove(gxf_uid_t cid) {
+  gxf_tid_t codelet_tid;
+  auto static_code = GxfComponentTypeId(TypenameAsString<Codelet>(), &codelet_tid);
+  if (static_code != GXF_SUCCESS) {
+    GXF_LOG_ERROR("Standard extension has not been loaded!");
+    return static_code;
+  }
+
+  if (cid == kNullUid || cid == kUnspecifiedUid) {
+    GXF_LOG_ERROR("Component id not provided for component removal, returning.");
+    return GXF_ARGUMENT_INVALID;
+  }
+  // Obtain the entity id
+  auto eid = warden_->getComponentEntity(cid);
+  if (!eid) {
+    const char * component_name;
+    auto name_result = parameters_->getStr(cid, kInternalNameParameterKey);
+    if (name_result) {
+      component_name = name_result.value();
+      GXF_LOG_ERROR("Could not find the entity for component %s.", component_name);
+    } else {
+      GXF_LOG_ERROR("Coult not find the entity for component id %lu.", cid);
+    }
+    return eid.error();
+  }
+  // Remove component from entity warden
+  gxf_result_t result = GXF_FAILURE;
+  result = warden_->removeComponent(context(), eid.value(), cid, extension_loader_);
+  if (result != GXF_SUCCESS) {
+    GXF_LOG_ERROR("Error while removing component id %lu.", cid);
+    return result;
+  }
+  // Remove component from global object storage
+  result = shared_context_->removeSingleComponentPointer(cid);
+  if (result != GXF_SUCCESS) {
+    GXF_LOG_ERROR("Failed to remove component %s", GxfResultStr(result));
+    return result;
+  }
+
+  // Remove parameters stored for this component
+  auto code = parameters_->clearEntityParameters(cid);
+  if (!code) {
+    auto name_result = parameters_->getStr(cid, kInternalNameParameterKey);
+    if (name_result) {
+      GXF_LOG_ERROR("Could not find the entity for component %s.", name_result.value());
+    } else {
+      GXF_LOG_ERROR("Could not find the entity for component id %lu.", cid);
+    }
+    return code.error();
+  }
+
   return GXF_SUCCESS;
 }
 
@@ -1009,23 +1204,32 @@ gxf_result_t Runtime::GxfComponentAddToInterface(gxf_uid_t eid, gxf_uid_t cid,
   if (code != GXF_SUCCESS) {
     return code;
   }
-
   return warden_->addComponentToInterface(eid, cid, name);
 }
 
 gxf_result_t Runtime::GxfComponentFind(gxf_uid_t eid, gxf_tid_t tid, const char* name,
                                        int32_t* offset, gxf_uid_t* cid) {
-  std::shared_lock<std::shared_timed_mutex> lock(mutex_);
-  return warden_->findComponent(context(), eid, tid, name, offset, type_registry_, cid);
+  Expected<EntityItem*> entity_item = warden_->getEntityPtr(eid);
+  if (!entity_item) { return ToResultCode(entity_item); }
+  void* ptr;
+  return warden_->findComponent(context(), entity_item.value(), tid, name,
+                                offset, type_registry_, cid, &ptr);
+}
+
+gxf_result_t Runtime::GxfComponentFind(gxf_uid_t eid, void* item_ptr, gxf_tid_t tid,
+                              const char* name, int32_t* offset, gxf_uid_t* cid, void** ptr) {
+  EntityItem* entity_item = static_cast<EntityItem*>(item_ptr);
+  return warden_->findComponent(context(), entity_item, tid, name, offset, type_registry_,
+                                cid, ptr);
 }
 
 gxf_result_t Runtime::GxfComponentFindAll(gxf_uid_t eid, uint64_t* num_cids, gxf_uid_t* cids) {
   if (num_cids == nullptr) {
-    GXF_LOG_ERROR("Buffer size was null when retrieving components for entity %05zu", eid);
+    GXF_LOG_ERROR("Buffer size was null when retrieving components for entity %05" PRId64 "", eid);
     return GXF_ARGUMENT_NULL;
   }
   if (cids == nullptr) {
-    GXF_LOG_ERROR("Buffer was null when retrieving components for entity %05zu", eid);
+    GXF_LOG_ERROR("Buffer was null when retrieving components for entity %05" PRId64 "", eid);
     return GXF_ARGUMENT_NULL;
   }
 
@@ -1033,7 +1237,7 @@ gxf_result_t Runtime::GxfComponentFindAll(gxf_uid_t eid, uint64_t* num_cids, gxf
 
   const auto maybe_cids_vector = warden_->getEntityComponents(eid);
   if (!maybe_cids_vector) {
-    GXF_LOG_ERROR("Failed to retrieve components for entity %05zu: %s", eid,
+    GXF_LOG_ERROR("Failed to retrieve components for entity %05" PRId64 ": %s", eid,
                   GxfResultStr(maybe_cids_vector.error()));
     return ToResultCode(maybe_cids_vector);
   }
@@ -1043,8 +1247,9 @@ gxf_result_t Runtime::GxfComponentFindAll(gxf_uid_t eid, uint64_t* num_cids, gxf
   (*num_cids) = cids_vector.size();
 
   if (max_cids < cids_vector.size()) {
-    GXF_LOG_ERROR("Components buffer capacity %li, but entity %05zu contains %li components",
-                  max_cids, eid, cids_vector.size());
+    GXF_LOG_ERROR(
+        "Components buffer capacity %" PRIu64 ", but entity %05" PRId64 " contains %zu components",
+        max_cids, eid, cids_vector.size());
     return GXF_QUERY_NOT_ENOUGH_CAPACITY;
   }
 
@@ -1057,12 +1262,12 @@ gxf_result_t Runtime::GxfEntityGroupFindResources(gxf_uid_t eid, uint64_t* num_r
                                                   gxf_uid_t* resource_cids) {
   if (num_resource_cids == nullptr) {
     GXF_LOG_ERROR("Buffer size was null when retrieving EntityGroup resource components "
-                  "for entity %05zu", eid);
+                  "for entity %05" PRId64 "", eid);
     return GXF_ARGUMENT_NULL;
   }
   if (resource_cids == nullptr) {
     GXF_LOG_ERROR("Buffer was null when retrieving EntityGroup resource components "
-                  "for entity %05zu", eid);
+                  "for entity %05" PRId64 "", eid);
     return GXF_ARGUMENT_NULL;
   }
 
@@ -1070,8 +1275,9 @@ gxf_result_t Runtime::GxfEntityGroupFindResources(gxf_uid_t eid, uint64_t* num_r
 
   const auto maybe_cids_vector = warden_->getEntityGroupResources(eid);
   if (!maybe_cids_vector) {
-    GXF_LOG_ERROR("Failed to retrieve EntityGroup resource components for entity %05zu: %s",
-                  eid, GxfResultStr(maybe_cids_vector.error()));
+    GXF_LOG_ERROR(
+        "Failed to retrieve EntityGroup resource components for entity %05" PRId64 ": %s",
+        eid, GxfResultStr(maybe_cids_vector.error()));
     return ToResultCode(maybe_cids_vector);
   }
 
@@ -1080,14 +1286,24 @@ gxf_result_t Runtime::GxfEntityGroupFindResources(gxf_uid_t eid, uint64_t* num_r
   (*num_resource_cids) = cids_vector.size();
 
   if (max_cids < cids_vector.size()) {
-    GXF_LOG_ERROR("Components buffer capacity %li, but EntityGroup of entity %05zu "
-                  "contains %li resource components", max_cids, eid, cids_vector.size());
+    GXF_LOG_ERROR("Components buffer capacity %" PRIu64 ", but EntityGroup of entity %05" PRId64
+                  " contains %zu resource components", max_cids, eid, cids_vector.size());
     return GXF_QUERY_NOT_ENOUGH_CAPACITY;
   }
 
   std::copy(cids_vector.data(), cids_vector.data() + cids_vector.size(), resource_cids);
 
   return GXF_SUCCESS;
+}
+
+gxf_result_t Runtime::GxfEntityGroupId(gxf_uid_t eid, gxf_uid_t* gid) {
+  Expected<gxf_uid_t> result = warden_->entityFindEntityGroupId(eid);
+  if (result) {
+    *gid = result.value();
+    return GXF_SUCCESS;
+  } else {
+    return result.error();
+  }
 }
 
 gxf_result_t Runtime::GxfEntityGroupName(gxf_uid_t eid, const char** name) {
@@ -1102,58 +1318,74 @@ gxf_result_t Runtime::GxfEntityGroupName(gxf_uid_t eid, const char** name) {
 }
 
 gxf_result_t Runtime::GxfParameterSetFloat64(gxf_uid_t uid, const char* key, double value) {
-  GXF_LOG_VERBOSE("[C%05zu] PROPERTY SET: '%s' := %f", uid, key, value);
+  GXF_LOG_VERBOSE("[C%05" PRId64 "] PROPERTY SET: '%s' := %f", uid, key, value);
   return ToResultCode(parameters_->set<double>(uid, key, value));
 }
 
 gxf_result_t Runtime::GxfParameterSetFloat32(gxf_uid_t uid, const char* key, float value) {
-  GXF_LOG_VERBOSE("[C%05zu] PROPERTY SET: '%s' := %f", uid, key, value);
+  GXF_LOG_VERBOSE("[C%05" PRId64 "] PROPERTY SET: '%s' := %f", uid, key, value);
   return ToResultCode(parameters_->set<float>(uid, key, value));
 }
 
+gxf_result_t Runtime::GxfParameterSetInt8(gxf_uid_t uid, const char* key, int8_t value) {
+  GXF_LOG_VERBOSE("[C%05" PRId64 "] PROPERTY SET: '%s' := %" PRId8 "", uid, key, value);
+  return ToResultCode(parameters_->set<int8_t>(uid, key, value));
+}
+
+gxf_result_t Runtime::GxfParameterSetInt16(gxf_uid_t uid, const char* key, int16_t value) {
+  GXF_LOG_VERBOSE("[C%05" PRId64 "] PROPERTY SET: '%s' := %" PRId16 "", uid, key, value);
+  return ToResultCode(parameters_->set<int16_t>(uid, key, value));
+}
+
+gxf_result_t Runtime::GxfParameterSetInt32(gxf_uid_t uid, const char* key, int32_t value) {
+  GXF_LOG_VERBOSE("[C%05" PRId64 "] PROPERTY SET: '%s' := %" PRId32 "", uid, key, value);
+  return ToResultCode(parameters_->set<int32_t>(uid, key, value));
+}
+
 gxf_result_t Runtime::GxfParameterSetInt64(gxf_uid_t uid, const char* key, int64_t value) {
-  GXF_LOG_VERBOSE("[C%05zu] PROPERTY SET: '%s' := %ld", uid, key, value);
+  GXF_LOG_VERBOSE("[C%05" PRId64 "] PROPERTY SET: '%s' := %" PRId64 "", uid, key, value);
   return ToResultCode(parameters_->set<int64_t>(uid, key, value));
 }
 
-gxf_result_t Runtime::GxfParameterSetUInt64(gxf_uid_t uid, const char* key, uint64_t value) {
-  GXF_LOG_VERBOSE("[C%05zu] PROPERTY SET: '%s' := %lu", uid, key, value);
-  return ToResultCode(parameters_->set<uint64_t>(uid, key, value));
-}
-
-gxf_result_t Runtime::GxfParameterSetUInt32(gxf_uid_t uid, const char* key, uint32_t value) {
-  GXF_LOG_VERBOSE("[C%05zu] PROPERTY SET: '%s' := %d", uid, key, value);
-  return ToResultCode(parameters_->set<uint32_t>(uid, key, value));
+gxf_result_t Runtime::GxfParameterSetUInt8(gxf_uid_t uid, const char* key, uint8_t value) {
+  GXF_LOG_VERBOSE("[C%05" PRId64 "] PROPERTY SET: '%s' := %" PRIu8 "", uid, key, value);
+  return ToResultCode(parameters_->set<uint8_t>(uid, key, value));
 }
 
 gxf_result_t Runtime::GxfParameterSetUInt16(gxf_uid_t uid, const char* key, uint16_t value) {
-  GXF_LOG_VERBOSE("[C%05zu] PROPERTY SET: '%s' := %d", uid, key, value);
+  GXF_LOG_VERBOSE("[C%05" PRId64 "] PROPERTY SET: '%s' := %" PRIu16 "", uid, key, value);
   return ToResultCode(parameters_->set<uint16_t>(uid, key, value));
 }
 
+gxf_result_t Runtime::GxfParameterSetUInt32(gxf_uid_t uid, const char* key, uint32_t value) {
+  GXF_LOG_VERBOSE("[C%05" PRId64 "] PROPERTY SET: '%s' := %" PRIu32 "", uid, key, value);
+  return ToResultCode(parameters_->set<uint32_t>(uid, key, value));
+}
+
+gxf_result_t Runtime::GxfParameterSetUInt64(gxf_uid_t uid, const char* key, uint64_t value) {
+  GXF_LOG_VERBOSE("[C%05" PRId64 "] PROPERTY SET: '%s' := %" PRIu64 "", uid, key, value);
+  return ToResultCode(parameters_->set<uint64_t>(uid, key, value));
+}
+
 gxf_result_t Runtime::GxfParameterSetStr(gxf_uid_t uid, const char* key, const char* value) {
-  GXF_LOG_VERBOSE("[C%05zu] PROPERTY SET: '%s' := '%s'", uid, key, value);
+  GXF_LOG_VERBOSE("[C%05" PRId64 "] PROPERTY SET: '%s' := '%s'", uid, key, value);
   return ToResultCode(parameters_->setStr(uid, key, value));
 }
 
 gxf_result_t Runtime::GxfParameterSetPath(gxf_uid_t uid, const char* key, const char* value) {
-  GXF_LOG_VERBOSE("[C%05zu] PROPERTY SET: '%s' := '%s'", uid, key, value);
+  GXF_LOG_VERBOSE("[C%05" PRId64 "] PROPERTY SET: '%s' := '%s'", uid, key, value);
   return ToResultCode(parameters_->setPath(uid, key, value));
 }
 
 gxf_result_t Runtime::GxfParameterSetHandle(gxf_uid_t uid, const char* key, gxf_uid_t value) {
-  GXF_LOG_VERBOSE("[C%05zu] PROPERTY SET: '%s' := [C%05zu]'", uid, key, value);
+  GXF_LOG_VERBOSE("[C%05" PRId64 "] PROPERTY SET: '%s' := [C%05" PRId64 "]'", uid, key, value);
   return ToResultCode(parameters_->setHandle(uid, key, value));
 }
 
 gxf_result_t Runtime::GxfParameterSetBool(gxf_uid_t uid, const char* key, bool value) {
-  GXF_LOG_VERBOSE("[C%05zu] PROPERTY SET: '%s' := '%s'", uid, key, (value ? "true" : "false"));
+  GXF_LOG_VERBOSE(
+      "[C%05" PRId64 "] PROPERTY SET: '%s' := '%s'", uid, key, (value ? "true" : "false"));
   return ToResultCode(parameters_->set<bool>(uid, key, value));
-}
-
-gxf_result_t Runtime::GxfParameterSetInt32(gxf_uid_t uid, const char* key, int32_t value) {
-  GXF_LOG_VERBOSE("[C%05zu] PROPERTY SET: '%s' := %d", uid, key, value);
-  return ToResultCode(parameters_->set<int32_t>(uid, key, value));
 }
 
 gxf_result_t Runtime::GxfParameterSet1DVectorString(gxf_uid_t uid, const char* key,
@@ -1162,7 +1394,7 @@ gxf_result_t Runtime::GxfParameterSet1DVectorString(gxf_uid_t uid, const char* k
     GXF_LOG_ERROR("Value for the parameter, %s, is null", key);
     return GXF_ARGUMENT_NULL;
   }
-  GXF_LOG_VERBOSE("[C%05zu] PROPERTY SET: '%s'[0] := %s, ...", uid, key, value[0]);
+  GXF_LOG_VERBOSE("[C%05" PRId64 "] PROPERTY SET: '%s'[0] := %s, ...", uid, key, value[0]);
   return ToResultCode(parameters_->setStrVector(uid, key, value, length));
 }
 
@@ -1246,7 +1478,7 @@ gxf_result_t Runtime::GxfParameterGetUInt16(gxf_uid_t uid, const char* key, uint
 
 gxf_result_t Runtime::GxfParameterGet1DStrVector(gxf_uid_t uid, const char* key, char* value[],
                                                  uint64_t* count, uint64_t* min_length) {
-  GXF_LOG_VERBOSE("[C%05zu] PROPERTY GET: '%s'", uid, key);
+  GXF_LOG_VERBOSE("[C%05" PRId64 "] PROPERTY GET: '%s'", uid, key);
   if (!value || !count || !min_length) { return GXF_ARGUMENT_NULL; }
 
   const Expected<std::vector<std::string>> result =
@@ -1278,7 +1510,7 @@ gxf_result_t Runtime::GxfParameterGet1DStrVector(gxf_uid_t uid, const char* key,
 
 gxf_result_t Runtime::GxfParameterInt64Add(gxf_uid_t uid, const char* key, int64_t delta,
                                            int64_t* value) {
-  GXF_LOG_VERBOSE("[C%05zu] PROPERTY ADD: '%s' + %ld", uid, key, delta);
+  GXF_LOG_VERBOSE("[C%05" PRId64 "] PROPERTY ADD: '%s' + %" PRId64 "", uid, key, delta);
 
   const Expected<int64_t> result = parameters_->addGetInt64(uid, key, delta);
   if (result) {
@@ -1300,6 +1532,15 @@ gxf_result_t Runtime::GxfParameterGetStr(gxf_uid_t uid, const char* key, const c
     *value = result.value();
     return GXF_SUCCESS;
   } else {
+    // Entity name is being searched using parameter storage, throw warning
+    if (strcmp(kInternalNameParameterKey, key) == 0 && result.error() == GXF_PARAMETER_NOT_FOUND) {
+      bool found = false;
+      if (isSuccessful(GxfEntityIsValid(uid, &found)) && found == true) {
+        GXF_LOG_WARNING("This API GxfParameterGetStr is deprecated for getting entity name."
+        " Kindly use GxfEntityGetName api instead");
+        return GxfEntityGetName(uid, value);
+      }
+    }
     return result.error();
   }
 }
@@ -1375,7 +1616,7 @@ gxf_result_t Runtime::GxfParameterGetInt32(gxf_uid_t uid, const char* key, int32
 }
 
 gxf_result_t Runtime::GxfComponentPointer(gxf_uid_t uid, gxf_tid_t tid, void** pointer) {
-  return shared_context_->findComponentPointer(uid, pointer);
+  return shared_context_->findComponentPointer(context(), uid, pointer);
 }
 
 gxf_result_t Runtime::GxfGraphActivate() {
@@ -1520,7 +1761,7 @@ gxf_result_t Runtime::GxfSetSeverity(gxf_severity_t severity) {
       log_level = nvidia::Severity::VERBOSE;
     } break;
     default: {
-      GXF_LOG_ERROR("Invalid severity level: %d", severity);
+      GXF_LOG_ERROR("Invalid severity level: %d", static_cast<int32_t>(severity));
       return GXF_FAILURE;
     } break;
   }
@@ -1588,7 +1829,7 @@ gxf_result_t Runtime::GxfSetTypeRegistry(TypeRegistry* type_registry) {
   return GXF_NULL_POINTER;
 }
 
-gxf_result_t Runtime::GxfSetParameterStorage(ParameterStorage* parameters) {
+gxf_result_t Runtime::GxfSetParameterStorage(std::shared_ptr<ParameterStorage> parameters) {
   if (parameters != nullptr) {
     parameters_ = parameters;
     return GXF_SUCCESS;
@@ -1614,7 +1855,7 @@ gxf_result_t Runtime::GxfSetParameterRegistrar(
 }
 
 gxf_result_t Runtime::GxfSetResourceRegistrar(
-    ResourceRegistrar* resource_registrar) {
+    std::shared_ptr<ResourceRegistrar> resource_registrar) {
   if (resource_registrar != nullptr) {
     resource_registrar_ = resource_registrar;
     return GXF_SUCCESS;

@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
+Copyright (c) 2022-2024, NVIDIA CORPORATION. All rights reserved.
 
 NVIDIA CORPORATION and its licensors retain all intellectual property
 and proprietary rights in and to this software, related documentation
@@ -55,15 +55,10 @@ gxf_result_t StdEntityIdSerializer::serialize_entity_abi(gxf_uid_t eid,
     return GXF_ARGUMENT_NULL;
   }
   GxfEntityRefCountInc(context(), eid);
-  return gxf::ToResultCode(
-      Entity::Shared(context(), eid)
-          .map([&](Entity entity) { return entity.findAll(); })
-          .and_then([&]() {
-            EntityHeader entity_header;
-            entity_header.entity_id = eid;
-            entity_header.sequence_number = outgoing_sequence_number_++;
-            return SerializeEntityHeader(entity_header, endpoint);
-          })
+          EntityHeader entity_header;
+          entity_header.entity_id = eid;
+          entity_header.sequence_number = outgoing_sequence_number_++;
+          return gxf::ToResultCode( SerializeEntityHeader(entity_header, endpoint)
           .assign_to(*size));
 }
 

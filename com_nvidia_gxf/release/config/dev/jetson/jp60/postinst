@@ -1,0 +1,22 @@
+################################################################################
+# Copyright (c) 2023-2024, NVIDIA CORPORATION. All rights reserved.
+#
+# NVIDIA Corporation and its licensors retain all intellectual property
+# and proprietary rights in and to this software, related documentation
+# and any modifications thereto.  Any use, reproduction, disclosure or
+# distribution of this software and related documentation without an express
+# license agreement from NVIDIA Corporation is strictly prohibited.
+#
+################################################################################
+
+#!/bin/bash
+
+update-alternatives --install /usr/lib/aarch64-linux-gnu/libgxf_core.so gxf_core /opt/nvidia/graph-composer/libgxf_core.so 50
+update-alternatives --install /usr/bin/gxe gxe /opt/nvidia/graph-composer/gxe 50
+update-alternatives --install /usr/bin/registry registry /opt/nvidia/graph-composer/registry 50
+update-alternatives --install /usr/bin/container_builder container_builder /opt/nvidia/graph-composer/container_builder 50
+update-alternatives --install /usr/bin/gxf_cli gxf_cli /opt/nvidia/graph-composer/gxf_cli 50
+update-alternatives --install /usr/bin/gxf_server gxf_server /opt/nvidia/graph-composer/gxf_server 50
+
+rm -rf /tmp/gxf_registry.log
+ldconfig

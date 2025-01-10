@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2021 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-FileCopyrightText: Copyright (c) 2021-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * SPDX-License-Identifier: Apache-2.0
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -20,7 +20,10 @@
 #include <cstdint>
 
 #if defined(__clang__)
-// Not yet implemented
+inline char* TypenameAsStringImpl(const char* begin, char* output, int32_t max_length) {
+  // Return nullptr since this is not implemented
+  return nullptr;
+}
 #elif defined(__GNUC__)
 #include "type_name_gnuc.hpp"
 #elif defined(_MSC_VER)
@@ -51,7 +54,7 @@ const char* TypenameAsString() {
   constexpr int32_t kMaxNameLength = sizeof(__PRETTY_FUNCTION__);  // Use upper bound to be safe.
   static char s_name[kMaxNameLength] = {0};  // Initialize with 0 to get a null-terminated string.
   static char* result = s_name;
-  if (s_name[0] == 0 && result != nullptr) {  // Check for first invokation of this function.
+  if (s_name[0] == 0 && result != nullptr) {  // Check for first invocation of this function.
     result = TypenameAsStringImpl(__PRETTY_FUNCTION__, s_name, kMaxNameLength);
   }
   return result;

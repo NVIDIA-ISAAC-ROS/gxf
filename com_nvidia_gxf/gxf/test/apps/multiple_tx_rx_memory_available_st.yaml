@@ -1,0 +1,248 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+%YAML 1.2
+---
+name: global_pool
+components:
+- name: pool
+  type: nvidia::gxf::BlockMemoryPool
+  parameters:
+    storage_type: 0
+    block_size: 4
+    num_blocks: 6
+---
+name: dummy_generator_1
+components:
+- name: integers
+  type: nvidia::gxf::DoubleBufferTransmitter
+- type: nvidia::gxf::DownstreamReceptiveSchedulingTerm
+  parameters:
+   transmitter: integers
+   min_size: 1
+- type: nvidia::gxf::test::IntegerSinSum
+  parameters:
+    count: 10
+    result: integers
+    pool: global_pool/pool
+- type: nvidia::gxf::CountSchedulingTerm
+  parameters:
+    count: 5
+- type: nvidia::gxf::test::StepCount
+  parameters:
+    expected_count: 5
+- type: nvidia::gxf::MemoryAvailableSchedulingTerm
+  parameters:
+    allocator: global_pool/pool
+    min_blocks: 1
+---
+name: dummy_generator_2
+components:
+- name: integers
+  type: nvidia::gxf::DoubleBufferTransmitter
+- type: nvidia::gxf::DownstreamReceptiveSchedulingTerm
+  parameters:
+   transmitter: integers
+   min_size: 1
+- type: nvidia::gxf::test::IntegerSinSum
+  parameters:
+    count: 10
+    result: integers
+    pool: global_pool/pool
+- type: nvidia::gxf::CountSchedulingTerm
+  parameters:
+    count: 5
+- type: nvidia::gxf::test::StepCount
+  parameters:
+    expected_count: 5
+- type: nvidia::gxf::MemoryAvailableSchedulingTerm
+  parameters:
+    allocator: global_pool/pool
+    min_blocks: 1
+---
+name: dummy_generator_3
+components:
+- name: integers
+  type: nvidia::gxf::DoubleBufferTransmitter
+- type: nvidia::gxf::DownstreamReceptiveSchedulingTerm
+  parameters:
+   transmitter: integers
+   min_size: 1
+- type: nvidia::gxf::test::IntegerSinSum
+  parameters:
+    count: 10
+    result: integers
+    pool: global_pool/pool
+- type: nvidia::gxf::CountSchedulingTerm
+  parameters:
+    count: 5
+- type: nvidia::gxf::test::StepCount
+  parameters:
+    expected_count: 5
+- type: nvidia::gxf::MemoryAvailableSchedulingTerm
+  parameters:
+    allocator: global_pool/pool
+    min_blocks: 1
+---
+name: forward1
+components:
+- name: input
+  type: nvidia::gxf::DoubleBufferReceiver
+- name: output
+  type: nvidia::gxf::DoubleBufferTransmitter
+- type: nvidia::gxf::Forward
+  parameters:
+    in: input
+    out: output
+- type: nvidia::gxf::MessageAvailableSchedulingTerm
+  parameters:
+    receiver: input
+    min_size: 1
+- type: nvidia::gxf::DownstreamReceptiveSchedulingTerm
+  parameters:
+   transmitter: output
+   min_size: 1
+- type: nvidia::gxf::test::StepCount
+  parameters:
+    expected_count: 5
+---
+name: forward2
+components:
+- name: input
+  type: nvidia::gxf::DoubleBufferReceiver
+- name: output
+  type: nvidia::gxf::DoubleBufferTransmitter
+- type: nvidia::gxf::Forward
+  parameters:
+    in: input
+    out: output
+- type: nvidia::gxf::MessageAvailableSchedulingTerm
+  parameters:
+    receiver: input
+    min_size: 1
+- type: nvidia::gxf::DownstreamReceptiveSchedulingTerm
+  parameters:
+   transmitter: output
+   min_size: 1
+- type: nvidia::gxf::test::StepCount
+  parameters:
+    expected_count: 5
+---
+name: forward3
+components:
+- name: input
+  type: nvidia::gxf::DoubleBufferReceiver
+- name: output
+  type: nvidia::gxf::DoubleBufferTransmitter
+- type: nvidia::gxf::Forward
+  parameters:
+    in: input
+    out: output
+- type: nvidia::gxf::MessageAvailableSchedulingTerm
+  parameters:
+    receiver: input
+    min_size: 1
+- type: nvidia::gxf::DownstreamReceptiveSchedulingTerm
+  parameters:
+   transmitter: output
+   min_size: 1
+- type: nvidia::gxf::test::StepCount
+  parameters:
+    expected_count: 5
+---
+name: receiver1
+components:
+- name: tensors
+  type: nvidia::gxf::DoubleBufferReceiver
+- type: nvidia::gxf::MessageAvailableSchedulingTerm
+  parameters:
+    receiver: tensors
+    min_size: 1
+- type: nvidia::gxf::PingRx
+  parameters:
+    signal: tensors
+- type: nvidia::gxf::test::StepCount
+  parameters:
+    expected_count: 5
+---
+name: receiver2
+components:
+- name: tensors
+  type: nvidia::gxf::DoubleBufferReceiver
+- type: nvidia::gxf::MessageAvailableSchedulingTerm
+  parameters:
+    receiver: tensors
+    min_size: 1
+- type: nvidia::gxf::PingRx
+  parameters:
+    signal: tensors
+- type: nvidia::gxf::test::StepCount
+  parameters:
+    expected_count: 5
+---
+name: receiver3
+components:
+- name: tensors
+  type: nvidia::gxf::DoubleBufferReceiver
+- type: nvidia::gxf::MessageAvailableSchedulingTerm
+  parameters:
+    receiver: tensors
+    min_size: 1
+- type: nvidia::gxf::PingRx
+  parameters:
+    signal: tensors
+- type: nvidia::gxf::test::StepCount
+  parameters:
+    expected_count: 5
+---
+components:
+- type: nvidia::gxf::Connection
+  parameters:
+    source: dummy_generator_1/integers
+    target: forward1/input
+- type: nvidia::gxf::Connection
+  parameters:
+    source: dummy_generator_2/integers
+    target: forward2/input
+- type: nvidia::gxf::Connection
+  parameters:
+    source: dummy_generator_3/integers
+    target: forward3/input
+- type: nvidia::gxf::Connection
+  parameters:
+    source: forward1/output
+    target: receiver1/tensors
+- type: nvidia::gxf::Connection
+  parameters:
+    source: forward2/output
+    target: receiver2/tensors
+- type: nvidia::gxf::Connection
+  parameters:
+    source: forward3/output
+    target: receiver3/tensors
+---
+name: scheduler
+components:
+- name: clock
+  type: nvidia::gxf::RealtimeClock
+- type: nvidia::gxf::MultiThreadScheduler
+  parameters:
+    clock: clock
+    max_duration_ms: 1000
+    worker_thread_number: 3
+- type: nvidia::gxf::test::EntityMonitor
+- type: nvidia::gxf::JobStatistics
+  parameters:
+    clock: clock
+    codelet_statistics: true

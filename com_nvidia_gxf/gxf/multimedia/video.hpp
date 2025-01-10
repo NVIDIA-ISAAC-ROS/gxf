@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2021-2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-FileCopyrightText: Copyright (c) 2021-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * SPDX-License-Identifier: Apache-2.0
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -183,6 +183,7 @@ GXF_VIDEO_TYPE_TRAITS(GXF_VIDEO_FORMAT_RAW16_RGGB);
 GXF_VIDEO_TYPE_TRAITS(GXF_VIDEO_FORMAT_RAW16_BGGR);
 GXF_VIDEO_TYPE_TRAITS(GXF_VIDEO_FORMAT_RAW16_GRBG);
 GXF_VIDEO_TYPE_TRAITS(GXF_VIDEO_FORMAT_RAW16_GBRG);
+
 
 // Struct to hold the information regarding a single color plane
 struct ColorPlane {
@@ -507,7 +508,6 @@ struct VideoFormatSize<T, std::enable_if_t<T == VideoFormat::GXF_VIDEO_FORMAT_R8
       color_planes[i].height = heightEven;
       color_planes[i].stride = ComputeStrides(stride_align, color_planes[i].width,
                             color_planes[i].bytes_per_pixel, color_planes[i].stride);
-      color_planes[i].size = color_planes[i].stride * color_planes[i].height;
       color_planes[i].size = color_planes[i].stride * color_planes[i].height;
       color_planes[i].offset = size;
       size += color_planes[i].size;
@@ -846,12 +846,15 @@ class VideoBuffer {
   // Moves the existing video buffer to a tensor element specified by the handle
   Expected<void> moveToTensor(Handle<Tensor>& tensor);
 
+  // Moves the existing video buffer to a tensor element specified by the pointer
+  Expected<void> moveToTensor(Tensor* tensor);
 
   // Moves memory buffer from tensor to video buffer works on rank 2 and 3 tensors,
   // ordering of dimensions in tensor is assumed to be [whc]
   // OBS: If successful, tensor destructor will be called and handle set to null
   template <VideoFormat C>
-  Expected<void> createFromTensor(Handle<Tensor>& tensor, SurfaceLayout layout);
+  Expected<void> createFromTensor(Handle<Tensor>& tensor, SurfaceLayout layout,
+                                  bool stride_align = true);
 
   // VideoBufferInfo of the video frame
   VideoBufferInfo video_frame_info() const { return buffer_info_; }
@@ -876,6 +879,7 @@ class VideoBuffer {
   static Expected<PrimitiveType> getPlanarPrimitiveType(VideoFormat color_format) {
     PrimitiveType primitive_type;
     switch (color_format) {
+        case   VideoFormat::GXF_VIDEO_FORMAT_NV12:          // BT.601 2 planes Y, UV
         case   VideoFormat::GXF_VIDEO_FORMAT_RGBA:          // RGBA-8-8-8-8 single plane
         case   VideoFormat::GXF_VIDEO_FORMAT_BGRA:          // BGRA-8-8-8-8 single plane
         case   VideoFormat::GXF_VIDEO_FORMAT_ARGB:          // ARGB-8-8-8-8 single plane
@@ -923,6 +927,10 @@ class VideoBuffer {
           primitive_type = PrimitiveType::kFloat64;
         } break;
 
+        case   VideoFormat::GXF_VIDEO_FORMAT_CUSTOM: {        // CUSTOM undefined
+          primitive_type = PrimitiveType::kCustom;
+        } break;
+
         default: {                                               // Non-planar type given
           GXF_LOG_ERROR("VideoFormat is of non-planar color format (%ld),"
                         " which cannot be moved from tensor", static_cast<int64_t>(color_format));
@@ -940,7 +948,8 @@ class VideoBuffer {
 
 template <VideoFormat C>
 Expected<void> VideoBuffer::createFromTensor(Handle<Tensor>& tensor,
-                                             SurfaceLayout layout) {
+                                             SurfaceLayout layout,
+                                             bool stride_align) {
   if (!tensor) {
     GXF_LOG_ERROR("createFromTensor received invalid tensor handle");
     return Unexpected{GXF_ARGUMENT_NULL};
@@ -976,7 +985,7 @@ Expected<void> VideoBuffer::createFromTensor(Handle<Tensor>& tensor,
   auto channels = static_cast<uint32_t>(tensor->shape().dimension(2));
 
   // Get color planes
-  auto color_planes = color_format.getDefaultColorPlanes(width, height);
+  auto color_planes = color_format.getDefaultColorPlanes(width, height, stride_align);
 
   // Sanity check that number of tensor channels corresponds to video format
   if (channels != color_planes.size()) {

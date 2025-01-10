@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023 NVIDIA CORPORATION & AFFILIATES. All rights
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION & AFFILIATES. All rights
  * reserved. SPDX-License-Identifier: Apache-2.0
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -30,9 +30,7 @@ class PingBatchRx : public Codelet {
   virtual ~PingBatchRx() = default;
 
   gxf_result_t registerInterface(Registrar* registrar) override;
-  gxf_result_t start() override;
   gxf_result_t tick() override;
-  gxf_result_t stop() override { return GXF_SUCCESS; }
 
  private:
   Parameter<Handle<Receiver>> signal_;

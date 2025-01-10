@@ -17,7 +17,9 @@
 #ifndef NVIDIA_GXF_STD_RECEIVER_HPP
 #define NVIDIA_GXF_STD_RECEIVER_HPP
 
+#include <set>
 #include "gxf/std/queue.hpp"
+#include "gxf/std/transmitter.hpp"
 
 namespace nvidia {
 namespace gxf {
@@ -39,6 +41,8 @@ class Receiver : public Queue {
 
   virtual gxf_result_t sync_io_abi() { return GXF_SUCCESS; }
 
+  virtual gxf_result_t wait_abi() { return GXF_SUCCESS; }
+
   Expected<Entity> receive();
 
   size_t back_size();
@@ -47,7 +51,14 @@ class Receiver : public Queue {
 
   Expected<void> sync_io();
 
+  Expected<void> wait();
+
   Expected<Entity> peekBack(int32_t index = 0);
+
+  Expected<void> setTransmitter(Handle<Transmitter> tx);
+
+ private:
+  std::set<Handle<Transmitter>> connected_transmitters_;
 };
 
 }  // namespace gxf

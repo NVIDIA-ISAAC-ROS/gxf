@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
+Copyright (c) 2022-2024, NVIDIA CORPORATION. All rights reserved.
 
 NVIDIA CORPORATION and its licensors retain all intellectual property
 and proprietary rights in and to this software, related documentation
@@ -45,6 +45,18 @@ TEST(GxfRegisterComponent,valid_gxf_tid)
   ASSERT_EQ(GxfContextDestroy(context),GXF_SUCCESS);
 }
 
+TEST(GxfRegisterComponent,duplicate_gxf_tid_name)
+{
+  gxf_context_t context = kNullContext;
+  GXF_ASSERT_SUCCESS(GxfContextCreate(&context));
+  gxf_tid_t tid{0UL,0UL} ;
+  gxf_tid_t tidl{0UL,1UL};
+  ASSERT_EQ(GxfRegisterComponent(context,tid, "nvidia::gxf::Comp", ""),GXF_SUCCESS);
+  ASSERT_EQ(GxfRegisterComponent(context,tidl, "nvidia::gxf::Comp1", ""),GXF_SUCCESS);
+  ASSERT_EQ(GxfRegisterComponent(context,tid,"nvidia::gxf::Comp1", ""),GXF_FACTORY_DUPLICATE_TID);
+  ASSERT_EQ(GxfContextDestroy(context),GXF_SUCCESS);
+}
+
 TEST(GxfRegisterComponent,duplicate_gxf_tid)
 {
   gxf_context_t context = kNullContext;
@@ -52,8 +64,7 @@ TEST(GxfRegisterComponent,duplicate_gxf_tid)
   gxf_tid_t tid{0UL,0UL} ;
   gxf_tid_t tidl{0UL,0UL};
   ASSERT_EQ(GxfRegisterComponent(context,tid, "nvidia::gxf::Comp", ""),GXF_SUCCESS);
-  ASSERT_EQ(GxfRegisterComponent(context,tidl, "nvidia::gxf::Comp1", ""),GXF_SUCCESS);
-  ASSERT_EQ(GxfRegisterComponent(context,tid,"nvidia::gxf::Comp1", ""),GXF_FACTORY_DUPLICATE_TID);
+  ASSERT_EQ(GxfRegisterComponent(context,tidl, "nvidia::gxf::Comp1", ""),GXF_FACTORY_DUPLICATE_TID);
   ASSERT_EQ(GxfContextDestroy(context),GXF_SUCCESS);
 }
 
@@ -73,8 +84,10 @@ TEST(GxfRegisterComponent,name_starting_with_special_Symbols_and_digit)
   gxf_tid_t tid = GxfTidNull();
   const char *component_name="_name";
   EXPECT_EQ(GxfRegisterComponent(context,tid,component_name, ""),GXF_SUCCESS);
+  tid = {0UL, 1UL};
   const char *component_name_1="1_name";
   EXPECT_EQ(GxfRegisterComponent(context,tid,component_name_1, ""),GXF_SUCCESS);
+  tid = {1UL, 1UL};
   const char *component_name_2="@_name";
   EXPECT_EQ(GxfRegisterComponent(context,tid,component_name_2, ""),GXF_SUCCESS);
   ASSERT_EQ(GxfContextDestroy(context),GXF_SUCCESS);

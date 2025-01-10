@@ -1,5 +1,5 @@
 """
- SPDX-FileCopyrightText: Copyright (c) 2021-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ SPDX-FileCopyrightText: Copyright (c) 2021-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  SPDX-License-Identifier: Apache-2.0
 
  Licensed under the Apache License, Version 2.0 (the "License");
@@ -43,15 +43,29 @@ cc_library(
         "common/type_name.hpp",
         "common/type_name_gnuc.hpp",
         "common/type_utils.hpp",
+        "common/yaml_parser.hpp",
+        "gxf/core/common_expected_macro.hpp",
         "gxf/core/component.hpp",
         "gxf/core/entity.hpp",
         "gxf/core/expected.hpp",
+        "gxf/core/expected_macro.hpp",
+        "gxf/core/filepath.hpp",
         "gxf/core/gxf.h",
         "gxf/core/gxf_ext.h",
         "gxf/core/handle.hpp",
         "gxf/core/parameter.hpp",
+        "gxf/core/parameter_parser.hpp",
+        "gxf/core/parameter_parser_std.hpp",
+        "gxf/core/parameter_registrar.hpp",
+        "gxf/core/parameter_storage.hpp",
+        "gxf/core/parameter_wrapper.hpp",
         "gxf/core/registrar.hpp",
         "gxf/core/resource.hpp",
+        "gxf/core/resource_manager.hpp",
+        "gxf/core/resource_registrar.hpp",
+        "gxf/core/type_registry.hpp",
+        "gxf/logger/gxf_logger.hpp",
+        "gxf/logger/logger.hpp",
         "gxf/std/allocator.hpp",
         "gxf/std/codelet.hpp",
         "gxf/std/component_allocator.hpp",
@@ -60,13 +74,9 @@ cc_library(
         "gxf/std/extension.hpp",
         "gxf/std/extension_factory_helper.hpp",
         "gxf/std/new_component_allocator.hpp",
-        "gxf/std/parameter_parser.hpp",
-        "gxf/std/parameter_registrar.hpp",
-        "gxf/std/parameter_storage.hpp",
-        "gxf/std/parameter_wrapper.hpp",
-        "gxf/std/resource_manager.hpp",
-        "gxf/std/resource_registrar.hpp",
-        "gxf/std/type_registry.hpp",
+        "gxf/std/gems/staging_queue/staging_queue_iterator.hpp",
+        "gxf/std/gems/staging_queue/staging_queue.hpp",
+        "gxf/std/gems/queue_thread/queue_thread.hpp",
     ],
     includes = ["."],
     linkopts = ["-lpthread"],
@@ -74,5 +84,6 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = [
         "@yaml-cpp",
+        "@magic_enum",
     ],
 )

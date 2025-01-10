@@ -1,4 +1,4 @@
-Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
+Copyright (c) 2022-2024, NVIDIA CORPORATION. All rights reserved.
 
 NVIDIA CORPORATION and its licensors retain all intellectual property
 and proprietary rights in and to this software, related documentation
@@ -10,8 +10,8 @@ license agreement from NVIDIA CORPORATION is strictly prohibited.
 
 Extensions uploaded to NGC can be imported into bazel workspace using the `gxf_import_ext` rule provided in `gxf/registry/build/gxf_extension.bzl`. A sample example of the rule invocation have been shown in `gxf/registry/test/ngc/import/gxf_extension_test.bzl`.
 
-## Prerequsites -
-1. [Optional] GXF resgistry can be installed through the graph composer package. If the registry executable is not found, the bazel rule will download an internal build to perform the registry opertions.
+## Prerequisites -
+1. [Optional] GXF registry can be installed through the graph composer package. If the registry executable is not found, the bazel rule will download an internal build to perform the registry operations.
 
 2. [Mandatory] NGC api key. It can be imported into bazel workspace by either
     a. Export it as an env var "NGC_API_KEY"
@@ -21,7 +21,7 @@ Extensions uploaded to NGC can be imported into bazel workspace using the `gxf_i
 
 ## Instructions -
 
-1. The bazel rule has been implemented as a reposiotry rule so any invocation of the rule must be done in the WORKSPACE file. See the `gxf_test_data` macro in WORKSPACE and its corresponding implementation in `gxf/third_party/gxf.bzl`
+1. The bazel rule has been implemented as a repository rule so any invocation of the rule must be done in the WORKSPACE file. See the `gxf_test_data` macro in WORKSPACE and its corresponding implementation in `gxf/third_party/gxf.bzl`
 
 ### Sample Usage -
 
@@ -31,10 +31,10 @@ Extensions uploaded to NGC can be imported into bazel workspace using the `gxf_i
         ext_name = "StandardExtension",
         repo_name = "gxf-dev-team",
         arch = "aarch64",
-        distribution = "ubuntu_20.04",
+        distribution = "ubuntu_22.04",
         os = "linux",
         version = "2.1.0",
-        cuda = "11.4",
+        cuda = "12.6",
         tensorrt = "",
         vpi = "",
         build_file = clean_dep("//registry/test/ngc/import:standard_extension.BUILD"),

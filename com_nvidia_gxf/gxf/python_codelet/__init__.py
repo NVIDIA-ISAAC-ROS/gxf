@@ -18,6 +18,8 @@
 import typing
 
 from .pycodelet import *
+from .pydata_pybind import *
+from .py_compute_entity import *
 from .codelet import *
 from gxf.core import Entity
 from .Components import *

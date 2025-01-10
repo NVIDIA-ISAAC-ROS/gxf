@@ -18,7 +18,6 @@ from gxf.core import MessageEntity
 from gxf.cuda import CudaStreamPool
 from gxf.std import Allocator
 from gxf.std import Clock
-from gxf.std import Receiver
 from gxf.std import Transmitter
 from gxf.std import TensorDescription
 from gxf.std import Tensor
@@ -62,7 +61,7 @@ class StreamGenerator(CodeletAdapter):
             storage_type=MemoryStorageType.kHost,
             shape=Shape([1024, 1]),
             element_type=PrimitiveType.kFloat32,
-            bytes_per_element=32
+            bytes_per_element=4
         )
         host_tensor = Tensor.add_to_entity(host_msg, host_tensor_description.name)
         host_tensor.reshape_custom(
@@ -87,7 +86,7 @@ class StreamGenerator(CodeletAdapter):
             storage_type=MemoryStorageType.kDevice,
             shape=Shape([1024, 1]),
             element_type=PrimitiveType.kFloat32,
-            bytes_per_element=32
+            bytes_per_element=4
         )
         dev_tensor = Tensor.add_to_entity(dev_msg, dev_tensor_description.name)
         dev_tensor.reshape_custom(

@@ -17,7 +17,7 @@ class TestPeriodicSchedulingTerm(CodeletAdapter):
     """ Python codelet to receive a msg on tick()
 
     Python implementation of CountSchedulingTerm.
-    Receives a message on the Reciever on every tick()
+    Receives a message on the Receiver on every tick()
     """
 
     def start(self):

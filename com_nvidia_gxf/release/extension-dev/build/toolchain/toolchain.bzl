@@ -19,7 +19,7 @@ _TARGET_PLATFORM = "target_platform"
 
 _GCC_PATH_MAP = {
     "x86_64": "/usr/bin/gcc",
-    "jetson": "/usr/bin/aarch64-linux-gnu-gcc-9",
+    "jetson": "/usr/bin/aarch64-linux-gnu-gcc-11",
 }
 
 def _tpl(repository_ctx, tpl, substitutions = {}, out = None):

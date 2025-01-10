@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2021 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2021-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -63,9 +63,12 @@ components:
     target: rx/signal
 ---
 components:
-- type: nvidia::gxf::GreedyScheduler
-  parameters:
-    max_duration_ms: 1000000
-    clock: clock
 - name: clock
-  type: nvidia::gxf::ManualClock
+  type: nvidia::gxf::RealtimeClock
+- type: nvidia::gxf::EventBasedScheduler
+  parameters:
+    clock: clock
+    max_duration_ms: 1200000
+    worker_thread_number: 3
+    stop_on_deadlock: true
+    stop_on_deadlock_timeout: 100

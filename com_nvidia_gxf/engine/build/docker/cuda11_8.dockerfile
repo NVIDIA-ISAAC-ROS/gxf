@@ -17,7 +17,8 @@ ENV DEBIAN_FRONTEND=noninteractive
 # weget: for vulkan and cudnn download
 # apt-utils: https://github.com/phusion/baseimage-docker/issues/319
 # aha, rsync, xz-utils: Install AHA utility to prepare HTML reports from the test results
-RUN apt-get update && apt-get install -y --no-install-recommends wget apt-utils aha rsync xz-utils lsb-release software-properties-common && \
+RUN apt-get update && apt-get install -y --no-install-recommends wget apt-utils aha rsync \
+    xz-utils lsb-release software-properties-common libnuma-dev && \
     rm -rf /var/lib/apt/lists/*
 
 # Configure the build for CUDA configuration

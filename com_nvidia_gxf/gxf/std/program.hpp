@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2021, NVIDIA CORPORATION. All rights reserved.
+Copyright (c) 2021-2024, NVIDIA CORPORATION. All rights reserved.
 
 NVIDIA CORPORATION and its licensors retain all intellectual property
 and proprietary rights in and to this software, related documentation
@@ -60,8 +60,8 @@ class Program {
 
   Program();
   Expected<void> setup(gxf_context_t context, EntityWarden* warden, EntityExecutor* executor,
-                       ParameterStorage* parameter_storage);
-  Expected<void> addEntity(gxf_uid_t eid);
+                       std::shared_ptr<ParameterStorage> parameter_storage);
+  Expected<void> addEntity(gxf_uid_t eid, EntityItem* item_ptr);
   Expected<void> scheduleEntity(gxf_uid_t eid);
   Expected<void> unscheduleEntity(gxf_uid_t eid);
   Expected<void> activate();
@@ -70,17 +70,21 @@ class Program {
   Expected<void> wait();
   Expected<void> deactivate();
   Expected<void> destroy();
-  Expected<void> entityEventNotify(gxf_uid_t eid);
+  Expected<void> entityEventNotify(gxf_uid_t eid, gxf_event_t event);
+  const char* programStateStr(const State& state);
 
  private:
+  // create all message routes defined by the components in the passed entities.
+  Expected<void> addRoutes(const FixedVector<Entity>& entities);
+
   // pre activate actions on a list of entities that need to be done before activate
-  Expected<void> preActivateEntities(const FixedVector<Entity, kMaxEntities>& entities);
+  Expected<void> preActivateEntities(const FixedVector<Entity>& entities);
   // pre deactivate actions on a list of entities that need to be done before deactivate
   Expected<void> preDeactivateEntities(const FixedVector<Entity, kMaxEntities>& entities);
 
   // activates a list of entities and deactivates the entire program if any entity
   // fails to activate
-  Expected<void> activateEntities(FixedVector<Entity, kMaxEntities> entities);
+  Expected<void> activateEntities(FixedVector<Entity> entities);
 
   // dynamic parameter change
   Expected<void> onParameterSet(const std::string& resource, const std::string& data);
@@ -88,6 +92,8 @@ class Program {
   Expected<std::string> onGraphDump(const std::string& resource);
   // dump the who graph
   Expected<std::string> dumpGraph(gxf_uid_t uid);
+  // resets the state of the program
+  void resetProgram();
 
   gxf_context_t context_;
   EntityWarden* entity_warden_;
@@ -107,7 +113,7 @@ class Program {
   FixedVector<Entity> unscheduled_entities_;
   FixedVector<Entity> scheduled_entities_;
   std::unordered_set<gxf_uid_t> schedulers_;
-  ParameterStorage* parameter_storage_;
+  std::shared_ptr<ParameterStorage> parameter_storage_;
 };
 
 }  // namespace gxf

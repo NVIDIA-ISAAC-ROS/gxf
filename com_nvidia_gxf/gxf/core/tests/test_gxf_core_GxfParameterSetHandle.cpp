@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
+Copyright (c) 2022-2024, NVIDIA CORPORATION. All rights reserved.
 
 NVIDIA CORPORATION and its licensors retain all intellectual property
 and proprietary rights in and to this software, related documentation
@@ -64,7 +64,7 @@ TEST_F(GxfParameterSetHandle_Test, InvalidComponenetIDParameterName) {
 
 TEST_F(GxfParameterSetHandle_Test, InvalidEntityComponent) {
   GXF_ASSERT_EQ(GxfParameterSetHandle(context, cid, "clock", kNullUid),
-                GXF_ENTITY_COMPONENT_NOT_FOUND);
+                GXF_ENTITY_NOT_FOUND);
 }
 
 TEST_F(GxfParameterSetHandle_Test, SettingInvalidParameterType) {

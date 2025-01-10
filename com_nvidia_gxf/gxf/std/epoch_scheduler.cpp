@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2021,2023 NVIDIA CORPORATION. All rights reserved.
+Copyright (c) 2021-2024 NVIDIA CORPORATION. All rights reserved.
 
 NVIDIA CORPORATION and its licensors retain all intellectual property
 and proprietary rights in and to this software, related documentation
@@ -59,7 +59,7 @@ gxf_result_t EpochScheduler::schedule_abi(gxf_uid_t eid) {
   if (!entity) {
     return ToResultCode(entity);
   }
-  auto codelets = entity->findAll<Codelet>();
+  auto codelets = entity->findAllHeap<Codelet>();
   if (!codelets) {
     return ToResultCode(codelets);
   }
@@ -112,7 +112,7 @@ gxf_result_t EpochScheduler::unschedule_abi(gxf_uid_t eid) {
   if (!entity) {
     return ToResultCode(entity);
   }
-  auto codelets = entity->findAll<Codelet>();
+  auto codelets = entity->findAllHeap<Codelet>();
   if (!codelets) {
     return ToResultCode(codelets);
   }
@@ -239,8 +239,7 @@ gxf_result_t EpochScheduler::run_epoch_abi(float budget_ms) {
 
         if (!maybe_condition) {
           const char* entityName = "UNKNOWN";
-          GxfParameterGetStr(context(), eid, kInternalNameParameterKey,
-                             &entityName);  // Ignore query error
+          GxfEntityGetName(context(), eid, &entityName);
           GXF_LOG_ERROR("Error while executing entity %zu named '%s': %s", eid,
                         entityName, GxfResultStr(maybe_condition.error()));
           return maybe_condition.error();
@@ -265,6 +264,8 @@ gxf_result_t EpochScheduler::run_epoch_abi(float budget_ms) {
         case SchedulingConditionType::NEVER: {
           to_remove_idx.push_back(i);
         } break;
+        default:
+          break;
       }
     }
 
@@ -352,7 +353,8 @@ gxf_result_t EpochScheduler::wait_abi() {
   return GXF_SUCCESS;
 }
 
-gxf_result_t EpochScheduler::event_notify_abi(gxf_uid_t eid) {
+gxf_result_t EpochScheduler::event_notify_abi(gxf_uid_t eid, gxf_event_t event) {
+  if (event != GXF_EVENT_EXTERNAL) { return GXF_SUCCESS; }
   std::unique_lock<std::mutex> lock(event_mutex_);
   const auto result = event_entities_.push_back(eid);
   if (!result) {

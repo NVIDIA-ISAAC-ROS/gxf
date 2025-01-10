@@ -154,7 +154,7 @@ class Repository:
         if not node:
             return None
 
-        ######   Maintain backward compatability
+        ######   Maintain backward compatibility
         if "sha256" not in node:
             node["sha256"] = None
 

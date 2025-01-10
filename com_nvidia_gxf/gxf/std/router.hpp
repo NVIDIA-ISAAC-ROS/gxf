@@ -29,6 +29,11 @@ class Router {
   // Synchronizes the inbox of an entity and prepares it for execution
   virtual Expected<void> syncInbox(const Entity& entity) = 0;
 
+  // Synchronizes the inbox of an entity and prepares it for execution
+  virtual Expected<void> wait(const Entity& entity) {
+    return Success;
+  }
+
   // Synchronizes the outbox of an entity after successful execution
   virtual Expected<void> syncOutbox(const Entity& entity) = 0;
 

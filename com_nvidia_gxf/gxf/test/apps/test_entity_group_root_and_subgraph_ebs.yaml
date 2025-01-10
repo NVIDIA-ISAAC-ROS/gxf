@@ -1,0 +1,182 @@
+%YAML 1.2
+# SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+---
+dependencies:
+- extension: StandardExtension
+  uuid: 8ec2d5d6-b5df-48bf-8dee-0252606fdd7e
+  version: 2.6.0
+- extension: TestHelperExtension
+  uuid: 1b99ffeb-c250-4ced-8117-62ac05969a50
+  version: 2.6.0
+- extension: SampleExtension
+  uuid: a6ad78b6-1682-11ec-9621-0242ac130002
+  version: 1.6.0
+# graph src: message_generator/MockCodelet
+---
+name: message_generator
+components:
+- name: signal
+  type: nvidia::gxf::DoubleBufferTransmitter
+  parameters:
+    capacity: 5
+- type: nvidia::gxf::DownstreamReceptiveSchedulingTerm
+  parameters:
+    transmitter: signal
+    min_size: 1
+- name: message_src
+  type: nvidia::gxf::test::MockCodelet
+  parameters:
+    mode: SRC
+    clock: scheduler/clock
+    transmitter: signal
+    duration_lower_ms: 11
+    duration_upper_ms: 11
+- type: nvidia::gxf::CountSchedulingTerm
+  parameters:
+    count: 10
+- name: cpu_thread
+  type: nvidia::gxf::CPUThread
+  parameters:
+    pin_entity: true
+- type: nvidia::gxf::test::StepCount
+  parameters:
+    expected_count: 10
+# message_generator -> test_subgraph
+---
+components:
+- type: nvidia::gxf::Connection
+  parameters:
+    source: message_generator/signal
+    target: test_subgraph/input
+# test_subgraph
+---
+name: test_subgraph
+components:
+- type: nvidia::gxf::Subgraph
+  name: gather_subgraph
+  parameters:
+    location: "gxf/test/apps/entity_group_subgraph.yaml"
+    prerequisites:
+      root_clock: scheduler/clock
+# test_subgraph -> message_sink/MockCodelet
+---
+components:
+- type: nvidia::gxf::Connection
+  parameters:
+    source: test_subgraph/output
+    target: message_sink/signal
+# graph sink: message_sink/MockCodelet
+---
+name: message_sink
+components:
+- name: signal
+  type: nvidia::gxf::DoubleBufferReceiver
+  parameters:
+    capacity: 5
+- type: nvidia::gxf::MessageAvailableSchedulingTerm
+  parameters:
+    receiver: signal
+    min_size: 1
+- name: message_sink
+  type: nvidia::gxf::test::MockCodelet
+  parameters:
+    mode: SINK
+    clock: scheduler/clock
+    receiver: signal
+    include_mock_latency: false
+- name: cpu_thread
+  type: nvidia::gxf::CPUThread
+  parameters:
+    pin_entity: true
+- type: nvidia::gxf::test::StepCount
+  parameters:
+    expected_count: 10
+# Scheduler
+---
+
+name: scheduler
+components:
+- name: clock
+  type: nvidia::gxf::RealtimeClock
+- type: nvidia::gxf::EventBasedScheduler
+  parameters:
+    max_duration_ms: 10000
+    clock: clock
+    worker_thread_number: 2
+    stop_on_deadlock: False
+    stop_on_deadlock_timeout: 100
+    # only applicable for MTS
+    #check_recession_period_ms: 0.2
+- type: nvidia::gxf::test::EntityMonitor
+- type: nvidia::gxf::JobStatistics
+  parameters:
+    clock: clock
+
+# Resources
+# GPU
+---
+# only the first will be added to default EntityGroup
+name: rootgraph_GPU_0
+components:
+- type: nvidia::gxf::GPUDevice
+  name: rootgraph_GPU_0
+  parameters:
+    dev_id: 0
+---
+name: rootgraph_GPU_1
+components:
+- type: nvidia::gxf::GPUDevice
+  name: rootgraph_GPU_1
+  parameters:
+    dev_id: 1
+---
+name: rootgraph_GPU_2
+components:
+- type: nvidia::gxf::GPUDevice
+  name: rootgraph_GPU_2
+  parameters:
+    dev_id: 2
+# CPU
+---
+# only the first will be added to default EntityGroup
+name: rootgraph_CPU_0
+components:
+- name: rootgraph_ThP_0
+  type: nvidia::gxf::ThreadPool
+---
+name: rootgraph_CPU_1
+components:
+- name: rootgraph_ThP_1
+  type: nvidia::gxf::ThreadPool
+---
+name: rootgraph_CPU_2
+components:
+- name: rootgraph_ThP_2
+  type: nvidia::gxf::ThreadPool
+# EntityGroups
+---
+EntityGroups:
+- name: rootgraph_EG_0
+  target:
+  - "message_generator"
+  - "rootgraph_GPU_1"
+  - "rootgraph_CPU_1"
+- name: rootgraph_EG_1
+  target:
+  - "message_sink"
+  - "test_subgraph.codelet2"  # overwrite test_subgraph.codelet2 resource
+  - "rootgraph_GPU_2"
+  - "rootgraph_CPU_2"

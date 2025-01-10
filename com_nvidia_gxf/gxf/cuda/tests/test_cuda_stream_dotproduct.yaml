@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2021 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2021-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -19,7 +19,6 @@ components:
 - name: stream_pool
   type: nvidia::gxf::CudaStreamPool
   parameters:
-    dev_id: 0
     stream_flags: 0
     stream_priority: 0
     reserved_size: 1
@@ -222,4 +221,8 @@ components:
 - type: nvidia::gxf::GreedyScheduler
   parameters:
     clock: clock
-    max_duration_ms: 1000
+    max_duration_ms: 6000
+- type: nvidia::gxf::JobStatistics
+  parameters:
+    clock: clock
+    codelet_statistics: true

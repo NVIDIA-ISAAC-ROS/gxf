@@ -44,6 +44,9 @@ for ARG in "$@"; do
   elif [ $ARG = "--compute-sanitizer" ]; then
     COMPUTE_SANITIZER=true
     continue
+  elif [ $ARG = "--valgrind" ]; then
+    VALGRIND=true
+    continue
   fi
   set -- "$@" "$ARG"
 done
@@ -84,6 +87,13 @@ elif [ $COMPUTE_SANITIZER ]; then
     EXECUTABLE_PATH="compute-sanitizer $EXECUTABLE_PATH"
   else
     echo "Could not find compute-sanitizer"
+    exit 1
+  fi
+elif [ $VALGRIND ]; then
+  if [ $(which valgrind) ]; then
+    EXECUTABLE_PATH="valgrind  --log-file=valgrind.log --error-limit=no --verbose $EXECUTABLE_PATH"
+  else
+    echo "Could not find valgrind"
     exit 1
   fi
 fi

@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2023, NVIDIA CORPORATION. All rights reserved.
+Copyright (c) 2023-2024, NVIDIA CORPORATION. All rights reserved.
 
 NVIDIA CORPORATION and its licensors retain all intellectual property
 and proprietary rights in and to this software, related documentation
@@ -11,11 +11,12 @@ license agreement from NVIDIA CORPORATION is strictly prohibited.
 
 #include <functional>
 #include <string>
+#include <thread>
 #include <utility>
 #include <vector>
 
+#include "gxf/core/parameter_parser_std.hpp"
 #include "gxf/std/gems/utils/time.hpp"
-#include "gxf/std/parameter_parser_std.hpp"
 
 namespace nvidia {
 namespace gxf {
@@ -109,6 +110,19 @@ gxf_result_t TcpCodelet::tick() {
     return GXF_SUCCESS;
   }
 
+  if (client_socket_.available()) {
+    auto result = client_socket_.receiveMessages(context(), entity_serializer_.get());
+    if (result) {
+      tx_messages_ = result.value();
+      last_msg_timestamp_ = std::chrono::steady_clock::now();
+    } else {
+      GXF_LOG_WARNING(
+          "Encountered error %s while deserializing message(s). Skipping message "
+          "deserialization.",
+          GxfResultStr(result.error()));
+    }
+  }
+
   // Send messages from receivers through socket
   for (Handle<Receiver> receiver : available_receivers_) {
     Expected<Entity> entity = receiver->receive();
@@ -177,19 +191,9 @@ Expected<void> TcpCodelet::monitor() {
       if (client_socket_.connected()) {
         // Reset connection attempts
         connection_attempts = 0;
-        // Read from socket, if available
+        // Schedule entity if socket has data available
         if (client_socket_.available()) {
-          auto result = client_socket_.receiveMessages(context(), entity_serializer_.get());
-          if (result) {
-            tx_messages_ = result.value();
-            last_msg_timestamp_ = std::chrono::steady_clock::now();
-            async_scheduling_term_->setEventState(AsynchronousEventState::EVENT_DONE);
-          } else {
-            GXF_LOG_WARNING(
-                "Encountered error %s while deserializing message(s). Skipping message "
-                "deserialization.",
-                GxfResultStr(result.error()));
-          }
+          async_scheduling_term_->setEventState(AsynchronousEventState::EVENT_DONE);
         }
         // Schedule entity if any receivers have data available
         for (Handle<Receiver> receiver : receivers_.get()) {

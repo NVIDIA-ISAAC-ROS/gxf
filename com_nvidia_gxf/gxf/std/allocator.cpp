@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2020-2023, NVIDIA CORPORATION. All rights reserved.
+Copyright (c) 2020-2024, NVIDIA CORPORATION. All rights reserved.
 
 NVIDIA CORPORATION and its licensors retain all intellectual property
 and proprietary rights in and to this software, related documentation
@@ -26,7 +26,9 @@ Expected<byte*> Allocator::allocate(uint64_t size, MemoryStorageType type) {
 
 // Frees the given memory block.
 Expected<void> Allocator::free(byte* pointer) {
-  return ExpectedOrCode(free_abi(static_cast<void*>(pointer)));
+  Expected<void> result =  ExpectedOrCode(free_abi(static_cast<void*>(pointer)));
+  GxfEntityNotifyEventType(context(), eid(), GXF_EVENT_MEMORY_FREE);
+  return result;
 }
 
 // Query block size of this allocator. Defaults to 1 for byte-based allocators.

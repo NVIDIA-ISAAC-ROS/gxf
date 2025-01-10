@@ -45,7 +45,7 @@ TEST(FirstFitAllocatorBase, acquire) {
   FirstFitAllocatorBase management;
   int size = kBufferSize;
   ASSERT_TRUE(management.allocate(size));
-  // Acquire all the available memory untill it's full
+  // Acquire all the available memory until it's full
   while (size) {
     int ss = rand()%std::min(size, 10101) + 1;
     size -= ss;

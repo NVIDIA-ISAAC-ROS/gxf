@@ -1,5 +1,5 @@
 """
- SPDX-FileCopyrightText: Copyright (c) 2020-2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ SPDX-FileCopyrightText: Copyright (c) 2020-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  SPDX-License-Identifier: Apache-2.0
 
  Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,8 +15,10 @@
  limitations under the License.
 """
 
-load("//engine/build/style:cpplint.bzl", "cpplint")
-load("//coverity/bazel:coverity.bzl", "coverity")
+load("@com_nvidia_gxf//bzl:docker.bzl", "gxf_docker_image")
+load("@com_nvidia_gxf//engine/build/style:cpplint.bzl", "cpplint")
+load("@com_nvidia_gxf//coverity/bazel:coverity.bzl", "coverity")
+load("@bazel_skylib//lib:new_sets.bzl", "sets")
 
 
 _gxf_tag = "gxf"
@@ -204,7 +206,7 @@ def nv_gxf_cc_extension(
         name = interface_lib_name,
         visibility = visibility,
         hdrs = hdrs + interfaces,
-        deps = deps + ext_deps,
+        deps = deps,
         **kwargs
     )
 
@@ -220,9 +222,12 @@ def nv_gxf_cc_extension(
     base_exts = [Label(_expand_extension(x)) for x in ext_deps]
     ext_dep_labels = [Label(_expand_extension_dep(x)) for x in ext_deps]
 
+    so_name = "libgxf_" + name + ".so"
+    kwargs["linkopts"] = kwargs.get("linkopts", []) + ["-Wl,-soname," + so_name]
+
     # Create the shared library for the module
     native.cc_binary(
-        name = "libgxf_" + name + ".so",
+        name = so_name,
         visibility = visibility,
         deps = deps + [source_lib_name],
         data = base_exts + data,
@@ -254,6 +259,7 @@ def _gxf_app_runscript_impl(ctx):
     graph_files = ctx.files.app_yaml_files
 
     ctx.actions.expand_template(
+        is_executable = True,
         template = ctx.file.template,
         output = ctx.outputs.out,
         substitutions = {
@@ -509,7 +515,7 @@ _nv_gxf_sub_graph = rule(
 )
 
 # A rule which creates a graph target that can be consumed by nv_gxf_app targets
-# These targets would be useful to create reuseable sub graphs
+# These targets would be useful to create reusable sub graphs
 # Note: This rule does not execute the graph itself.
 
 def nv_gxf_sub_graph(
@@ -518,7 +524,7 @@ def nv_gxf_sub_graph(
     data = [],
     extensions = []):
 
-    # Collect all extension depdencies
+    # Collect all extension dependencies
     # //gxf/foo:bar => //gxf/foo:foo_ext_deps
     ext_dep_labels = [Label(_expand_extension_dep(x)) for x in extensions]
     ext_labels = [Label(_expand_extension(x)) for x in extensions]
@@ -537,6 +543,22 @@ def nv_gxf_sub_graph(
         data = sub_graphs + ext_labels + ext_dep_labels + data,
         visibility = ["//visibility:public"],
     )
+
+# A macro to create a GXF test app
+#
+# A nv_gxf_test_app target is similar to a nv_gxf_app but it creates a
+# bazel "test" target instead of a "run" target.
+#
+# It consists of a GXF graph app yaml file along with a
+# list of extensions needed to run that app. The rule auto generates
+# a manifest file based on list of extensions provided and uses the
+# manifest + app yamls to execute the app with GXE binary. The transitive
+# dependecies of all the extensions are automatically recognized by the rule.
+# The app sources can be split across multiple files including parameter
+# files. Any sub graph and data dependecies for the app can be
+# specified explicitly with the corresponding arguments. A tar archive
+# of all the files needed to execute the app is also available with
+# target name same as the app's name with the '-pkg' suffix appended.
 
 def nv_gxf_test_app(
         name,
@@ -559,7 +581,7 @@ def nv_gxf_test_app(
         ext_name = x.name.split(".so")[0].split("libgxf_")[1]
         all_ext_deps.append(x.relative(ext_name + "_ext_deps"))
 
-    # Merge all extensions + merged subgraph list to create the finall app manifest
+    # Merge all extensions + merged subgraph list to create the final app manifest
     sub_graph_files = [Label(_expand_sub_graph_files(x)) for x in sub_graphs]
     nv_gxf_cc_prepare_extensions(manifest_target, manifest_filename, all_ext_deps, sub_graphs)
     ext_deps = [manifest_filename] + ext_labels + sub_graph_files
@@ -577,8 +599,10 @@ def nv_gxf_test_app(
         deps = deps,
     )
 
+    # Do not run nv_gxf_test_app targets on jetson since they are not supported yet.
+    # Adding "host" tag executes it only on x86 platform in CI
     native.sh_test(
-        tags = tags,
+        tags = tags + ["host"],
         name = name,
         srcs = [script],
         data = [
@@ -590,10 +614,41 @@ def nv_gxf_test_app(
     nv_gxf_pkg(
         name = name + "-pkg",
         srcs = [name],
+        data = ext_deps + data,
         visibility = ["//visibility:public"],
         tags = ["manual"],
         testonly = True,
     )
+
+# A macro to create a GXF app, optionally wrapped in a Docker container
+#
+# A GXF app target consists of a GXF graph app yaml file along with a
+# list of extensions needed to run that app. The rule auto generates
+# a manifest file based on list of extensions provided and uses the
+# manifest + app yamls to execute the app with GXE binary. The transitive
+# dependecies of all the extensions are automatically recognized by the rule.
+# The app sources can be split across multiple files including parameter
+# files. Any sub graph and data dependecies for the app can be
+# specified explicitly with the corresponding arguments. A tar archive
+# of all the files needed to execute the app is also available with
+# target name same as the app's name with the '-pkg' suffix appended.
+#
+# When a image target is provided in the docker_base_image argument,
+# then in addition to the regular binary and package build, a Docker
+# container containing this app will also be built. The name of the
+# Docker image target is the same as the app's name with the '-image'
+# suffix appended. A '-push' target will be provided that can be used
+# by calling it with `bazel run` to push the newly built containers to
+# NGC.
+#
+# The name of the image will be auto-generated from the target
+# name. If this is not desired, the docker_name argument can be
+# used to override the container name. However, manually specifying
+# the name is generally not recommended to avoid naming conflicts.
+#
+# Similarly, the registry can be changed from the default nvcr.io to a
+# custom target using the docker_registry argument. The default
+# tagging scheme can be changed using the docker_tag argument.
 
 def nv_gxf_app(
         name,
@@ -605,6 +660,11 @@ def nv_gxf_app(
         deps = [],
         tags = [],
         sub_graphs = [],
+        docker_base_image = "",
+        docker_registry = None,
+        docker_repository = None,
+        docker_name = None,
+        docker_tag = None,
         **kwargs):
     """
     Defines a default GXF application. The application depends on a couple of extensions and is
@@ -622,7 +682,7 @@ def nv_gxf_app(
         ext_name = x.name.split(".so")[0].split("libgxf_")[1]
         all_ext_deps.append(x.relative(ext_name + "_ext_deps"))
 
-    # Merge all extensions + merged subgraph list to create the finall app manifest
+    # Merge all extensions + merged subgraph list to create the final app manifest
     sub_graph_files = [Label(_expand_sub_graph_files(x)) for x in sub_graphs]
     nv_gxf_cc_prepare_extensions(manifest_target, manifest_filename, all_ext_deps, sub_graphs)
     ext_deps = [manifest_filename] + ext_labels + sub_graph_files
@@ -675,6 +735,140 @@ def nv_gxf_app(
             args = ["--run=false"],
             **kwargs
         )
+
+    gxf_docker_image(
+        name = name,
+        data = data,
+        tags = tags,
+        docker_base_image = docker_base_image,
+        docker_registry = docker_registry,
+        docker_repository = docker_repository,
+        docker_name = docker_name,
+        docker_tag = docker_tag,
+    )
+
+
+# A macro to create a GXF multi app, optionally wrapped in a Docker container
+#
+# It is used for apps that need multiple binaries to be executed in parallel
+# Individual app targets are passed in the "apps" argument along with the
+# required data dependencies
+#
+# When a image target is provided in the docker_base_image argument,
+# then in addition to the regular binary and package build, a Docker
+# container containing this app will also be built. The name of the
+# Docker image target is the same as the app's name with the '-image'
+# suffix appended. A '-push' target will be provided that can be used
+# by calling it with `bazel run` to push the newly built containers to
+# NGC.
+#
+# The name of the image will be auto-generated from the target
+# name. If this is not desired, the docker_name argument can be
+# used to override the container name. However, manually specifying
+# the name is generally not recommended to avoid naming conflicts.
+#
+# Similarly, the registry can be changed from the default nvcr.io to a
+# custom target using the docker_registry argument. The default
+# tagging scheme can be changed using the docker_tag argument.
+
+def nv_gxf_multi_app(
+    name,
+    apps,
+    data = [],
+    tags = [],
+    docker_base_image = "",
+    docker_registry = None,
+    docker_repository = None,
+    docker_name = None,
+    docker_tag = None,
+    **kwargs):
+
+    if type(apps) == type([]):
+        # If apps is a list we interpret it as a list of targets.
+        app_arg_dict = {"$(location " + app + ")": [] for app in apps}
+    elif type(apps) == type({}):
+        # If apps is a dict we interpret keys as targets and values as args for the target.
+        app_arg_dict = {"$(location " + app + ")": args for app, args in apps.items()}
+        apps = list(apps.keys())
+    else:
+        fail("Argument 'apps' should be either a dict or a list.")
+
+    args = ["'{}'".format(json.encode(app_arg_dict))]
+    unique_apps = sets.to_list(sets.make(apps))
+
+    native.py_binary(
+        name = name,
+        main = "//gxf:run_apps.py",
+        srcs = ["//gxf:run_apps.py"],
+        data = unique_apps + data,
+        args = args,
+        tags = tags + ["host"],
+        **kwargs
+    )
+
+    gxf_docker_image(
+        name = name,
+        data = data,
+        tags = tags,
+        docker_base_image = docker_base_image,
+        docker_registry = docker_registry,
+        docker_repository = docker_repository,
+        docker_name = docker_name,
+        docker_tag = docker_tag,
+    )
+
+# A macro to create a GXF multi test app, optionally wrapped in a Docker container
+#
+# It is used for test apps that need multiple binaries to be executed in
+# parallel individual app targets are passed in the "apps" argument along with the
+# required data dependencies
+#
+# When a image target is provided in the docker_base_image argument,
+# then in addition to the regular binary and package build, a Docker
+# container containing this app will also be built. The name of the
+# Docker image target is the same as the app's name with the '-image'
+# suffix appended. A '-push' target will be provided that can be used
+# by calling it with `bazel run` to push the newly built containers to
+# NGC.
+#
+# The name of the image will be auto-generated from the target
+# name. If this is not desired, the docker_name argument can be
+# used to override the container name. However, manually specifying
+# the name is generally not recommended to avoid naming conflicts.
+#
+# Similarly, the registry can be changed from the default nvcr.io to a
+# custom target using the docker_registry argument. The default
+# tagging scheme can be changed using the docker_tag argument.
+
+def nv_gxf_multi_test_app(
+    name,
+    apps,
+    data = [],
+    tags = [],
+    **kwargs):
+
+    if type(apps) == type([]):
+        # If apps is a list we interpret it as a list of targets.
+        app_arg_dict = {"$(location " + app + ")": [] for app in apps}
+    elif type(apps) == type({}):
+        # If apps is a dict we interpret keys as targets and values as args for the target.
+        app_arg_dict = {"$(location " + app + ")": args for app, args in apps.items()}
+        apps = list(apps.keys())
+    else:
+        fail("Argument 'apps' should be either a dict or a list.")
+
+    args = ["'{}'".format(json.encode(app_arg_dict))]
+    unique_apps = sets.to_list(sets.make(apps))
+
+    native.py_test(
+        name = name,
+        main = "//gxf:run_apps.py",
+        srcs = ["//gxf:run_apps.py"],
+        data = unique_apps + data,
+        args = args,
+        tags = tags + ["host"],
+        **kwargs
+    )
 
 def _nice_name(app):
     """ Gives a valid rule name for an app. Ex: my/foo/bar.yaml => my_foo_bar_yaml """
@@ -774,6 +968,139 @@ def nv_gxf_cc_prepare_extensions(manifest_target, manifest_filename, extensions=
         visibility = ["//visibility:public"],
     )
 
+# A macro to create a GXF CC app, optionally wrapped in a Docker container
+#
+# This rule is primarily used to create cpp src code based applications
+# It creates one cc_binary target from the given cpp src files
+#
+# When a image target is provided in the docker_base_image argument,
+# then in addition to the regular binary and package build, a Docker
+# container containing this app will also be built. The name of the
+# Docker image target is the same as the app's name with the '-image'
+# suffix appended. A '-push' target will be provided that can be used
+# by calling it with `bazel run` to push the newly built containers to
+# NGC.
+#
+# The name of the image will be auto-generated from the target
+# name. If this is not desired, the docker_name argument can be
+# used to override the container name. However, manually specifying
+# the name is generally not recommended to avoid naming conflicts.
+#
+# Similarly, the registry can be changed from the default nvcr.io to a
+# custom target using the docker_registry argument. The default
+# tagging scheme can be changed using the docker_tag argument.
+
+def nv_gxf_cc_app(
+    name,
+    srcs,
+    manifest = None,
+    extensions = [],
+    tags = [],
+    data = [],
+    docker_base_image = "",
+    docker_registry = None,
+    docker_repository = None,
+    docker_name = None,
+    docker_tag = None,
+     **kwargs):
+    """
+    Creates one cc_test target from the given cpp application file in `app_file`
+    The test is given the name provided in the `name`
+    """
+    manifest_target = "{}_manifest".format(name)
+    manifest_filename = "{}_manifest.yaml".format(name)
+    ext_labels = [Label(_expand_extension(x)) for x in extensions]
+
+    # Prepare list of base extension (direct dependencies) depset targets for all extensions
+    all_ext_deps = []
+    for x in ext_labels:
+        ext_name = x.name.split(".so")[0].split("libgxf_")[1]
+        all_ext_deps.append(x.relative(ext_name + "_ext_deps"))
+
+    nv_gxf_cc_prepare_extensions(manifest_target, manifest_filename, all_ext_deps)
+    ext_deps = [manifest_filename] + ext_labels
+
+    if manifest == None:
+        manifest = manifest_filename
+
+
+    if _has_code(srcs):
+        if _shall_lint(tags):
+            cpplint(name = name, srcs = srcs, tags = [_gxf_tag])
+
+    native.cc_binary(
+        name = name,
+        srcs = srcs,
+        tags = tags + [_gxf_tag],
+        visibility = ["//visibility:public"],
+        data = data + ext_deps,
+        **kwargs
+    )
+
+    nv_gxf_pkg(
+        name = name + "-pkg",
+        srcs = [name],
+        data = data + ext_deps,
+        visibility = ["//visibility:public"],
+        tags = ["manual"],
+    )
+
+    gxf_docker_image(
+        name = name,
+        data = data,
+        tags = tags,
+        docker_base_image = docker_base_image,
+        docker_registry = docker_registry,
+        docker_repository = docker_repository,
+        docker_name = docker_name,
+        docker_tag = docker_tag,
+    )
+
+def nv_gxf_cc_test(name, srcs, manifest = None, extensions = [], tags = [],
+                         data = [], **kwargs):
+    """
+    Creates one cc_test target from the given cpp application file in `app_file`
+    The test is given the name provided in the `name`
+    """
+
+    manifest_target = "{}_manifest".format(name)
+    manifest_filename = "{}_manifest.yaml".format(name)
+    ext_labels = [Label(_expand_extension(x)) for x in extensions]
+
+    # Prepare list of base extension (direct dependencies) depset targets for all extensions
+    all_ext_deps = []
+    for x in ext_labels:
+        ext_name = x.name.split(".so")[0].split("libgxf_")[1]
+        all_ext_deps.append(x.relative(ext_name + "_ext_deps"))
+
+    nv_gxf_cc_prepare_extensions(manifest_target, manifest_filename, all_ext_deps)
+    ext_deps = [manifest_filename] + ext_labels
+
+    if manifest == None:
+        manifest = manifest_filename
+
+    if _has_code(srcs):
+        if _shall_lint(tags):
+            cpplint(name = name, srcs = srcs, tags = [_gxf_tag])
+
+    native.cc_test(
+        name = name,
+        srcs = srcs,
+        tags = tags + [_gxf_tag],
+        visibility = ["//visibility:public"],
+        data = data + ext_deps,
+        **kwargs
+    )
+
+    nv_gxf_pkg(
+        name = name + "-pkg",
+        srcs = [name],
+        data = data + ext_deps,
+        visibility = ["//visibility:public"],
+        tags = ["manual"],
+        testonly = True,
+    )
+
 def nv_gxf_cc_test_group(name, apps, manifest_path_hack, manifest = None, extensions = [],
                          data = [], use_app_as_name = True, **kwargs):
     """
@@ -813,7 +1140,7 @@ def nv_gxf_cc_test_group(name, apps, manifest_path_hack, manifest = None, extens
         all_tests.append(app_name)
 
     nv_gxf_pkg(
-        name = name,
+        name = name + "-pkg",
         srcs = all_tests,
         testonly = True,
         tags = ["manual"],

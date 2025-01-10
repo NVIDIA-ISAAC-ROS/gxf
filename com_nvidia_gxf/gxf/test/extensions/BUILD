@@ -1,5 +1,5 @@
 """
- SPDX-FileCopyrightText: Copyright (c) 2020 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ SPDX-FileCopyrightText: Copyright (c) 2020-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  SPDX-License-Identifier: Apache-2.0
 
  Licensed under the Apache License, Version 2.0 (the "License");
@@ -57,9 +57,6 @@ nv_gxf_cc_library(
 nv_gxf_cc_library(
     name = "test_metric",
     hdrs = ["test_metric.hpp"],
-    deps = [
-        "@gtest//:main",
-    ],
 )
 
 exports_files(["LICENSE"])

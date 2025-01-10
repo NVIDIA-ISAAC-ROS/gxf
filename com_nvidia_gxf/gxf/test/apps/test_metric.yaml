@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2020-2021 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2020-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -27,36 +27,43 @@ components:
   parameters:
     lower_threshold: 49.4
     upper_threshold: 49.6
+    aggregation_policy: "mean"
 - name: sample_metric_rms
   type: nvidia::gxf::Metric
   parameters:
     lower_threshold: 57.300
     upper_threshold: 57.302
+    aggregation_policy: "root_mean_square"
 - name: sample_metric_abs_max
   type: nvidia::gxf::Metric
   parameters:
     lower_threshold: 98.0
     upper_threshold: 100.0
+    aggregation_policy: "abs_max"
 - name: sample_metric_max
   type: nvidia::gxf::Metric
   parameters:
     lower_threshold: 98.0
     upper_threshold: 100.0
+    aggregation_policy: "max"
 - name: sample_metric_min
   type: nvidia::gxf::Metric
   parameters:
     lower_threshold: 0.0
     upper_threshold: 0.1
+    aggregation_policy: "min"
 - name: sample_metric_sum
   type: nvidia::gxf::Metric
   parameters:
     lower_threshold: 4940
     upper_threshold: 4960
+    aggregation_policy: "sum"
 - name: sample_metric_fixed
   type: nvidia::gxf::Metric
   parameters:
     lower_threshold: 98.0
     upper_threshold: 100.0
+    aggregation_policy: "fixed"
 - name: sample_metric_fail_threshold
   type: nvidia::gxf::Metric
   parameters:

@@ -33,7 +33,7 @@ gxf_result_t PingRx::start() {
 
 gxf_result_t PingRx::tick() {
   auto message = signal_->receive();
-  GXF_LOG_DEBUG("Message Received: %d", this->count);
+  GXF_LOG_INFO("Message Received: %d", this->count);
   this->count = this->count + 1;
   if (!message || message.value().is_null()) {
     return GXF_CONTRACT_MESSAGE_NOT_AVAILABLE;

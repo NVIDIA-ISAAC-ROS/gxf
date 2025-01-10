@@ -44,6 +44,10 @@ nv_gxf_cc_extension(
     deps = [
         "test_stream_sync_cuda_helper",
         "//gxf/core:gxf",
+        "//gxf/std:tensor",
+        "//gxf/std:default_extension",
+        "//gxf/stream:stream_nvsci",
+        "//gxf/cuda",
     ],
     ext_deps = [
         "//gxf/std",

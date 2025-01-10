@@ -1,5 +1,5 @@
 #####################################################################################
-# Copyright (c) 2021, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2021-2023, NVIDIA CORPORATION. All rights reserved.
 
 # NVIDIA CORPORATION and its licensors retain all intellectual property
 # and proprietary rights in and to this software, related documentation
@@ -9,8 +9,7 @@
 #####################################################################################
 # Full GXF build environment for development activities.
 
-# this is the latest known good version from the 10.2-devel-ubuntu18.04 tag
-FROM nvcr.io/nvidia/l4t-base:r32.5.0
+FROM nvcr.io/nvidian/nvidia-aarch64-base:ubuntu22.04
 
 RUN apt update && DEBIAN_FRONTEND=noninteractive apt install -y python3-dev python3-pip zlib1g-dev curl git
 
@@ -19,7 +18,7 @@ ADD scripts/registry_requirements.txt engine/build/scripts/
 RUN python3 -m pip install --upgrade pip
 RUN python3 -m pip install -r engine/build/scripts/requirements.txt
 RUN python3 -m pip install -r engine/build/scripts/registry_requirements.txt
-RUN python3 -m pip install pyinstaller==4.3
+RUN python3 -m pip install pyinstaller==5.13.2
 
 # cupy for arm is not available from pypi yet. Install experimental wheels from cupy github repo.
 # See here - https://github.com/cupy/cupy/issues/3196

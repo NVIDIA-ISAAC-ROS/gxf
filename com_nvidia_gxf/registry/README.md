@@ -1,5 +1,5 @@
 
-Copyright (c) 2020-2022, NVIDIA CORPORATION. All rights reserved.
+Copyright (c) 2020-2024, NVIDIA CORPORATION. All rights reserved.
 
 NVIDIA Corporation and its licensors retain all intellectual property
 and proprietary rights in and to this software, related documentation
@@ -24,9 +24,10 @@ bazel run @com_nvidia_gxf//registry/cli:registry_cli -- repo clean
 ```
  Build and register all extensions and variants
 ```
-bazel build --config=x86_64_cuda_11_8
-bazel build --config=x86_64_cuda_12_1
-bazel build --config=jetpack51
+
+
+bazel build --config=x86_64_cuda_12_2
+
 ```
 
 List extensions

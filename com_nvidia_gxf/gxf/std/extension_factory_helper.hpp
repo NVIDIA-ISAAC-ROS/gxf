@@ -33,7 +33,7 @@
 //
 // Components can have at most one base class. Multiple base classes are not supported.
 //
-// Every component must be registered with a unique 128-bit identifier. The identifer must be
+// Every component must be registered with a unique 128-bit identifier. The identifier must be
 // unique across all existing extensions.
 //
 // Note that the extension factory can also be created manually without using these macros.

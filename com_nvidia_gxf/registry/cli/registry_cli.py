@@ -1,5 +1,5 @@
 #! /usr/env/python
-# Copyright (c) 2020-2023, NVIDIA CORPORATION.  All rights reserved.
+# Copyright (c) 2020-2024, NVIDIA CORPORATION.  All rights reserved.
 #
 # NVIDIA CORPORATION and its licensors retain all intellectual property
 # and proprietary rights in and to this software, related documentation
@@ -362,11 +362,11 @@ class GraphHandler:
         output_dp = self.get_elm_if_exist(args, "output_dir")
 
         if not archive_dp and not output_dp:
-            return Err("Atleast one option has to be selected amongst"
+            return Err("At least one option has to be selected amongst"
                        " --output-directory and --archive-dir-path ")
 
         if archive_dp is not None:
-            export_dp = self.replace_if_none(in_export_dp, "/opt/nvidia/nvgraph/")
+            export_dp = self.replace_if_none(in_export_dp, "/opt/nvidia/gxf/")
             result = self.registry.install_graph_with_archive(graph_files,
                                                               manifest_fp, archive_dp,
                                                               export_dp, target_fp)

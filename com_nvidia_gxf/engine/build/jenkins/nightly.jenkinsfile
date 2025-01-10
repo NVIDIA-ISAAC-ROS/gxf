@@ -1,0 +1,362 @@
+// GXF Nightly Pipeline
+//
+// Nightly automated builds for GXF
+// Runs every night and archives the resulting artifacts on the
+// binary storage
+//
+// Copyright (c) 2023-2024, NVIDIA CORPORATION. All rights reserved.
+//
+// NVIDIA CORPORATION and its licensors retain all intellectual property
+// and proprietary rights in and to this software, related documentation
+// and any modifications thereto. Any use, reproduction, disclosure or
+// distribution of this software and related documentation without an express
+// license agreement from NVIDIA CORPORATION is strictly prohibited.
+@Library('ci-groovkins-lib@5049eebe095b22f589cf601c8c508feda21313b7')
+
+import com.nvidia.isaac.ci.utils.WorkflowScriptUtil
+
+//  Pipeline specific configs
+env.REPO_NAME = 'gxf'
+String driver_version = '560.35.03'
+String build_folder = 'engine/build'
+String image_pull_secret = 'urm'
+String artifactory_secret = 'vault-artifactory'
+String enable_kaniko_cache = 'true'
+
+String jp_tag = 'jp-6.0'
+String jp_60_tag = 'jp-6.0 && 64GB'
+String jp_61_tag = 'jp-6.1'
+String jetpack_version = 'jetpack60'
+String jetpack_61_version = 'jetpack61'
+String driver_version_cuda_12_2 = '535.104.05'
+
+//  Base images
+String base_image_12_2 = ''
+String base_image_12_6 = ''
+String base_image_arm = ''
+String base_image_arm_61 = ''
+
+//  Remote Execution configs
+Boolean enable_re = false
+String re_config = '--config=remote_exec_rpt --remote_download_minimal --jobs=128'
+
+blossom.init()
+common.init()
+gxf.init()
+
+pipeline {
+    agent any
+    triggers { pollSCM(env.BRANCH_NAME == "master" || env.BRANCH_NAME == "release-3.1_lws2" ? "TZ=America/Los_Angeles\n0 19 * * 0-5" : "") }
+    parameters {
+        string(name: 'GERRIT_REFSPEC', defaultValue: 'refs/heads/master')
+        choice(name: 'BUILD_TYPE', choices: ['internal', 'public'])
+        booleanParam(name: 'DEBUG_GXF_CORE', defaultValue: true)
+        booleanParam(name: 'ENABLE_JETPACK', defaultValue: true)
+        booleanParam(name: 'ENABLE_COVERITY', defaultValue: true)
+        booleanParam(name: 'ENABLE_LWS', defaultValue: false)
+        booleanParam(name: 'ENABLE_CODE_COVERAGE', defaultValue: true)
+        booleanParam(name: 'ENABLE_DEBUG_BUILD', defaultValue: true)
+    }
+    stages {
+        stage('Environment setup') { steps { script {
+            blossom.run_container("${env.DOCKER_BASE}/gxf-development-build-checker:shared", image_pull_secret) {
+                setup_environment()
+                if (!enable_re) { re_config = '' }
+            }
+        }}}
+        stage('Build Base Images') {
+            steps { script {
+                parallel(
+                'X86-CUDA-12.2': {
+                    base_image_12_2 = "${env.DOCKER_BASE}/${env.IMAGE_PREFIX}-x86_64_cuda_12_2:${env.BUILD_NUMBER}-ci"
+                    blossom.build_image("${build_folder}/docker/cuda12_2.dockerfile", build_folder, base_image_12_2, enable_kaniko_cache)
+                },
+                'X86-CUDA-12.6': {
+                    base_image_12_6 = "${env.DOCKER_BASE}/${env.IMAGE_PREFIX}-x86_64_cuda_12_6:${env.BUILD_NUMBER}-ci"
+                    blossom.build_image("${build_folder}/docker/cuda12_6.dockerfile", build_folder, base_image_12_6, enable_kaniko_cache)
+                },
+                'ARM': {
+                    base_image_arm = "${env.DOCKER_BASE}/${env.IMAGE_PREFIX}-arm:${env.BUILD_NUMBER}-ci"
+                    blossom.run_on_static_node(jp_tag) {
+                        checkout scm
+                        withCredentials([
+                            usernamePassword(credentialsId: 'vault-ngc', usernameVariable: 'NGC_USERNAME', passwordVariable: 'NGC_PASSWORD'),
+                            usernamePassword(credentialsId: 'vault-artifactory', usernameVariable: 'URM_USERNAME', passwordVariable: 'URM_PASSWORD')
+                            ]) {
+                            sh  "docker login -u '${NGC_USERNAME}' -p ${NGC_PASSWORD} nvcr.io"
+                            sh "docker login -u '${URM_USERNAME}' -p ${URM_PASSWORD} urm.nvidia.com"
+                        }
+                        common.docker_login('vault-artifactory', 'urm.nvidia.com')
+                        sh "docker build -t ${base_image_arm} -f ${build_folder}/docker/arm64/jp60.dockerfile ${build_folder} && docker push ${base_image_arm}"
+                    }
+                },
+                'ARM61': {
+                    base_image_arm_61 = "${env.DOCKER_BASE}/${env.IMAGE_PREFIX}-arm61:${env.BUILD_NUMBER}-ci"
+                    blossom.run_on_static_node(jp_tag) {
+                        checkout scm
+                        withCredentials([
+                            usernamePassword(credentialsId: 'vault-ngc', usernameVariable: 'NGC_USERNAME', passwordVariable: 'NGC_PASSWORD'),
+                            usernamePassword(credentialsId: 'vault-artifactory', usernameVariable: 'URM_USERNAME', passwordVariable: 'URM_PASSWORD')
+                            ]) {
+                            sh  "docker login -u '${NGC_USERNAME}' -p ${NGC_PASSWORD} nvcr.io"
+                            sh "docker login -u '${URM_USERNAME}' -p ${URM_PASSWORD} urm.nvidia.com"
+                        }
+                        common.docker_login('vault-artifactory', 'urm.nvidia.com')
+                        sh "docker build -t ${base_image_arm_61} -f ${build_folder}/docker/arm64/jp61.dockerfile ${build_folder} && docker push ${base_image_arm_61}"
+                    }
+                })
+            }}
+        }
+        stage('Parallel Stages') { steps { script {
+            parallel(
+            'Debug Build': {
+                if (params.ENABLE_DEBUG_BUILD == true) {
+                    catchError(buildResult: 'FAILURE', stageResult: 'FAILURE') {
+                        blossom.run_container(base_image_12_2, image_pull_secret, driver_version_cuda_12_2) {
+                            String config = '--config=debug'
+                            def cpu_cores = blossom.get_cpu_cores()
+                            common.bazel_build("${config} ${re_config}", cpu_cores)
+                        }
+                    }
+                }
+            },
+            'Build Jetpack60': {
+                if (params.ENABLE_JETPACK) {
+                    blossom.run_container(base_image_12_2, image_pull_secret) {
+                        checkout scm
+                        def cpu_cores = blossom.get_cpu_cores()
+                        common.bazel_limit_cpu_usage(cpu_cores)
+                        gxf.upload_tests('engine/build/scripts/build_upload_tests.sh', 'jetpack60', artifactory_secret)
+                    }
+                }
+            },
+            'Build Jetpack61': {
+                if (params.ENABLE_JETPACK) {
+                    blossom.run_container(base_image_12_6, image_pull_secret) {
+                        checkout scm
+                        def cpu_cores = blossom.get_cpu_cores()
+                        common.bazel_limit_cpu_usage(cpu_cores)
+                        gxf.upload_tests('engine/build/scripts/build_upload_tests.sh', 'jetpack61', artifactory_secret)
+                    }
+                }
+            },
+            'Release Packages': {
+                blossom.run_container(base_image_12_6, image_pull_secret, driver_version) {
+                    checkout scm
+                    check_apply_release_patch()
+                    bazel_build_documentation()
+                    build_gxf_release_package('release/tarball_content.yaml', env.OUTPUT_TARBALL_NAME, env.OUTPUT_DIR_NAME)
+                    deploy_release_builds()
+                    test_gxf_release_package()
+                }
+            },
+            'Coverity': {
+                if (params.ENABLE_COVERITY) {
+                    blossom.run_container(base_image_12_6, image_pull_secret, '20000m', '50Gi', '100Gi') {
+                        gxf.runCoverity(
+                                        config = "",
+                                        url = "https://urm.nvidia.com/artifactory/sw-isaac-gxf-generic-local/dependencies/internal/coverity/",
+                                        packageName = "coverity-2022.12.0.tar.xz",
+                                        certificate = "coverity-certificate",
+                                        binaryPath = "Linux64/bin",
+                                        configPath = "execroot/com_nvidia_gxf/coverity/config/coverity_config.xml",
+                                        rulesetPath = "execroot/com_nvidia_gxf/coverity/ruleset/autosarcpp14-required-only.config",
+                                        reportUrl = "commit://reporter:coverity@ipp-coverity-10:9090",
+                                        tag = "GXF_master",
+                                        reportName = "${env.REPO_NAME}-${env.BRANCH_NAME}-nightly-build-${env.BUILD_NUMBER}"
+                                    )
+                    }
+                }
+            },
+            'Code Coverage': {
+                if (params.ENABLE_CODE_COVERAGE) {
+                    blossom.run_container(base_image_12_6, image_pull_secret, driver_version,
+                                            '20000m', '50Gi', '100Gi') {
+                        checkout scm
+                        codecoverage.generateReport("GXF Core")
+                    }
+                }
+            })
+        }}}
+        stage('Jetpack Tests') { steps { script {
+            if (params.ENABLE_JETPACK) {
+                parallel(
+                blossom.run_on_static_node(jp_60_tag) {
+                    checkout scm
+                    gxf.run_tests_on_jetson(base_image_arm, jetpack_version, artifactory_secret, '')
+                },
+                blossom.run_on_static_node(jp_61_tag) {
+                    checkout scm
+                    gxf.run_tests_on_jetson(base_image_arm_61, jetpack_61_version, artifactory_secret, '')
+                })
+            }
+        }}}
+        stage('Deploy') { steps { script {
+            blossom.run_container(base_image_12_6, image_pull_secret) {
+                common.safe_unstash(env.ARTIFACT_GXF_PACKAGE, env.OUTPUT_TARBALL_NAME)
+                def src_gxf_core = env.OUTPUT_TARBALL_NAME
+                def dst_gxf_core = make_package_name('gxf_core', 'any', 'any')
+                send_file(src_gxf_core, dst_gxf_core)
+
+                common.safe_unstash(env.ARTIFACT_GXF_DOC, env.GXF_DOC_TARBALL_NAME)
+                def src_gxf_core_doc = env.GXF_DOC_TARBALL_NAME
+                def dst_gxf_core_doc = make_package_name('gxf_core-docs', 'any', 'any')
+                send_file(src_gxf_core_doc, dst_gxf_core_doc)
+            }
+        }}}
+        stage('Artifactory Cleanup') { steps { script {
+            blossom.run_container(base_image_12_6, image_pull_secret) {
+                gxf.artifactory_cleanup()
+            }
+        }}}
+    }
+    post { always { script {
+        common.post_actions_nightly(env.CRON_STRING, env.GIT_HASH_PATH, env.TEAM, env.ARTIFACTORY_ENDPOINT, env.SUCCESS_EMAIL_RECIPIENT, env.FAILURE_EMAIL_RECIPIENT)
+    }}}
+}
+
+void send_file(String src, String dst) {
+    def vault_secret = [
+      [path: '/secrets/artifactory', engineVersion: 1, secretValues: [
+          [envVar: 'ISAAC_ARTIFACTORY_KEY', vaultKey: 'key']]]
+      ]
+    withVault([vaultSecrets: vault_secret]) {
+        def build_metadata = [
+            "arch=any",
+            "commit_id=${env.GIT_COMMIT_ID}",
+            "component_name=gxf-core",
+            "distro=ubuntu22.04",
+            "os=linux",
+            "version=${env.BRANCH_NAME}.${env.BUILD_NUMBER}",
+            "branch=${env.BRANCH_NAME}"
+        ]
+        if (params.ENABLE_LWS) {
+            build_metadata.add("lws_major_version=2")
+            build_metadata.add("lws_version=0.0.0")
+        } else {
+            build_metadata.add("build_number=${env.BUILD_NUMBER}")
+            build_metadata.add("build_url=${env.RUN_DISPLAY_URL}")
+        }
+        def build_metadata_str = build_metadata.join(';')
+        def headers = "'X-JFrog-Art-Api:${ISAAC_ARTIFACTORY_KEY}'"
+        sh "curl -H ${headers} -T ${src} \"${env.ARTIFACTORY_ENDPOINT}/${dst};${build_metadata_str}\""
+    }
+}
+
+void check_apply_release_patch() {
+    if (params.BUILD_TYPE == 'public') {
+        sh 'git apply release/patch/release_build.patch'
+    }
+}
+
+def make_package_name(String name, String os, String arch) {
+    def utcdate = new Date().format('yyyyMMdd', TimeZone.getTimeZone('UTC'))
+    def final_name = "${name}-${os}-${arch}-${env.BRANCH_NAME}.${env.BUILD_VERSION}_${utcdate}_${env.GIT_COMMIT_ID}_${params.BUILD_TYPE}.tar"
+    return final_name
+}
+
+void skip_extn_registration() {
+    sh 'echo build --define=register_extensions=False >> ~/.bazelrc'
+}
+
+void copy_and_stash(String src, String dst, String artifact_name) {
+    sh "cp -f ${src} ${dst}"
+    common.safe_stash(artifact_name, dst)
+}
+
+void bazel_build_documentation() {
+    def cpu_cores = blossom.get_cpu_cores()
+    sh "bazel build //doc:doc --define skip_doc=false --local_cpu_resources=${cpu_cores}"
+    copy_and_stash(env.GXF_DOC_TAR, env.GXF_DOC_TARBALL_NAME, env.ARTIFACT_GXF_DOC)
+}
+
+void run_jetson_tests(String jp_version) {
+    sh 'rm -rf jetson_testlog'
+    sh 'chmod +x engine/build/scripts/download_run_tests.sh'
+    sh "./engine/build/scripts/download_run_tests.sh \
+        u$ARTIFACTORY_USER $ARTIFACTORY_PASS ${env.ARTIFACTORY_JETSON}/${env.BUILD_NUMBER}-${jp_version} \
+        ${env.BUILD_NUMBER}-${jp_version}"
+}
+
+void report_test_results_jetson() {
+    String tag = UUID.randomUUID()
+    sh "cp -r jetson_artifactory/jetson_testlog $WORKSPACE/jetson_testlog-${tag}"
+    archiveArtifacts artifacts: "jetson_testlog-${tag}/**/*.xml"
+    junit testResults: "jetson_testlog-${tag}/**/*.xml",
+        allowEmptyResults: true
+}
+
+void build_gxf_release_package(String config, String output_file, String output_folder) {
+    def cpu_cores = blossom.get_cpu_cores()
+    common.bazel_limit_cpu_usage(cpu_cores)
+    sh "python3 release/make_tarball.py ${config} ${output_file} ${output_folder}"
+}
+
+void deploy_release_builds() {
+    // Deploy gxf core release package builds which can be used to debug build failures
+    if (params.DEBUG_GXF_CORE == true) {
+        def src_gxf_core = env.OUTPUT_TARBALL_NAME
+        def dst_gxf_core = make_package_name('testing-gxf_core', 'any', 'any')
+        send_file(src_gxf_core, dst_gxf_core)
+    }
+    common.safe_stash(env.ARTIFACT_GXF_PACKAGE, env.OUTPUT_TARBALL_NAME)
+}
+
+void test_gxf_release_package() {
+    def cpu_cores = blossom.get_cpu_cores()
+    common.bazel_limit_cpu_usage(cpu_cores)
+    common.safe_unstash(env.ARTIFACT_GXF_PACKAGE, env.OUTPUT_TARBALL_NAME)
+    sh 'mkdir -p /tmp/testing_tarball'
+    sh "cp ${env.OUTPUT_TARBALL_NAME} /tmp/testing_tarball"
+    sh "cd /tmp/testing_tarball && tar xf ${env.OUTPUT_TARBALL_NAME}"
+    sh """cd /tmp/testing_tarball/${env.OUTPUT_DIR_NAME} &&
+          bazel build --local_cpu_resources=${cpu_cores} ... &&
+          bazel test --local_cpu_resources=${cpu_cores} ... &&
+          bazel build --local_cpu_resources=${cpu_cores} --config=jetpack61 ...
+       """
+}
+
+void setup_environment() {
+    checkout scm
+    blossom.add_safe_directory()
+    //  Email recipients
+    env.FAILURE_EMAIL_RECIPIENT = 'isacc-sdk-ci@exchange.nvidia.com;chandrahasj@nvidia.com;yongchangl@nvidia.com\
+            deepstream-next-sqa@exchange.nvidia.com;gxf-qa-extended@exchange.nvidia.com;pgaikwad@nvidia.com;jrao@nvidia.com'
+    env.SUCCESS_EMAIL_RECIPIENT = 'isaac-sdk-ci-notifications@exchange.nvidia.com;chandrahasj@nvidia.com;yongchangl@nvidia.com\
+            deepstream-next-sqa@exchange.nvidia.com;gxf-qa-extended@exchange.nvidia.com;pgaikwad@nvidia.com;jrao@nvidia.com'
+    //  Set branch name to 'verification' if it's triggered by a test run
+    if (env.BRANCH_NAME == null) {
+        env.BRANCH_NAME = 'verification'
+        env.FAILURE_EMAIL_RECIPIENT = sh(script: 'git show -s --format=%ae', returnStdout: true).trim()
+        env.SUCCESS_EMAIL_RECIPIENT = env.FAILURE_EMAIL_RECIPIENT
+    }
+    //  Get git commit id
+    env.GIT_COMMIT_ID = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
+    //  Directories
+    env.OUTPUT_DIR_NAME = "/tmp/gxf-${env.BRANCH_NAME}-release"
+    env.OUTPUT_DIR_DOC_NAME = "gxf-doc-${env.BRANCH_NAME}-release"
+    env.OUTPUT_TARBALL_NAME = "gxf-${env.BRANCH_NAME}-release.tar"
+    env.GXF_DOC_TARBALL_NAME = "${env.OUTPUT_DIR_DOC_NAME}.tar"
+    //  Build version and artifacts
+    if (params.ENABLE_LWS) {
+        // LWS build version
+        env.LWS_MAJOR_VERSION = '0'
+        env.LWS_MINOR_VERSION = '1'
+        env.BUILD_VERSION = "${env.LWS_MAJOR_VERSION}.${env.LWS_MINOR_VERSION}.${env.BUILD_NUMBER}"
+        env.ARTIFACTORY_ENDPOINT = "${env.ARTIFACTORY_URL_BASE}/sw-ipp-lws2-internal-generic-local/gxf/${env.BRANCH_NAME}/any-any"
+    } else {
+        env.BUILD_VERSION = "${env.BUILD_NUMBER}"
+        env.ARTIFACTORY_ENDPOINT = "${env.ARTIFACTORY_URL_BASE}/${env.ARTIFACTORY_REPO}/nightly/${env.BRANCH_NAME}"
+    }
+    env.ARTIFACTORY_JETSON = "${env.ARTIFACTORY_URL_BASE}/${env.ARTIFACTORY_REPO}/nightly/${env.BRANCH_NAME}/jetson_tests"
+    env.ARTIFACT_GXF_DOC = 'artifact-gxf-doc'
+    env.ARTIFACT_GXF_PACKAGE = 'gxf-release-pkg-tarball'
+    env.GIT_HASH_PATH = "${env.ARTIFACTORY_URL_BASE}/${env.ARTIFACTORY_REPO}/nightly/git_hash/${env.JOB_NAME}/${env.BRANCH_NAME}/last_successful_git_hash"
+    //  Bazel build files
+    env.BAZEL_OUTPUT_ROOT_DOC = 'bazel-bin/doc/'
+    env.GXF_DOC_TAR = "${env.BAZEL_OUTPUT_ROOT_DOC}/gxf.tar.gz"
+    env.NEXT_BUILD_TIME = ''
+    env.GIT_CHANGELOG = 'No change since last successful build'
+    //  Get and set git commit information including Git hash
+    common.get_commit_information()
+}

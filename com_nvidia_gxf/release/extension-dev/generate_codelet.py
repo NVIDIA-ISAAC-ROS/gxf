@@ -1,7 +1,7 @@
 # /usr/bin/env python3
 
 ################################################################################
-# SPDX-FileCopyrightText: Copyright (c) 2021-2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2021-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -36,6 +36,9 @@ build --action_env=target_platform="x86_64"
 build:x86_64 --define=target_platform=x86_64
 build:x86_64 --action_env=target_platform="x86_64"
 
+build:x86_64_rhel9 --define=target_platform=x86_64_rhel9
+build:x86_64_rhel9 --action_env=target_platform="x86_64_rhel9"
+
 build:jetson --cpu=aarch64
 build:jetson --define=target_platform=jetson
 build:jetson --action_env=target_platform="jetson"
@@ -66,23 +69,36 @@ load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 
 toolchain_configure(name = "toolchain")
 
-new_git_repository(
+# Package created from - https://github.com/jbeder/yaml-cpp.git
+# commit = "9a3624205e8774953ef18f57067b3426c1c5ada6"
+http_archive(
     name = "yaml-cpp",
     build_file = "@com_extension_dev//build:third_party/yaml-cpp.BUILD",
-    commit = "9a3624205e8774953ef18f57067b3426c1c5ada6",
-    remote = "https://github.com/jbeder/yaml-cpp.git",
-    shallow_since = "1569430560 -0700",
+    strip_prefix = "yaml-cpp-9a3624205e8774953ef18f57067b3426c1c5ada6",
+    url = "https://urm.nvidia.com/artifactory/sw-isaac-gxf-generic-local/dependencies/external/yaml-cpp/9a3624205e8774953ef18f57067b3426c1c5ada6.tar.gz",
+    sha256 = "e39f54bd2927692603378e373009e56b4891701cee8af7c27370c36978a43ffa",
+    type = "tar.gz",
 )
 
+# Package created from - https://github.com/bazelbuild/rules_python
+# version - 0.1.0
 http_archive(
     name = "rules_python",
-    url = "https://github.com/bazelbuild/rules_python/releases/download/0.1.0/rules_python-0.1.0.tar.gz",
+    url = "https://urm.nvidia.com/artifactory/sw-isaac-gxf-generic-local/dependencies/external/bazelbuild/rules_python/rules_python-0.1.0.tar.gz",
     sha256 = "b6d46438523a3ec0f3cead544190ee13223a52f6a6765a29eae7b7cc24cc83a0",
+)
+
+# Package created from - https://github.com/Neargye/magic_enum
+# version - 0.9.3
+http_archive(
+    name = "magic_enum",
+    strip_prefix = "magic_enum-0.9.3",
+    urls = ["https://urm.nvidia.com/artifactory/sw-isaac-gxf-generic-local/dependencies/external/magic_enum/v0.9.3.zip"],
 )
 
 graph_nvidia_extension(
     name = "StandardExtension",
-    version = "2.3.0",
+    version = "2.6.0",
 )
   """.format(args.extn_name)
   with open(os.path.abspath("{0}/{1}/WORKSPACE".format(args.output_dir, args.extn_name)),'w') as file:
@@ -213,9 +229,8 @@ register_extension(
         "nvidia",
         "gpu",
     ],
-    license_file = ":LICENSE",
     ngc_dependencies = {{
-        "StandardExtension": "2.3.0",
+        "StandardExtension": "2.6.0",
     }},
     priority = "1",
     git_repository = "",

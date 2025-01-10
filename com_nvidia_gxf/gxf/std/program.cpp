@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2021-2023, NVIDIA CORPORATION. All rights reserved.
+Copyright (c) 2021-2024, NVIDIA CORPORATION. All rights reserved.
 
 NVIDIA CORPORATION and its licensors retain all intellectual property
 and proprietary rights in and to this software, related documentation
@@ -40,7 +40,7 @@ Program::Program() {
 
 Expected<void> Program::setup(gxf_context_t context, EntityWarden* warden,
                               EntityExecutor* executor,
-                              ParameterStorage* parameter_storage) {
+                              std::shared_ptr<ParameterStorage> parameter_storage) {
   if (context == nullptr) { return Unexpected{GXF_ARGUMENT_NULL}; }
   if (warden == nullptr) { return Unexpected{GXF_ARGUMENT_NULL}; }
   if (executor == nullptr) { return Unexpected{GXF_ARGUMENT_NULL}; }
@@ -56,9 +56,9 @@ Expected<void> Program::setup(gxf_context_t context, EntityWarden* warden,
   return Success;
 }
 
-Expected<void> Program::addEntity(gxf_uid_t eid) {
+Expected<void> Program::addEntity(gxf_uid_t eid, EntityItem* item_ptr) {
   std::lock_guard<std::recursive_mutex> lock(entity_mutex_);
-  auto maybe = Entity::Shared(context_, eid);
+  auto maybe = Entity::Shared(context_, eid, item_ptr);
   if (!maybe) { return ForwardError(maybe); }
 
   // Entity is unscheduled when it's created
@@ -85,36 +85,42 @@ Expected<void> Program::activate() {
 
   // Sort entities based on their components so they can
   // be activated in order
-  FixedVector<Entity, kMaxEntities> graph_entities;
-  FixedVector<Entity, kMaxEntities> connection_entities;
-  FixedVector<Entity, kMaxEntities> system_entities;
-  FixedVector<Entity, kMaxEntities> router_entities;
-  FixedVector<Entity, kMaxEntities> network_context_entities;
+  FixedVector<Entity> graph_entities;
+  FixedVector<Entity> connection_entities;
+  FixedVector<Entity> system_entities;
+  FixedVector<Entity> router_entities;
+  FixedVector<Entity> network_context_entities;
+
+  graph_entities.reserve(kMaxEntities);
+  connection_entities.reserve(kMaxEntities);
+  system_entities.reserve(kMaxEntities);
+  router_entities.reserve(kMaxEntities);
+  network_context_entities.reserve(kMaxEntities);
 
   for (size_t i = 0; i < unscheduled_entities_.size(); ++i) {
     const gxf_uid_t eid = unscheduled_entities_.at(i).value().eid();
     Expected<Entity> maybe = Entity::Shared(context_, eid);
     if (!maybe) {
       const char* name = "UNKNOWN";
-      GxfParameterGetStr(context_, eid, kInternalNameParameterKey, &name);
-      GXF_LOG_ERROR("Failed to create shared entity from unscheduled entity with eid"
-                    " %05zu named %s", eid, name);
+      GxfEntityGetName(context_, eid, &name);
+      GXF_LOG_ERROR("Failed to create shared entity from unscheduled entity "
+                    "with eid %05zu named %s", eid, name);
       return ForwardError(maybe);
     }
     auto entity = maybe.value();
-    auto systems = entity.findAll<System>();
+    auto systems = entity.findAllHeap<System>();
     if (!systems) {
       return ForwardError(systems);
     }
-    auto connections = entity.findAll<Connection>();
+    auto connections = entity.findAllHeap<Connection>();
     if (!connections) {
       return ForwardError(connections);
     }
-    auto routers = entity.findAll<Router>();
+    auto routers = entity.findAllHeap<Router>();
     if (!routers) {
       return ForwardError(routers);
     }
-    auto network_contexts = entity.findAll<NetworkContext>();
+    auto network_contexts = entity.findAllHeap<NetworkContext>();
     if (!network_contexts) {
       return ForwardError(network_contexts);
     }
@@ -200,6 +206,36 @@ Expected<void> Program::activate() {
      return ForwardError(result);
   }
 
+  for (const auto& entity : router_entities) {
+    // Find all routers
+    auto routers = entity->findAllHeap<Router>();
+    if (!routers) { return ForwardError(routers); }
+    for (auto router : routers.value()) {
+      if (!router) {
+        GXF_LOG_ERROR("Found a bad router component while scheduling entity %s", entity->name());
+        return Unexpected{GXF_FAILURE};
+      }
+      auto result = router_group_->addRouter(router.value());
+      if (!result) { return ForwardError(result); }
+    }
+  }
+  // Add network context to router
+  for (size_t i = 0; i < unscheduled_entities_.size(); i++) {
+    const gxf_uid_t eid = unscheduled_entities_.at(i)->eid();
+    const auto maybe_entity = Entity::Shared(context_, eid);
+    if (!maybe_entity) { ForwardError(maybe_entity); }
+    auto network_contexts = maybe_entity->findAllHeap<NetworkContext>();
+    for (auto context : network_contexts.value()) {
+      if (context) {
+        router_group_->addNetworkContext(context.value());
+      }
+    }
+  }
+
+  // add message routes from all entities
+  const auto add_routes_result = addRoutes(unscheduled_entities_);
+  if (!add_routes_result) { return add_routes_result; }
+
   // initialize the entity executor with the routers
   entity_executor_->initialize(router_group_, message_router, network_router);
 
@@ -226,13 +262,30 @@ Expected<void> Program::activate() {
   return Success;
 }
 
-Expected<void> Program::activateEntities(FixedVector<Entity, kMaxEntities> entities) {
+Expected<void> Program::addRoutes(const FixedVector<Entity>& entities) {
+  for (size_t i = 0; i < entities.size(); i++) {
+    const gxf_uid_t eid = entities.at(i)->eid();
+    const auto maybe_entity = Entity::Shared(context_, eid);
+    if (!maybe_entity) { ForwardError(maybe_entity); }
+    const auto add_route_result = router_group_->addRoutes(maybe_entity.value());
+    if (!add_route_result) {
+      GXF_LOG_ERROR("Failed to activate entity %s.", maybe_entity.value().name());
+      GXF_LOG_ERROR("Deactivating...");
+      const auto deactivate_result = deactivate();
+      if (!deactivate_result) { GXF_LOG_ERROR("Deactivation failed."); }
+      return deactivate_result;
+    }
+  }
+  return Success;
+}
+
+Expected<void> Program::activateEntities(FixedVector<Entity> entities) {
   for (size_t i = 0; i < entities.size(); i++) {
     const gxf_uid_t eid = entities.at(i)->eid();
     const gxf_result_t code = GxfEntityActivate(context_, eid);
     if (code != GXF_SUCCESS) {
       const char* entityName = "UNKNOWN";
-      GxfParameterGetStr(context_, eid, kInternalNameParameterKey, &entityName);
+      GxfEntityGetName(context_, eid, &entityName);
       GXF_LOG_ERROR("Failed to activate entity %05zu named %s: %s",
         eid, entityName, GxfResultStr(code));
       GXF_LOG_ERROR("Deactivating...");
@@ -245,13 +298,13 @@ Expected<void> Program::activateEntities(FixedVector<Entity, kMaxEntities> entit
   return Success;
 }
 
-Expected<void> Program::preActivateEntities(const FixedVector<Entity, kMaxEntities>& entities) {
+Expected<void> Program::preActivateEntities(const FixedVector<Entity>& entities) {
   for (size_t i = 0; i < entities.size(); i++) {
     const gxf_uid_t eid = entities.at(i)->eid();
     const gxf_result_t code = entity_warden_->populateResourcesToEntityGroup(context_, eid);
     if (code != GXF_SUCCESS) {
       const char* entityName = "UNKNOWN";
-      GxfParameterGetStr(context_, eid, kInternalNameParameterKey, &entityName);
+      GxfEntityGetName(context_, eid, &entityName);
       GXF_LOG_ERROR(
         "Failed to populate resources from entity %05zu named %s to its EntityGroup: %s",
         eid, entityName, GxfResultStr(code));
@@ -302,7 +355,7 @@ Expected<void> Program::scheduleEntity(gxf_uid_t eid) {
   if (!is_schedulable) { return Success; }
 
   // Find all systems
-  auto systems = entity.findAll<System>();
+  auto systems = entity.findAllHeap<System>();
   if (!systems) {
     return ForwardError(systems);
   }
@@ -315,52 +368,23 @@ Expected<void> Program::scheduleEntity(gxf_uid_t eid) {
     if (!result) { return ForwardError(result); }
   }
 
-  // Find all routers
-  auto routers = entity.findAll<Router>();
-  if (!routers) {
-    return ForwardError(routers);
-  }
-  for (auto router : routers.value()) {
-    if (!router) {
-      GXF_LOG_ERROR("Found a bad router component while scheduling entity %s", entity.name());
-      return Unexpected{GXF_FAILURE};
-    }
-    auto result = router_group_->addRouter(router.value());
-    if (!result) { return ForwardError(result); }
-  }
-  // Add network context to router
-  auto network_contexts = entity.findAll<NetworkContext>();
-  for (auto context : network_contexts.value()) {
-    if (context) {
-      router_group_->addNetworkContext(context.value());
-    }
-  }
-  // Register entity with all routers
-  const Expected<void> result = router_group_->addRoutes(entity);
-  if (!result) { return ForwardError(result); }
-
   // Offer entity executor to all the schedulers
-  auto schedulers = entity.findAll<Scheduler>();
-  if (!schedulers) {
-    return ForwardError(schedulers);
-  }
+  auto schedulers = entity.findAllHeap<Scheduler>();
+  if (!schedulers) { return ForwardError(schedulers); }
   for (auto scheduler : schedulers.value()) {
     if (!scheduler) {
       GXF_LOG_ERROR("Found a bad scheduler component while scheduling entity %s", entity.name());
       return Unexpected{GXF_FAILURE};
     }
 
-    gxf_result_t code;
-
-    code = scheduler.value()->prepare_abi(entity_executor_);
-
+    const gxf_result_t code = scheduler.value()->prepare_abi(entity_executor_);
     if (code != GXF_SUCCESS) { return Unexpected{code}; }
   }
   // Keep track of entities with schedulers
   if (!schedulers->empty()) { schedulers_.insert(eid); }
 
   // Find all monitors
-  auto monitors = entity.findAll<Monitor>();
+  auto monitors = entity.findAllHeap<Monitor>();
   if (!monitors) {
     return ForwardError(monitors);
   }
@@ -374,7 +398,7 @@ Expected<void> Program::scheduleEntity(gxf_uid_t eid) {
   }
 
   // Find all statistics
-  auto job_statistics = entity.findAll<JobStatistics>();
+  auto job_statistics = entity.findAllHeap<JobStatistics>();
   if (!job_statistics) {
     return ForwardError(job_statistics);
   }
@@ -389,7 +413,7 @@ Expected<void> Program::scheduleEntity(gxf_uid_t eid) {
   }
 
   // Find all IPC servers
-  auto ipc_servers = entity.findAll<IPCServer>();
+  auto ipc_servers = entity.findAllHeap<IPCServer>();
   if (ipc_servers) {
     for (auto server : ipc_servers.value()) {
       server.value()->registerService(IPCServer::Service{
@@ -435,7 +459,7 @@ Expected<void> Program::unscheduleEntity(gxf_uid_t eid) {
   }
 
   // Remove all statistics
-  auto job_statistics = entity.findAll<JobStatistics>();
+  auto job_statistics = entity.findAllHeap<JobStatistics>();
   if (!job_statistics) {
     return ForwardError(job_statistics);
   }
@@ -450,7 +474,7 @@ Expected<void> Program::unscheduleEntity(gxf_uid_t eid) {
   }
 
   // Remove all monitors
-  auto monitors = entity.findAll<Monitor>();
+  auto monitors = entity.findAllHeap<Monitor>();
   if (!monitors) {
     return ForwardError(monitors);
   }
@@ -473,7 +497,7 @@ Expected<void> Program::unscheduleEntity(gxf_uid_t eid) {
   if (!result) { return ForwardError(result); }
 
   // Remove all routers
-  auto routers = entity.findAll<Router>();
+  auto routers = entity.findAllHeap<Router>();
   if (!routers) {
     return ForwardError(routers);
   }
@@ -487,7 +511,7 @@ Expected<void> Program::unscheduleEntity(gxf_uid_t eid) {
   }
 
   // Remove all systems
-  auto systems = entity.findAll<System>();
+  auto systems = entity.findAllHeap<System>();
   if (!systems) {
     return ForwardError(systems);
   }
@@ -511,7 +535,7 @@ Expected<void> Program::runAsync() {
   }
 
   if (system_group_->empty()) {
-    GXF_LOG_WARNING("No system specified. Nothing to do");
+    GXF_LOG_WARNING("No GXF scheduler specified.");
   }
 
   const Expected<void> result = system_group_->runAsync();
@@ -570,14 +594,29 @@ Expected<void> Program::wait() {
   return Success;
 }
 
-Expected<void> Program::entityEventNotify(gxf_uid_t eid) {
+Expected<void> Program::entityEventNotify(gxf_uid_t eid, gxf_event_t event) {
+  if (!system_group_) { return Success; }
+
   State state = state_.load();
-  if (state != State::RUNNING && state != State::INTERRUPTING) {
-    GXF_LOG_ERROR("Unexpected State: %hhd", static_cast<int32_t>(state_.load()));
+
+  // Ignore the event if notified during deinitialization
+  if (state == State::DEINITALIZING || state == State::ACTIVATING) {
+    const char* entityName = "UNKNOWN";
+    GxfEntityGetName(context_, eid, &entityName);
+    GXF_LOG_DEBUG("Ignoring event notification for entity [%s] with id [%ld] since graph is"
+                   " [%s]", entityName, eid, programStateStr(state));
+    return Success;
+  }
+
+  if (state != State::RUNNING && state != State::INTERRUPTING && state != State::STARTING) {
+    const char* entityName = "UNKNOWN";
+    GxfEntityGetName(context_, eid, &entityName);
+    GXF_LOG_ERROR("Event notification %d for entity [%s] with id [%ld] received in an unexpected "
+                  "state [%s]", event, entityName, eid, programStateStr(state));
     return Unexpected{GXF_INVALID_EXECUTION_SEQUENCE};
   }
 
-  const auto result = system_group_->event_notify(eid);
+  const auto result = system_group_->event_notify(eid, event);
   if (!result) {
     return ForwardError(result);
   }
@@ -597,34 +636,49 @@ Expected<void> Program::deactivate() {
     auto eid = unscheduled_entities_.at(i).value().eid();
     if (schedulers_.find(eid) != schedulers_.end()) { continue; }
     auto result = graph_eids.emplace_back(eid);
-    if (!result) { return Unexpected{GXF_EXCEEDING_PREALLOCATED_SIZE}; }
+    if (!result) {
+      resetProgram();
+      return Unexpected{GXF_EXCEEDING_PREALLOCATED_SIZE};
+    }
   }
 
   for (size_t i = 0; i < scheduled_entities_.size(); ++i) {
     auto eid = scheduled_entities_.at(i).value().eid();
     if (schedulers_.find(eid) != schedulers_.end()) { continue; }
     auto result = graph_eids.emplace_back(eid);
-    if (!result) { return Unexpected{GXF_EXCEEDING_PREALLOCATED_SIZE}; }
+    if (!result) {
+      resetProgram();
+      return Unexpected{GXF_EXCEEDING_PREALLOCATED_SIZE};
+    }
   }
 
   // Deactivate all graph entities first (scheduled and unscheduled)
   // Deactivating the entities in the reverse order.
   for (int32_t i = (static_cast<int32_t>(graph_eids.size())) - 1; i >= 0; i--) {
     const gxf_result_t code = GxfEntityDeactivate(context_, graph_eids.at(i).value());
-    if (code != GXF_SUCCESS) { return Unexpected{code}; }
+    if (code != GXF_SUCCESS) {
+      resetProgram();
+      return Unexpected{code};
+    }
   }
 
   // Make a copy of the scheduler eids
   FixedVector<gxf_uid_t, kMaxEntities> scheduler_eids;
   for (const auto& scheduler : schedulers_) {
     auto result = scheduler_eids.emplace_back(scheduler);
-    if (!result) { return Unexpected{GXF_EXCEEDING_PREALLOCATED_SIZE}; }
+    if (!result) {
+      resetProgram();
+      return Unexpected{GXF_EXCEEDING_PREALLOCATED_SIZE};
+    }
   }
 
   // Deactivate all the scheduler entities next
   for (size_t i = 0; i < scheduler_eids.size(); i++) {
     const gxf_result_t code = GxfEntityDeactivate(context_, scheduler_eids.at(i).value());
-    if (code != GXF_SUCCESS) { return Unexpected{code}; }
+    if (code != GXF_SUCCESS) {
+      resetProgram();
+      return Unexpected{code};
+    }
   }
 
   router_group_entity_ = Entity();
@@ -705,23 +759,32 @@ Expected<std::string> Program::onGraphDump(const std::string& resource) {
 Expected<std::string> Program::dumpGraph(gxf_uid_t uid) {
   YAML::Emitter out;
   bool filter_eid = false;
+  State state = state_.load();
+  FixedVector<Entity> entity_list;
+  if (state == State::ORIGIN) {
+    entity_list.reserve(unscheduled_entities_.size());
+    entity_list.copy_from(unscheduled_entities_);
+  } else {
+    entity_list.reserve(scheduled_entities_.size());
+    entity_list.copy_from(scheduled_entities_);
+  }
+
   if (uid != kUnspecifiedUid) {
-    for (auto e : scheduled_entities_) {
+    for (auto e : entity_list) {
       if (e.value().eid() == uid) {
         filter_eid = true;
         break;
       }
     }
   }
-  for (auto e : scheduled_entities_) {
+  for (auto e : entity_list) {
     const gxf_uid_t eid = e.value().eid();
     if (filter_eid && uid != kUnspecifiedUid && uid != eid) {
       continue;
     }
 
     const char *entity_name;
-    const gxf_result_t result_2 = GxfParameterGetStr(context_, eid, kInternalNameParameterKey,
-                                                     &entity_name);
+    const gxf_result_t result_2 = GxfEntityGetName(context_, eid, &entity_name);
     if (result_2 != GXF_SUCCESS) {
       GXF_LOG_ERROR("Could not get name for the entity E%05zu", eid);
       return Unexpected{result_2};
@@ -841,8 +904,9 @@ Expected<std::string> Program::dumpGraph(gxf_uid_t uid) {
         if (maybe) {
           out << YAML::Key << param_info.key;
           out << YAML::Value << maybe.value();
-        } else if (maybe.error() != GXF_UNINITIALIZED_VALUE) {
-          GXF_LOG_ERROR("Failed to wrap parameter %s", param_info.key);
+        } else if (maybe.error() != GXF_PARAMETER_NOT_INITIALIZED) {
+          GXF_LOG_ERROR("Failed to wrap parameter %s with error %s", param_info.key,
+                        GxfResultStr(maybe.error()));
           return Unexpected{GXF_FAILURE};
         }
       }
@@ -858,6 +922,27 @@ Expected<std::string> Program::dumpGraph(gxf_uid_t uid) {
   }
   out << YAML::EndDoc;
   return out.c_str();
+}
+
+const char* Program::programStateStr(const State& state) {
+  switch (state) {
+    GXF_ENUM_TO_STR(State::ORIGIN, Origin)
+    GXF_ENUM_TO_STR(State::ACTIVATING, Activating)
+    GXF_ENUM_TO_STR(State::ACTIVATED, Activated)
+    GXF_ENUM_TO_STR(State::STARTING, Starting)
+    GXF_ENUM_TO_STR(State::RUNNING, Running)
+    GXF_ENUM_TO_STR(State::INTERRUPTING, Interrupting)
+    GXF_ENUM_TO_STR(State::DEINITALIZING, Deinitializing)
+    default:
+      return "N/A";
+  }
+}
+
+void Program::resetProgram() {
+  router_group_entity_ = Entity();
+  system_group_entity_ = Entity();
+  scheduled_entities_.clear();
+  unscheduled_entities_.clear();
 }
 
 }  // namespace gxf

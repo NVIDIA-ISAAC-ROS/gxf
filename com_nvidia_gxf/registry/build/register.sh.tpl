@@ -21,7 +21,7 @@ set -e
 
 # Find registry cli tool
 REGISTRY=registry_cli
-REGISTRY_PATH="$(find . -name $REGISTRY -follow)"
+REGISTRY_PATH="$(find ${PWD} -name $REGISTRY -follow)"
 if [ ! -f $REGISTRY_PATH ]; then
   echo "Could not find $REGISTRY_PATH"
   exit 1

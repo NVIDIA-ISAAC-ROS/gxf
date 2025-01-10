@@ -1,0 +1,87 @@
+# SPDX-FileCopyrightText: Copyright (c) 2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+%YAML 1.2
+---
+name: transmitter
+components:
+- name: signal
+  type: nvidia::gxf::DoubleBufferTransmitter
+- name: topic
+  type: nvidia::gxf::Topic
+  parameters:
+    topic_name: "example_topic"
+    transmitters: [signal]
+- type: nvidia::gxf::PingTx
+  parameters:
+    signal: signal
+- type: nvidia::gxf::DownstreamReceptiveSchedulingTerm
+  parameters:
+    transmitter: signal
+    min_size: 1
+- type: nvidia::gxf::CountSchedulingTerm
+  parameters:
+    count: 10
+---
+name: receiver_a
+components:
+- name: signal
+  type: nvidia::gxf::DoubleBufferReceiver
+- name: topic
+  type: nvidia::gxf::Topic
+  parameters:
+    topic_name: "example_topic"
+    receivers: [signal]
+- type: nvidia::gxf::MessageAvailableSchedulingTerm
+  parameters:
+    receiver: signal
+    min_size: 1
+- type: nvidia::gxf::PingRx
+  parameters:
+    signal: signal
+- type: nvidia::gxf::test::StepCount
+  parameters:
+    expected_count: 10
+---
+name: receiver_b
+components:
+- name: signal
+  type: nvidia::gxf::DoubleBufferReceiver
+- name: topic
+  type: nvidia::gxf::Topic
+  parameters:
+    topic_name: "example_topic"
+    receivers: [signal]
+- type: nvidia::gxf::MessageAvailableSchedulingTerm
+  parameters:
+    receiver: signal
+    min_size: 1
+- type: nvidia::gxf::PingRx
+  parameters:
+    signal: signal
+- type: nvidia::gxf::test::StepCount
+  parameters:
+    expected_count: 10
+---
+name: misc
+components:
+- name: clock
+  type: nvidia::gxf::RealtimeClock
+---
+name: scheduler
+components:
+- type: nvidia::gxf::GreedyScheduler
+  parameters:
+    clock: misc/clock

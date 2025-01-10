@@ -1,5 +1,5 @@
 """
- SPDX-FileCopyrightText: Copyright (c) 2021 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ SPDX-FileCopyrightText: Copyright (c) 2021-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  SPDX-License-Identifier: Apache-2.0
 
  Licensed under the Apache License, Version 2.0 (the "License");
@@ -22,11 +22,33 @@ load(
     "nv_gxf_cc_test_group",
     "nv_gxf_app"
 )
+load(
+    "//bzl:cuda.bzl",
+    "cc_cuda_library"
+)
 
 nv_gxf_cc_test_group(
-    name = "tests",
+    name = "tests_cuda_allocator",
     apps = [
-        "gxf/cuda/tests/test_cuda_stream_dotproduct.yaml",
+        "gxf/cuda/tests/test_cuda_allocator.yaml",
+        "gxf/cuda/tests/test_cuda_allocator_stress_test.yaml",
+    ],
+    extensions = [
+        "//gxf/std",
+        "//gxf/cuda",
+        "//gxf/cuda/tests:test_cuda",
+        "//gxf/test/extensions:test",
+        "//gxf/sample:sample",
+    ],
+    manifest_path_hack = "gxf/cuda/tests/",
+    deps = ["//gxf/test:test_main", "//gxf/std:yaml_file_loader", "@yaml-cpp"],
+)
+
+nv_gxf_cc_test_group(
+    name = "tests_scheduling_terms",
+    apps = [
+        "gxf/cuda/tests/test_cuda_stream_st_dotproduct_mock.yaml",
+        "gxf/cuda/tests/test_cuda_event_st_dotproduct_mock.yaml",
     ],
     extensions = [
         "//gxf/std",
@@ -38,13 +60,39 @@ nv_gxf_cc_test_group(
     deps = ["//gxf/test:test_main", "//gxf/std:yaml_file_loader", "@yaml-cpp"],
 )
 
+nv_gxf_cc_test_group(
+    name = "tests",
+    apps = [
+        "gxf/cuda/tests/test_cuda_stream_dotproduct.yaml",
+        "gxf/cuda/tests/test_cuda_stream_ordered_allocator_cuda_event_st_dotproduct.yaml"
+    ],
+    extensions = [
+        "//gxf/std",
+        "//gxf/cuda",
+        "//gxf/cuda/tests:test_cuda",
+        "//gxf/test/extensions:test",
+    ],
+    manifest_path_hack = "gxf/cuda/tests/",
+    deps = ["//gxf/test:test_main", "//gxf/std:yaml_file_loader", "@yaml-cpp"],
+)
+
+cc_cuda_library(
+    name = "convolution",
+    srcs = ["convolution.cu.cpp"],
+    hdrs = ["convolution.h"],
+    visibility = ["//visibility:public"],
+)
+
 nv_gxf_cc_extension(
     name = "test_cuda",
     srcs = ["test_cuda_ext.cpp"],
     deps = [
         "test_cuda_helper",
+        "convolution",
         "//gxf/core:gxf",
         "//gxf/std:tensor",
+        "//gxf/std:default_extension",
+        "//gxf/cuda",
     ],
     ext_deps = [
         "//gxf/std",

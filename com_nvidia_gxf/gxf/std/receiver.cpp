@@ -16,6 +16,10 @@ Expected<Entity> Receiver::receive() {
   gxf_uid_t uid;
   const gxf_result_t code = receive_abi(&uid);
   if (code == GXF_SUCCESS) {
+    for (const Handle<Transmitter> transmitter : connected_transmitters_) {
+      GXF_LOG_VERBOSE("Notifying upstream transmitter eid '%ld'.", transmitter->eid());
+      GxfEntityNotifyEventType(context(), transmitter->eid(), GXF_EVENT_MESSAGE_SYNC);
+    }
     return Entity::Own(context(), uid);
   } else {
     return Unexpected{code};
@@ -32,6 +36,15 @@ Expected<void> Receiver::sync() {
 
 Expected<void> Receiver::sync_io() {
   return ExpectedOrCode(sync_io_abi());
+}
+
+Expected<void> Receiver::wait() {
+  return ExpectedOrCode(wait_abi());
+}
+
+Expected<void> Receiver::setTransmitter(Handle<Transmitter> tx) {
+  connected_transmitters_.insert(tx);
+  return Success;
 }
 
 Expected<Entity> Receiver::peekBack(int32_t index) {

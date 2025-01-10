@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2021-2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-FileCopyrightText: Copyright (c) 2021-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * SPDX-License-Identifier: Apache-2.0
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -52,7 +52,8 @@ std::string BytesToString(size_t bytes) {
   return string;
 }
 
-Expected<void*> Allocate(size_t size, MemoryStorageType storage_type) {
+Expected<void*> Allocate(size_t size, MemoryStorageType storage_type,
+                         gxf_context_t context, gxf_uid_t eid) {
   void* pointer;
   switch (storage_type) {
     case MemoryStorageType::kHost: {
@@ -83,7 +84,8 @@ Expected<void*> Allocate(size_t size, MemoryStorageType storage_type) {
   return pointer;
 }
 
-Expected<void> Deallocate(void* pointer, MemoryStorageType storage_type) {
+Expected<void> Deallocate(void* pointer, MemoryStorageType storage_type,
+                          gxf_context_t context, gxf_uid_t eid) {
   switch (storage_type) {
     case MemoryStorageType::kHost: {
       const cudaError_t error = cudaFreeHost(pointer);
@@ -190,7 +192,7 @@ gxf_result_t MockAllocator::allocate_abi(uint64_t size, int32_t type, void** poi
   const MemoryStorageType storage_type = static_cast<MemoryStorageType>(type);
   return ToResultCode(
       verifyAllocation(size, storage_type)
-      .and_then([&]() { return Allocate(size, storage_type); })
+      .and_then([&]() { return Allocate(size, storage_type, context(), eid()); })
       .map([&](void* address) {
         std::unique_lock<std::shared_timed_mutex> lock(mutex_);
         memory_blocks_[address] = MemoryBlock{storage_type, size};
@@ -210,7 +212,7 @@ gxf_result_t MockAllocator::free_abi(void* pointer) {
       .map([&](MemoryStorageType storage_type) {
         std::unique_lock<std::shared_timed_mutex> lock(mutex_);
         memory_blocks_.erase(pointer);
-        return Deallocate(pointer, storage_type);
+        return Deallocate(pointer, storage_type, context(), eid());
       }));
 }
 
@@ -278,7 +280,11 @@ Expected<void> MockAllocator::checkForMemoryLeaks() {
   const auto& host = lost[MemoryStorageType::kHost];
   const auto& device = lost[MemoryStorageType::kDevice];
   const auto& system = lost[MemoryStorageType::kSystem];
+  (void)host;  // avoid unused variable warning
+  (void)device;  // avoid unused variable warning
+  (void)system;  // avoid unused variable warning
   if (lost_blocks > 0) {
+    (void)BytesToString;  // avoid unused variable warning
     GXF_LOG_WARNING("[%s/%s] Blocks Lost: %zu (%s) "
                     "{ Host: %zu (%s) | Device: %zu (%s) | System: %zu (%s) }",
                     entity().name(), name(),
@@ -302,6 +308,9 @@ void MockAllocator::printMemoryUsage() {
   const auto& host = metrics_[MemoryStorageType::kHost];
   const auto& device = metrics_[MemoryStorageType::kDevice];
   const auto& system = metrics_[MemoryStorageType::kSystem];
+  (void)host;  // avoid unused variable warning
+  (void)device;  // avoid unused variable warning
+  (void)system;  // avoid unused variable warning
   GXF_LOG_INFO("[%s/%s] Blocks Allocated: %zu (%s) "
                "{ Host: %zu (%s) | Device: %zu (%s) | System: %zu (%s) }",
                entity().name(), name(),

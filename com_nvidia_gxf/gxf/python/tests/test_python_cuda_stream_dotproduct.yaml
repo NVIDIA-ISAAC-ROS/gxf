@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2021-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2021-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,13 +17,13 @@
 dependencies:
 - extension: StandardExtension
   uuid: 8ec2d5d6-b5df-48bf-8dee-0252606fdd7e
-  version: 2.1.0
+  version: 2.6.0
 - extension: CudaExtension
   uuid: d63a98fa-7882-11eb-a917-b38f664f399c
-  version: 1.0.1
+  version: 2.6.0
 - extension: PythonCodeletExtension
   uuid: 787daddc-1c34-11ec-9621-0242ac130002
-  version: 2.0.0
+  version: 0.6.0
 ---
 name: global
 components:

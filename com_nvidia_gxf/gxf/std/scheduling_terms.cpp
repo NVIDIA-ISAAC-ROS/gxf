@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2020-2023, NVIDIA CORPORATION. All rights reserved.
+Copyright (c) 2020-2024, NVIDIA CORPORATION. All rights reserved.
 
 NVIDIA CORPORATION and its licensors retain all intellectual property
 and proprietary rights in and to this software, related documentation
@@ -86,6 +86,7 @@ gxf_result_t TargetTimeSchedulingTerm::registerInterface(Registrar* registrar) {
 
 gxf_result_t TargetTimeSchedulingTerm::initialize() {
   last_timestamp_ = clock_->timestamp();
+  target_timestamp_ = last_timestamp_;
   return GXF_SUCCESS;
 }
 
@@ -99,13 +100,15 @@ gxf_result_t TargetTimeSchedulingTerm::setNextTargetTime(int64_t target_timestam
     return GXF_FAILURE;
   }
   target_timestamp_ = target_timestamp;
+  GxfEntityNotifyEventType(context(), eid(), GXF_EVENT_TIME_UPDATE);
   return GXF_SUCCESS;
 }
 
 gxf_result_t TargetTimeSchedulingTerm::check_abi(int64_t timestamp, SchedulingConditionType* type,
                                                  int64_t* target_timestamp) const {
   // Lock in the target time
-  if (target_timestamp_) {
+  // if entity is not executed, dont invalidate the target_timestamp
+  if (target_timestamp_ && !locked_target_timestamp_) {
     locked_target_timestamp_ = target_timestamp_;
     target_timestamp_ = Unexpected{GXF_UNINITIALIZED_VALUE};
   }
@@ -175,25 +178,28 @@ gxf_result_t DownstreamReceptiveSchedulingTerm::registerInterface(Registrar* reg
   result &= registrar->parameter(
       min_size_, "min_size", "Minimum size",
       "The term permits execution if the receiver connected to the transmitter has at least "
-      "the specified number of free slots in its back buffer.");
+      "the specified number of free slots in its back buffer.", 1UL);
   return ToResultCode(result);
 }
 
 gxf_result_t DownstreamReceptiveSchedulingTerm::initialize() {
-  current_state_ = SchedulingConditionType::WAIT;
+  current_state_ = SchedulingConditionType::READY;
   last_state_change_ = 0;
   return GXF_SUCCESS;
 }
 
 gxf_result_t DownstreamReceptiveSchedulingTerm::update_state_abi(int64_t timestamp) {
-  if (!receiver_) {
+  if (receivers_.empty()) {
     // Entity will never tick
     return GXF_SUCCESS;
   }
 
-  const uint64_t required = receiver_->back_size() + min_size_;
-  const uint64_t available = receiver_->capacity() - receiver_->size();
-  const bool is_ready = required <= available;
+  bool is_ready = true;
+  for (const Handle<Receiver> receiver : receivers_) {
+    const uint64_t required = receiver->back_size() + min_size_;
+    const uint64_t available = receiver->capacity() - receiver->size();
+    is_ready &= required <= available;
+  }
 
   // Check for state change
   if (is_ready && current_state_ != SchedulingConditionType::READY) {
@@ -205,14 +211,13 @@ gxf_result_t DownstreamReceptiveSchedulingTerm::update_state_abi(int64_t timesta
     current_state_ = SchedulingConditionType::WAIT;
     last_state_change_ = timestamp;
   }
-
   return GXF_SUCCESS;
 }
 
 gxf_result_t DownstreamReceptiveSchedulingTerm::check_abi(int64_t timestamp,
                                                           SchedulingConditionType* type,
                                                           int64_t* target_timestamp) const {
-  if (!receiver_) {
+  if (receivers_.empty()) {
     *type = SchedulingConditionType::NEVER;
     return GXF_SUCCESS;
   }
@@ -238,7 +243,7 @@ gxf_result_t MessageAvailableSchedulingTerm::registerInterface(Registrar* regist
   result &= registrar->parameter(
       min_size_, "min_size", "Minimum message count",
       "The scheduling term permits execution if the given receiver has at least the "
-      "given number of messages available.");
+      "given number of messages available.", 1UL);
   result &= registrar->parameter(
       front_stage_max_size_, "front_stage_max_size", "Maximum front stage message count",
       "If set the scheduling term will only allow execution if the number of messages in the front "
@@ -390,7 +395,7 @@ gxf_result_t MultiMessageAvailableSchedulingTerm::update_state_abi(int64_t times
                          last_state_change_ : timestamp;
     current_state_ = SchedulingConditionType::READY;
   } else {
-    // Wait for atleast one condition to be true
+    // Wait for at least one condition to be true
     last_state_change_ = current_state_ == SchedulingConditionType::WAIT ? \
                          last_state_change_ : timestamp;
     current_state_ = SchedulingConditionType::WAIT;
@@ -456,7 +461,7 @@ gxf_result_t ExpiringMessageAvailableSchedulingTerm::check_abi(int64_t timestamp
     return GXF_SUCCESS;
   }
 
-  auto timestamp_components = msg_result->findAll<Timestamp>();
+  auto timestamp_components = msg_result->findAllHeap<Timestamp>();
   if (!timestamp_components) {
     return ToResultCode(timestamp_components);
   }
@@ -505,9 +510,23 @@ gxf_result_t BooleanSchedulingTerm::onExecute_abi(int64_t dt) {
   return GXF_SUCCESS;
 }
 
-Expected<void> BooleanSchedulingTerm::enable_tick() { return enable_tick_.set(true); }
+Expected<void> BooleanSchedulingTerm::enable_tick() {
+  auto retval =  enable_tick_.set(true);
+  const gxf_result_t code = GxfEntityNotifyEventType(context(), eid(), GXF_EVENT_STATE_UPDATE);
+  if (code != GXF_SUCCESS) {
+    GXF_LOG_ERROR("Entity %ld BooleanST failed to send event notification", eid());
+  }
+  return retval;
+}
 
-Expected<void> BooleanSchedulingTerm::disable_tick() { return enable_tick_.set(false); }
+Expected<void> BooleanSchedulingTerm::disable_tick() {
+  auto retval =  enable_tick_.set(false);
+  const gxf_result_t code = GxfEntityNotifyEventType(context(), eid(), GXF_EVENT_STATE_UPDATE);
+  if (code != GXF_SUCCESS) {
+    GXF_LOG_ERROR("Entity %ld BooleanST failed to send event notification", eid());
+  }
+  return retval;
+}
 
 bool BooleanSchedulingTerm::checkTickEnabled() const { return enable_tick_.get(); }
 
@@ -698,7 +717,7 @@ gxf_result_t MessageAvailableFrequencyThrottler::update_state_abi(int64_t timest
                          last_state_change_ : timestamp;
     current_state_ = SchedulingConditionType::READY;
   } else {
-    // Wait for atleast one condition to be true
+    // Wait for at least one condition to be true
     last_state_change_ = current_state_ == SchedulingConditionType::WAIT ? \
                          last_state_change_ : timestamp;
     current_state_ = SchedulingConditionType::WAIT;

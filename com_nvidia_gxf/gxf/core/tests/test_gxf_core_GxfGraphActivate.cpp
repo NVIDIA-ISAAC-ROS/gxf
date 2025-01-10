@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
+Copyright (c) 2022-2024, NVIDIA CORPORATION. All rights reserved.
 
 NVIDIA CORPORATION and its licensors retain all intellectual property
 and proprietary rights in and to this software, related documentation
@@ -44,7 +44,7 @@ TEST_F(GxfGraphActivateTest, Valid1050Entities) {
   GXF_ASSERT_EQ(GxfGraphActivate(context), GXF_SUCCESS);
 }
 
-TEST_F(GxfGraphActivateTest, Valid1024EntitiesWith1050ComponentsEach) {
+TEST_F(GxfGraphActivateTest, Valid1024EntitiesWith1024ComponentsEach) {
   for (int i = 0; i < 1024; i++) {
     gxf_uid_t eid = kNullUid;
     std::string entity_name = "e" + std::to_string(i);
@@ -53,7 +53,7 @@ TEST_F(GxfGraphActivateTest, Valid1024EntitiesWith1050ComponentsEach) {
 
     ASSERT_EQ(GxfCreateEntity(context, &entity_create_info, &eid), GXF_SUCCESS);
 
-    for (int j = 0; j < 1050; j++) {
+    for (int j = 0; j < 1024; j++) {
       gxf_tid_t tid = GxfTidNull();
       GXF_ASSERT_SUCCESS(GxfComponentTypeId(context, "nvidia::gxf::DoubleBufferTransmitter", &tid));
       gxf_uid_t cid = kNullUid;

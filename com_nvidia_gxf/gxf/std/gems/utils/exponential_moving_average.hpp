@@ -62,7 +62,7 @@ class ExponentialMovingAverage {
   }
   ExponentialMovingAverage() : ExponentialMovingAverage(K(1)) {}
 
-  // Adds a new observation for the givne time and updates the current smoothed estimate. New
+  // Adds a new observation for the given time and updates the current smoothed estimate. New
   // observations advance the internal timeline. An observation with an older time will be
   // discarded by the filter.
   const_ref_t add(const_ref_t value, K time) {

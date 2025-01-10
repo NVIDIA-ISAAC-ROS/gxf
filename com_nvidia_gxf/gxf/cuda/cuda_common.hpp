@@ -1,6 +1,6 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2021 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
- * SPDX-License-Identifier: Apache-2.0
+ * SPDX-FileCopyrightText: Copyright (c) 2021-2024 NVIDIA CORPORATION &
+ * AFFILIATES. All rights reserved. SPDX-License-Identifier: Apache-2.0
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -31,6 +31,16 @@
             return Unexpected{GXF_FAILURE};                                     \
         }                                                                       \
     } while (0)
+
+#define CHECK_CUDA_ERROR_RESULT(cu_result, fmt, ...)                      \
+  do {                                                                    \
+    cudaError_t err = (cu_result);                                        \
+    if (err != cudaSuccess) {                                             \
+      GXF_LOG_ERROR(fmt ", cuda_error: %s, error_str: %s", ##__VA_ARGS__, \
+                    cudaGetErrorName(err), cudaGetErrorString(err));      \
+      return GXF_FAILURE;                                                 \
+    }                                                                     \
+  } while (0)
 
 #define CONTINUE_CUDA_ERROR(cu_result, fmt, ...)                               \
     do {                                                                       \

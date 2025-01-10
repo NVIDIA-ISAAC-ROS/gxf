@@ -67,12 +67,11 @@ cc_toolchain_config(
     name = "k8_toolchain_config",
     cxx_builtin_include_directories = [
         "/usr/include",
-        "/usr/include/c++/9",
-        "/usr/include/c++/9/backward",
+        "/usr/include/c++/11",
+        "/usr/include/c++/11/backward",
         "/usr/include/x86_64-linux-gnu",
-        "/usr/include/x86_64-linux-gnu/c++/9",
-        "/usr/lib/gcc/x86_64-linux-gnu/9/include-fixed",
-        "/usr/lib/gcc/x86_64-linux-gnu/9/include",
+        "/usr/include/x86_64-linux-gnu/c++/11",
+        "/usr/lib/gcc/x86_64-linux-gnu/11/include",
         "/usr/local/include",
     ],
     cxx_compile_opts = [
@@ -94,7 +93,7 @@ cc_toolchain_config(
         "-ffunction-sections",
         "-fdata-sections",
     ],
-    cxx_compiler = "/usr/bin/g++-9",
+    cxx_compiler = "/usr/bin/g++-11",
     cxx_link_opts = [
         "-lstdc++",
         "-lm",
@@ -113,10 +112,10 @@ cc_toolchain_config(
     name = "aarch64_toolchain_config",
     cxx_builtin_include_directories = [
         "/usr/aarch64-linux-gnu/include",
-        "/usr/aarch64-linux-gnu/include/c++/9",
-        "/usr/lib/gcc-cross/aarch64-linux-gnu/9/include",
-        "/usr/lib/gcc-cross/aarch64-linux-gnu/9/include-fixed",
-        "/usr/aarch64-linux-gnu/include/c++/9/backward",
+        "/usr/aarch64-linux-gnu/include/c++/11",
+        "/usr/lib/gcc-cross/aarch64-linux-gnu/11/include",
+        "/usr/lib/gcc-cross/aarch64-linux-gnu/11/include-fixed",
+        "/usr/aarch64-linux-gnu/include/c++/11/backward",
         "/usr/aarch64-linux-gnu/include",
     ],
     cxx_compile_opts = [
@@ -136,7 +135,7 @@ cc_toolchain_config(
         "-ffunction-sections",
         "-fdata-sections",
     ],
-    cxx_compiler = "/usr/bin/aarch64-linux-gnu-g++-9",
+    cxx_compiler = "/usr/bin/aarch64-linux-gnu-g++-11",
     cxx_link_opts = [
         "-lstdc++",
         "-Wl,--dynamic-linker=/lib/ld-linux-aarch64.so.1",

@@ -1,0 +1,329 @@
+# SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+%YAML 1.2
+---
+application:
+  name: deepstream-ucx-server
+---
+dependencies:
+- extension: NvDsVisualizationExt
+  uuid: 25903cd4-fc5c-4139-987b-47bb27e8b424
+  version: 1.4.0
+- extension: NvDsBaseExt
+  uuid: 56d7e3ec-62c6-4652-bcc8-4f1c3b00df03
+  version: 1.5.0
+- extension: NvDsOutputSinkExt
+  uuid: 3fc9ad87-03e7-47a8-bbfc-8501c3f7ff2f
+  version: 1.4.0
+- extension: NvDsConverterExt
+  uuid: 7fe1ae48-7bb3-49a8-98fb-142ba07eb273
+  version: 1.4.0
+- extension: UcxExtension
+  uuid: 525f8a1a-dfb5-426b-8ddb-00c3ac839994
+  version: 0.8.0
+- extension: TestHelperExtension
+  uuid: 1b99ffeb-c250-4ced-8117-62ac05969a50
+  version: 2.6.0
+- extension: StandardExtension
+  uuid: 8ec2d5d6-b5df-48bf-8dee-0252606fdd7e
+  version: 2.6.0
+- extension: NvDsInferenceUtilsExt
+  uuid: 27856a43-5ad4-4d8e-be36-0ec2cf9bbb58
+  version: 1.4.0
+- extension: SerializationExtension
+  uuid: bc573c2f-89b3-d4b0-8061-2da8b11fe79a
+  version: 2.6.0
+---
+components:
+- name: video_convert
+  parameters:
+    video-in: video_input
+    video-out: video_output
+  type: nvidia::deepstream::NvDsOSD
+- name: video_output
+  type: nvidia::deepstream::NvDsStaticOutput
+- name: video_input
+  type: nvidia::deepstream::NvDsStaticInput
+name: onscreen_display
+ui_property:
+  position:
+    x: 684.650146484375
+    y: 18.668365478515625
+---
+components:
+- name: video_renderer
+  parameters:
+    video-in: video_input
+  type: nvidia::deepstream::NvDsVideoRenderer
+- name: video_input
+  type: nvidia::deepstream::NvDsStaticInput
+name: video_renderer
+ui_property:
+  position:
+    x: 869.5250244140625
+    y: -5.932162761688232
+---
+components:
+- name: video_convert
+  parameters:
+    video-in: video_input
+    video-out: video_output
+  type: nvidia::deepstream::NvDsVideoConvert
+- name: video_output
+  type: nvidia::deepstream::NvDsStaticOutput
+- name: video_input
+  type: nvidia::deepstream::NvDsStaticInput
+name: video_convert
+ui_property:
+  position:
+    x: 463.41265869140625
+    y: 8.708329200744629
+---
+components:
+- name: nv_ds_connection23
+  parameters:
+    source: video_convert/video_output
+    target: onscreen_display/video_input
+  type: nvidia::deepstream::NvDsConnection
+name: node
+---
+components:
+- name: ucx_context20
+  parameters:
+    serializer: ucx_entity_serializer21
+  type: nvidia::gxf::UcxContext
+- name: ucx_entity_serializer21
+  parameters:
+    component_serializers:
+    - ucx_component_serializer22
+  type: nvidia::gxf::UcxEntitySerializer
+- name: ucx_component_serializer22
+  parameters:
+    allocator: mock_allocator23
+  type: nvidia::gxf::UcxComponentSerializer
+- name: mock_allocator23
+  type: nvidia::gxf::test::MockAllocator
+name: UcxContext
+ui_property:
+  position:
+    x: 251.4905548095703
+    y: 556.4132690429688
+---
+components:
+- name: multi_thread_scheduler24
+  parameters:
+    clock: realtime_clock25
+    stop_on_deadlock: false
+    worker_thread_number: 1
+  type: nvidia::gxf::MultiThreadScheduler
+- name: realtime_clock25
+  type: nvidia::gxf::RealtimeClock
+name: MultiThreadScheduler
+ui_property:
+  position:
+    x: 477.8767395019531
+    y: 495.0345764160156
+---
+components:
+- name: Deepstream Data Connection31
+  parameters:
+    source: onscreen_display/video_output
+    target: video_renderer/video_input
+  type: nvidia::deepstream::NvDsConnection
+name: node9
+---
+components:
+- name: FPS Measurement0
+  parameters:
+    probe-connector: Probe Connector1
+  type: nvidia::deepstream::NvDsFpsMeasurement
+- name: Probe Connector1
+  type: nvidia::deepstream::NvDsProbeConnector
+name: FPS Measurement
+ui_property:
+  position:
+    x: 680.389404296875
+    y: 266.3728332519531
+---
+components:
+- name: Object Counter25
+  parameters:
+    probe-connector: Probe Connector26
+  type: nvidia::deepstream::NvDsPerClassObjectCounting
+- name: Probe Connector26
+  type: nvidia::deepstream::NvDsProbeConnector
+name: Object Counter
+ui_property:
+  position:
+    x: 760.2129516601562
+    y: 441.6129455566406
+---
+components:
+- name: forward0
+  parameters:
+    in: ucx_receiver13
+    out: double_buffer_transmitter1
+  type: nvidia::gxf::Forward
+- name: double_buffer_transmitter1
+  type: nvidia::gxf::DoubleBufferTransmitter
+- name: downstream_receptive_scheduling_term2
+  parameters:
+    min_size: 1
+    transmitter: double_buffer_transmitter1
+  type: nvidia::gxf::DownstreamReceptiveSchedulingTerm
+- name: ucx_receiver13
+  parameters:
+    buffer: serialization_buffer14
+  type: nvidia::gxf::UcxReceiver
+- name: mock_allocator18
+  type: nvidia::gxf::test::MockAllocator
+- name: serialization_buffer14
+  parameters:
+    allocator: mock_allocator18
+    buffer_size: 8192
+  type: nvidia::gxf::UcxSerializationBuffer
+- name: message_available_scheduling_term19
+  parameters:
+    min_size: 1
+    receiver: ucx_receiver13
+  type: nvidia::gxf::MessageAvailableSchedulingTerm
+name: Forward
+ui_property:
+  position:
+    x: 83.23916625976562
+    y: 26.2067813873291
+---
+components:
+- name: Deepstream Data Connection3
+  parameters:
+    source: GXF to DeepStream Bridge/Static Data Output15
+    target: video_convert/video_input
+  type: nvidia::deepstream::NvDsConnection
+name: node0
+---
+components:
+- name: Probe Monitor4
+  parameters:
+    io: GXF to DeepStream Bridge/Static Data Output15
+    probe-connector: FPS Measurement/Probe Connector1
+  type: nvidia::deepstream::NvDsProbe
+name: node1
+---
+components:
+- name: Probe Monitor5
+  parameters:
+    io: GXF to DeepStream Bridge/Static Data Output15
+    probe-connector: Object Counter/Probe Connector26
+  type: nvidia::deepstream::NvDsProbe
+name: node2
+---
+components:
+- name: GXF to DeepStream Bridge14
+  parameters:
+    caps: video/x-raw(memory:NVMM), format=NV12, width=1920, height=1080, framerate=30/1
+    data-rx: double_buffer_receiver7
+    data-timeout: 100000
+    frame-rx: double_buffer_receiver6
+    out: Static Data Output15
+  type: nvidia::deepstream::NvGxfToDsBridge
+- name: Static Data Output15
+  type: nvidia::deepstream::NvDsStaticOutput
+- name: nv_ds_gxf_object_data_translator24
+  type: nvidia::deepstream::NvDsGxfObjectDataTranslator
+- name: double_buffer_receiver6
+  parameters:
+    capacity: 10
+  type: nvidia::gxf::DoubleBufferReceiver
+- name: double_buffer_receiver7
+  parameters:
+    capacity: 10
+  type: nvidia::gxf::DoubleBufferReceiver
+- name: message_available_scheduling_term8
+  parameters:
+    min_size: 1
+    receiver: double_buffer_receiver6
+  type: nvidia::gxf::MessageAvailableSchedulingTerm
+- name: message_available_scheduling_term10
+  parameters:
+    min_size: 1
+    receiver: double_buffer_receiver7
+  type: nvidia::gxf::MessageAvailableSchedulingTerm
+name: GXF to DeepStream Bridge
+ui_property:
+  position:
+    x: 382.320556640625
+    y: 196.69509887695312
+---
+components:
+- name: Deepstream Scheduler28
+  type: nvidia::deepstream::NvDsScheduler
+name: scheduler
+ui_property:
+  position:
+    x: 862.4935302734375
+    y: 170.4398956298828
+---
+components:
+- name: connection11
+  parameters:
+    source: Forward/double_buffer_transmitter1
+    target: GXF to DeepStream Bridge/double_buffer_receiver6
+  type: nvidia::gxf::Connection
+name: node3
+---
+components:
+- name: forward0
+  parameters:
+    in: ucx_receiver15
+    out: double_buffer_transmitter1
+  type: nvidia::gxf::Forward
+- name: double_buffer_transmitter1
+  type: nvidia::gxf::DoubleBufferTransmitter
+- name: downstream_receptive_scheduling_term2
+  parameters:
+    min_size: 1
+    transmitter: double_buffer_transmitter1
+  type: nvidia::gxf::DownstreamReceptiveSchedulingTerm
+- name: ucx_receiver15
+  parameters:
+    buffer: serialization_buffer16
+    port: '13338'
+  type: nvidia::gxf::UcxReceiver
+- name: serialization_buffer16
+  parameters:
+    allocator: mock_allocator17
+    buffer_size: 8192
+  type: nvidia::gxf::UcxSerializationBuffer
+- name: mock_allocator17
+  type: nvidia::gxf::test::MockAllocator
+- name: message_available_scheduling_term20
+  parameters:
+    min_size: 1
+    receiver: ucx_receiver15
+  type: nvidia::gxf::MessageAvailableSchedulingTerm
+name: Forward0
+ui_property:
+  position:
+    x: 58.75838088989258
+    y: 366.6476135253906
+---
+components:
+- name: connection12
+  parameters:
+    source: Forward0/double_buffer_transmitter1
+    target: GXF to DeepStream Bridge/double_buffer_receiver7
+  type: nvidia::gxf::Connection
+name: node4

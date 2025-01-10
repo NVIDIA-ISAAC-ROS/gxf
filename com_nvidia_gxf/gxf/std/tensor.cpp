@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2020-2022, NVIDIA CORPORATION. All rights reserved.
+Copyright (c) 2020-2024, NVIDIA CORPORATION. All rights reserved.
 
 NVIDIA CORPORATION and its licensors retain all intellectual property
 and proprietary rights in and to this software, related documentation
@@ -10,8 +10,13 @@ license agreement from NVIDIA CORPORATION is strictly prohibited.
 
 #include "gxf/std/tensor.hpp"
 
+#include <cinttypes>
+#include <memory>
+#include <string>
 #include <utility>
 #include <vector>
+
+#include "common/logger.hpp"
 
 namespace nvidia {
 namespace gxf {
@@ -31,12 +36,69 @@ uint64_t PrimitiveTypeSize(PrimitiveType primitive) {
     case PrimitiveType::kUnsigned32: return 4;
     case PrimitiveType::kInt64:      return 8;
     case PrimitiveType::kUnsigned64: return 8;
+    case PrimitiveType::kFloat16:    return 2;
     case PrimitiveType::kFloat32:    return 4;
     case PrimitiveType::kFloat64:    return 8;
     case PrimitiveType::kComplex64:  return 8;
     case PrimitiveType::kComplex128: return 16;
     default: return 0;
   }
+}
+
+const char* primitiveTypeStr(const PrimitiveType& primitive_type) {
+  switch (primitive_type) {
+    GXF_ENUM_TO_STR(PrimitiveType::kCustom, kCustom)
+    GXF_ENUM_TO_STR(PrimitiveType::kInt8, kInt8)
+    GXF_ENUM_TO_STR(PrimitiveType::kUnsigned8, kUnsigned8)
+    GXF_ENUM_TO_STR(PrimitiveType::kInt16, kInt16)
+    GXF_ENUM_TO_STR(PrimitiveType::kUnsigned16, kUnsigned16)
+    GXF_ENUM_TO_STR(PrimitiveType::kInt32, kInt32)
+    GXF_ENUM_TO_STR(PrimitiveType::kUnsigned32, kUnsigned32)
+    GXF_ENUM_TO_STR(PrimitiveType::kInt64, kInt64)
+    GXF_ENUM_TO_STR(PrimitiveType::kUnsigned64, kUnsigned64)
+    GXF_ENUM_TO_STR(PrimitiveType::kFloat16, kFloat16)
+    GXF_ENUM_TO_STR(PrimitiveType::kFloat32, kFloat32)
+    GXF_ENUM_TO_STR(PrimitiveType::kFloat64, kFloat64)
+    GXF_ENUM_TO_STR(PrimitiveType::kComplex64, kComplex64)
+    GXF_ENUM_TO_STR(PrimitiveType::kComplex128, kComplex128)
+    default:
+      return "N/A";
+  }
+}
+
+const char* dlpackDeviceStr(int32_t device_type) {
+  switch (device_type) {
+    GXF_ENUM_TO_STR(kDLCUDA, kDLCUDA)
+    GXF_ENUM_TO_STR(kDLCUDAHost, kDLCUDAHost)
+    GXF_ENUM_TO_STR(kDLCPU, kDLCPU)
+    GXF_ENUM_TO_STR(kDLOpenCL, kDLOpenCL)
+    GXF_ENUM_TO_STR(kDLVulkan, kDLVulkan)
+    GXF_ENUM_TO_STR(kDLMetal, kDLMetal)
+    GXF_ENUM_TO_STR(kDLVPI, kDLVPI)
+    GXF_ENUM_TO_STR(kDLROCM, kDLROCM)
+    GXF_ENUM_TO_STR(kDLROCMHost, kDLROCMHost)
+    GXF_ENUM_TO_STR(kDLExtDev, kDLExtDev)
+    GXF_ENUM_TO_STR(kDLCUDAManaged, kDLCUDAManaged)
+    GXF_ENUM_TO_STR(kDLOneAPI, kDLOneAPI)
+    GXF_ENUM_TO_STR(kDLWebGPU, kDLWebGPU)
+    GXF_ENUM_TO_STR(kDLHexagon, kDLHexagon)
+    default:
+      return "N/A";
+  }
+}
+
+DLManagedMemoryBuffer::DLManagedMemoryBuffer(DLManagedTensor* self) : self_(self) {}
+
+DLManagedMemoryBuffer::~DLManagedMemoryBuffer() {
+  if (self_ && self_->deleter != nullptr) { self_->deleter(self_); }
+}
+
+Tensor::Tensor(const DLManagedTensor* dl_managed_tensor_ptr) {
+  fromDLPack(dl_managed_tensor_ptr);
+}
+
+Tensor::Tensor(std::shared_ptr<DLManagedTensorContext> dl_ctx) {
+  fromDLPack(dl_ctx);
 }
 
 Expected<void> Tensor::reshapeCustom(const Shape& shape,
@@ -58,26 +120,29 @@ Expected<void> Tensor::reshapeCustom(const Shape& shape,
 
   result = memory_buffer_.resize(allocator, bytes_per_element * element_count_, storage_type);
   if (!result) { return ForwardError(result); }
-  return Success;
+
+  return initializeDLContext();
 }
 
 Expected<void> Tensor::wrapMemory(const Shape& shape,
                                   PrimitiveType element_type, uint64_t bytes_per_element,
                                   Expected<stride_array_t> strides,
                                   MemoryStorageType storage_type, void* pointer,
-                                  release_function_t release_func) {
-  auto result = memory_buffer_.freeBuffer();
-  if (!result) { return ForwardError(result); }
-
+                                  release_function_t release_func, bool reset_dlpack) {
   shape_ = shape;
   element_count_ = shape_.size();
   element_type_ = element_type;
   bytes_per_element_ = bytes_per_element;
   strides_ = strides ? *strides : ComputeTrivialStrides(shape_, bytes_per_element_);
 
-  result = memory_buffer_.wrapMemory(pointer, bytes_per_element * element_count_,
-                                     storage_type, release_func);
+  auto result = memory_buffer_.wrapMemory(pointer, bytes_per_element * element_count_,
+                                          storage_type, release_func);
   if (!result) { return ForwardError(result); }
+
+  if (reset_dlpack) {
+    return initializeDLContext();
+  }
+
   return Success;
 }
 
@@ -95,7 +160,8 @@ Expected<void> Tensor::wrapMemoryBuffer(const Shape& shape,
   strides_ = strides ? *strides : ComputeTrivialStrides(shape_, bytes_per_element_);
 
   memory_buffer_ = std::move(memory_buffer);
-  return Success;
+
+  return initializeDLContext();
 }
 
 Expected<void> Tensor::permute(const std::initializer_list<int32_t>& axes) {
@@ -135,7 +201,8 @@ Expected<void> Tensor::permute(const std::initializer_list<int32_t>& axes) {
   shape_ = Shape(new_dims);
   std::copy_n(new_strides.begin(), rank_tensor, strides_.begin());
 
-  return Success;
+  // update the DLManagedTensorContext based on the new shape/strides
+  return updateDLContext();
 }
 
 Expected<void> Tensor::noCopyReshape(const std::initializer_list<int32_t>& new_shape) {
@@ -215,9 +282,10 @@ Expected<void> Tensor::noCopyReshape(const std::initializer_list<int32_t>& new_s
 
   // Assign new shape and strides
   shape_ = Shape(new_dims);
-  std::copy_n(new_strides.begin(), rank_tensor, strides_.begin());
+  std::copy_n(new_strides.begin(), num_dims_new_shape, strides_.begin());
 
-  return Success;
+  // update the DLManagedTensorContext based on the new shape/strides
+  return updateDLContext();
 }
 
 Expected<void> Tensor::insertSingletonDim(uint32_t dimension) {
@@ -246,7 +314,8 @@ Expected<void> Tensor::insertSingletonDim(uint32_t dimension) {
   shape_ = Shape(new_dims);
   std::copy_n(new_strides.begin(), rank_tensor + 1, strides_.begin());
 
-  return Success;
+  // update the DLManagedTensorContext based on the new shape/strides
+  return updateDLContext();
 }
 
 Expected<bool> Tensor::isContiguous() {
@@ -255,7 +324,7 @@ Expected<bool> Tensor::isContiguous() {
   // for i={0, ..., r - 1}
   uint32_t r = static_cast<uint64_t>(rank());  // rank
   uint64_t x = bytes_per_element();  // total bytes
-  for (uint32_t i = r - 1; i >= 0; --i) {
+  for (int32_t i = r - 1; i >= 0; --i) {
     uint64_t s = this->stride(i);  // stride
     uint64_t d = static_cast<uint64_t>(this->shape().dimension(i));  // dimension
     if (s != x) {
@@ -264,6 +333,170 @@ Expected<bool> Tensor::isContiguous() {
     x *= d;
   }
   return true;
+}
+
+Expected<DLManagedTensor*> Tensor::toDLPack() {
+  auto dl_managed_tensor_ctx = new DLManagedTensorContext;
+  auto& dl_managed_tensor = dl_managed_tensor_ctx->tensor;
+
+  // call toDLManagedTensorContext() method so dl_ctx_ will be created if it is still nullptr
+  auto maybe_dl_ctx = toDLManagedTensorContext();
+  if (!maybe_dl_ctx) {
+    ForwardError(maybe_dl_ctx);
+  }
+  auto dl_ctx = maybe_dl_ctx.value();
+  dl_managed_tensor_ctx->memory_ref = dl_ctx->memory_ref;
+
+  dl_managed_tensor.manager_ctx = dl_managed_tensor_ctx;
+  dl_managed_tensor.deleter = [](DLManagedTensor* self) {
+    auto dl_managed_tensor_ctx = static_cast<DLManagedTensorContext*>(self->manager_ctx);
+    dl_managed_tensor_ctx->memory_ref.reset();
+    delete dl_managed_tensor_ctx;
+  };
+
+  // Copy the DLTensor struct data
+  DLTensor& dl_tensor = dl_managed_tensor.dl_tensor;
+  dl_tensor = dl_ctx->tensor.dl_tensor;
+  return &dl_managed_tensor;
+}
+
+Expected<void> Tensor::wrapDLPack(const DLManagedTensor* dl_managed_tensor_ptr,
+                                  MemoryBuffer::release_function_t release_func) {
+  auto& dl_tensor = dl_managed_tensor_ptr->dl_tensor;
+  auto maybe_shape = ShapeFromDLTensor(&dl_tensor);
+  if (!maybe_shape) { return ForwardError(maybe_shape); }
+  auto maybe_strides = StridesFromDLTensor(&dl_tensor);
+  if (!maybe_strides) { return ForwardError(maybe_strides); }
+  auto maybe_storage_type = MemoryStorageTypeFromDLTensor(&dl_tensor);
+  if (!maybe_storage_type) { return ForwardError(maybe_storage_type); }
+  auto maybe_element_type = PrimitiveTypeFromDLDataType(dl_tensor.dtype);
+  if (!maybe_element_type) { return ForwardError(maybe_element_type); }
+  auto element_type = maybe_element_type.value();
+  uint64_t bytes_per_element = dl_tensor.dtype.lanes * PrimitiveTypeSize(element_type);
+  // must set reset_dlpack to false when wrapping an external DLPack data structure as a Tensor
+  bool reset_dlpack = false;
+  auto status =
+      wrapMemory(maybe_shape.value(), element_type, bytes_per_element,
+                 maybe_strides.value(), maybe_storage_type.value(), dl_tensor.data, release_func,
+                 reset_dlpack);
+  if (!status) { ForwardError(status); }
+  return Success;
+}
+
+Expected<void> Tensor::fromDLPack(const DLManagedTensor* dl_managed_tensor_ptr) {
+  dl_ctx_ = std::make_shared<DLManagedTensorContext>();
+  dl_ctx_->memory_ref =
+      std::make_shared<DLManagedMemoryBuffer>(const_cast<DLManagedTensor*>(dl_managed_tensor_ptr));
+  auto& dl_managed_tensor = dl_ctx_->tensor;
+  dl_managed_tensor = *dl_managed_tensor_ptr;
+  // Note: release_func argument to wrapTensor is nullptr because we use a
+  // DLManagedMemoryBuffer that will handle release of the DLPack tensor memory.
+  auto status = wrapDLPack(dl_managed_tensor_ptr, nullptr);
+  if (!status) { ForwardError(status); }
+  return Success;
+}
+
+Expected<void> Tensor::fromDLPack(std::shared_ptr<DLManagedTensorContext> dl_ctx) {
+  dl_ctx_ = dl_ctx;
+  // Note: release_func argument to wrapTensor is nullptr because we use a
+  // DLManagedMemoryBuffer that will handle release of the DLPack tensor memory.
+  auto status = wrapDLPack(&(dl_ctx->tensor), nullptr);
+  if (!status) { ForwardError(status); }
+  return Success;
+}
+
+Expected<void> Tensor::initializeDLContext() {
+  // Get the tensor info
+  const auto shape = this->shape();
+  const auto element_type = this->element_type();
+  const auto bytes_per_element = this->bytes_per_element();
+  const auto storage_type = this->storage_type();
+  const auto pointer = this->pointer();
+  const auto rank = this->rank();
+  const auto size = this->size();
+
+  // Move the memory buffer from 'tensor' to 'buffer' variable with a shared pointer
+  auto buffer = std::make_shared<MemoryBuffer>(std::move(this->move_buffer()));
+
+  dl_ctx_ = std::make_shared<DLManagedTensorContext>();
+  dl_ctx_->memory_ref = buffer;
+  auto& dl_managed_tensor = dl_ctx_->tensor;
+  auto& dl_tensor = dl_managed_tensor.dl_tensor;
+
+  auto& buffer_shape = dl_ctx_->dl_shape;
+  auto& buffer_strides = dl_ctx_->dl_strides;
+
+  buffer_shape.reserve(rank);
+  buffer_strides.reserve(rank);
+
+  for (uint32_t index = 0; index < rank; ++index) {
+    const auto stride = this->stride(index);
+
+    buffer_shape.push_back(shape.dimension(index));
+    // DLPack's stride (buffer_strides) is in elements but GXF Tensor's stride is in bytes
+    buffer_strides.push_back(stride / bytes_per_element);
+  }
+
+  // change the release_func on the existing memory buffer
+  auto result = memory_buffer_.wrapMemory(pointer, size, storage_type,
+                                          [buffer = buffer](void* pointer) mutable {
+                                            buffer.reset();
+                                            return Success;
+                                          });
+  if (!result) { return ForwardError(result); }
+
+  // Set the DLManagedTensorContext
+  dl_managed_tensor.manager_ctx = nullptr;  // not used
+  dl_managed_tensor.deleter = nullptr;      // not used
+
+  // For Tensor, bytes_per_element may account for multiple channels (e.g. three for RGB video)
+  // DLPack uses DLDataType.lanes to represent this.
+  auto primitive_size = element_type == PrimitiveType::kCustom ?
+                                        bytes_per_element : PrimitiveTypeSize(element_type);
+  uint16_t lanes = bytes_per_element / primitive_size;
+  auto maybe_dtype = PrimitiveTypeToDLDataType(element_type, lanes);
+  if (!maybe_dtype) { ForwardError(maybe_dtype); }
+
+  auto maybe_device = device();
+  if (!maybe_device) { ForwardError(maybe_device); }
+
+  dl_tensor.data = pointer;
+  dl_tensor.device = maybe_device.value();
+  dl_tensor.ndim = rank;
+  dl_tensor.dtype = maybe_dtype.value();
+  dl_tensor.shape = buffer_shape.data();
+  dl_tensor.strides = buffer_strides.data();
+  dl_tensor.byte_offset = 0;
+  return Success;
+}
+
+Expected<DLDevice> Tensor::device() const {
+  switch (storage_type()) {
+    case nvidia::gxf::MemoryStorageType::kSystem:
+      return DLDevice{kDLCPU, 0};
+    case nvidia::gxf::MemoryStorageType::kHost:
+    case nvidia::gxf::MemoryStorageType::kDevice:
+      return DLDeviceFromPointer(pointer());
+    default:
+      GXF_LOG_ERROR("Unsupported GXF storage type (storage_type: (%d))",
+                    static_cast<int>(storage_type()));
+      return Unexpected{GXF_INVALID_DATA_FORMAT};
+  }
+}
+
+Expected<void> Tensor::updateDLContext() {
+  // need to regenerate the DLManagedTensorContext for methods like permute or insertSingletonDim
+  if (dl_ctx_ != nullptr) {
+    dl_ctx_.reset();
+    auto status = initializeDLContext();
+    if (!status) {
+      GXF_LOG_ERROR(
+          "Failed to reinitialize DLManagedTensorContext with code: %s, returning nullptr",
+          GxfResultStr(status.error()));
+      return ForwardError(status);
+    }
+  }
+  return Success;
 }
 
 Expected<Entity> CreateTensorMap(gxf_context_t context, Handle<Allocator> pool,
@@ -354,5 +587,191 @@ Expected<Tensor::stride_array_t> ComputeRowStrides(const Shape& shape, uint32_t 
   return ComputeStrides(shape, steps);
 }
 
+Expected<Shape> ShapeFromDLTensor(const DLTensor* dl_tensor) {
+  const uint32_t rank = dl_tensor->ndim;
+  if (rank > Shape::kMaxRank) {
+    GXF_LOG_ERROR("Tensor rank (%d) needs to be in [0, %d]", rank, Shape::kMaxRank);
+    return Unexpected{GXF_INVALID_DATA_FORMAT};
+  }
+  std::array<int32_t, Shape::kMaxRank> shape;
+  for (uint32_t index = 0; index < rank; ++index) { shape[index] = dl_tensor->shape[index]; }
+  return Shape(shape, rank);
+}
+
+Expected<Tensor::stride_array_t> StridesFromDLTensor(const DLTensor* dl_tensor) {
+  nvidia::gxf::Tensor::stride_array_t strides;
+
+  const uint8_t bytes_per_element = dl_tensor->dtype.bits / 8;
+  // If strides is not set, set it to the default strides
+  if (dl_tensor->strides == nullptr) {
+    const auto shape = ShapeFromDLTensor(dl_tensor);
+    if (!shape) { return ForwardError(shape); }
+    strides = ComputeTrivialStrides(shape.value(), bytes_per_element);
+  } else {
+    const uint32_t rank = dl_tensor->ndim;
+    if (rank > Shape::kMaxRank) {
+      GXF_LOG_ERROR("Tensor rank (%d) needs to be in [0, %d]", rank, Shape::kMaxRank);
+      return Unexpected{GXF_INVALID_DATA_FORMAT};
+    }
+    for (uint32_t index = 0; index < rank; ++index) {
+      // GXF Tensor's stride is in bytes, but DLPack's stride is in elements
+      strides[index] = dl_tensor->strides[index] * bytes_per_element;
+    }
+  }
+  return strides;
+}
+
+Expected<MemoryStorageType> MemoryStorageTypeFromDLTensor(const DLTensor* dl_tensor) {
+  const int32_t device_type = dl_tensor->device.device_type;
+  MemoryStorageType storage_type = MemoryStorageType::kDevice;
+  switch (device_type) {
+    case kDLCUDAHost:
+      storage_type = MemoryStorageType::kHost;
+      break;
+    case kDLCUDA:
+      storage_type = MemoryStorageType::kDevice;
+      break;
+    case kDLCPU:
+      storage_type = MemoryStorageType::kSystem;
+      break;
+    default:
+      GXF_LOG_ERROR("Unsupported DLPack device type (%s)", dlpackDeviceStr(device_type));
+      return Unexpected{GXF_INVALID_DATA_FORMAT};
+  }
+  return storage_type;
+}
+
+Expected<PrimitiveType> PrimitiveTypeFromDLDataType(const DLDataType& dtype) {
+  PrimitiveType element_type;
+
+  switch (dtype.code) {
+    case kDLInt:
+      switch (dtype.bits) {
+        case 8:
+          element_type = PrimitiveType::kInt8;
+          break;
+        case 16:
+          element_type = PrimitiveType::kInt16;
+          break;
+        case 32:
+          element_type = PrimitiveType::kInt32;
+          break;
+        case 64:
+          element_type = PrimitiveType::kInt64;
+          break;
+        default:
+          GXF_LOG_ERROR("Unsupported DLPack data type (code: %" PRIu8
+                        ", bits: %" PRIu8 ", lanes: %" PRIu16 ")",
+                        dtype.code, dtype.bits, dtype.lanes);
+          return Unexpected{GXF_INVALID_DATA_FORMAT};
+      }
+      break;
+    case kDLUInt:
+      switch (dtype.bits) {
+        case 8:
+          element_type = PrimitiveType::kUnsigned8;
+          break;
+        case 16:
+          element_type = PrimitiveType::kUnsigned16;
+          break;
+        case 32:
+          element_type = PrimitiveType::kUnsigned32;
+          break;
+        case 64:
+          element_type = PrimitiveType::kUnsigned64;
+          break;
+        default:
+          GXF_LOG_ERROR("Unsupported DLPack data type (code: %" PRIu8
+                        ", bits: %" PRIu8 ", lanes: %" PRIu16 ")",
+                        dtype.code, dtype.bits, dtype.lanes);
+          return Unexpected{GXF_INVALID_DATA_FORMAT};
+      }
+      break;
+    case kDLFloat:
+      switch (dtype.bits) {
+        case 16:
+          element_type = PrimitiveType::kFloat16;
+          break;
+        case 32:
+          element_type = PrimitiveType::kFloat32;
+          break;
+        case 64:
+          element_type = PrimitiveType::kFloat64;
+          break;
+        default:
+          GXF_LOG_ERROR("Unsupported DLPack data type (code: %" PRIu8
+                        ", bits: %" PRIu8 ", lanes: %" PRIu16 ")",
+                        dtype.code, dtype.bits, dtype.lanes);
+          return Unexpected{GXF_INVALID_DATA_FORMAT};
+      }
+      break;
+    case kDLComplex:
+      switch (dtype.bits) {
+        case 64:
+          element_type = PrimitiveType::kComplex64;
+          break;
+        case 128:
+          element_type = PrimitiveType::kComplex128;
+          break;
+        default:
+          GXF_LOG_ERROR("Unsupported DLPack data type (code: %" PRIu8
+                        ", bits: %" PRIu8 ", lanes: %" PRIu16 ")",
+                        dtype.code, dtype.bits, dtype.lanes);
+          return Unexpected{GXF_INVALID_DATA_FORMAT};
+      }
+      break;
+    case kDLOpaqueHandle:
+    {
+      element_type = PrimitiveType::kCustom;
+    }
+    break;
+    default:
+      GXF_LOG_ERROR("Unsupported DLPack data type (code: %" PRIu8
+                    ", bits: %" PRIu8 ", lanes: %" PRIu16 ")",
+                    dtype.code, dtype.bits, dtype.lanes);
+      return Unexpected{GXF_INVALID_DATA_FORMAT};
+  }
+  return element_type;
+}
+
+Expected<DLDataType> PrimitiveTypeToDLDataType(const PrimitiveType& element_type, uint16_t lanes) {
+  if (lanes < 1) {
+    GXF_LOG_ERROR("Lanes must be a positive integer, found (%" PRIu16 ")", lanes);
+    return Unexpected{GXF_INVALID_DATA_FORMAT};
+  }
+  DLDataType dtype;
+  dtype.lanes = lanes;
+  dtype.bits = PrimitiveTypeSize(element_type) * 8;
+  switch (element_type) {
+    case PrimitiveType::kInt8:
+    case PrimitiveType::kInt16:
+    case PrimitiveType::kInt32:
+    case PrimitiveType::kInt64:
+      dtype.code = kDLInt;
+      break;
+    case PrimitiveType::kUnsigned8:
+    case PrimitiveType::kUnsigned16:
+    case PrimitiveType::kUnsigned32:
+    case PrimitiveType::kUnsigned64:
+      dtype.code = kDLUInt;
+      break;
+    case PrimitiveType::kFloat16:
+    case PrimitiveType::kFloat32:
+    case PrimitiveType::kFloat64:
+      dtype.code = kDLFloat;
+      break;
+    case PrimitiveType::kComplex64:
+    case PrimitiveType::kComplex128:
+      dtype.code = kDLComplex;
+      break;
+    case PrimitiveType::kCustom:
+      dtype.code = kDLOpaqueHandle;
+      break;
+    default:
+      GXF_LOG_ERROR("Unsupported primitive type (%s)", primitiveTypeStr(element_type));
+      return Unexpected{GXF_INVALID_DATA_FORMAT};
+  }
+  return dtype;
+}
 }  // namespace gxf
 }  // namespace nvidia

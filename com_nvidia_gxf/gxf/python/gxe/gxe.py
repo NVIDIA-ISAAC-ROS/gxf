@@ -1,5 +1,5 @@
 '''
- SPDX-FileCopyrightText: Copyright (c) 2021 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ SPDX-FileCopyrightText: Copyright (c) 2021-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  SPDX-License-Identifier: Apache-2.0
 
  Licensed under the Apache License, Version 2.0 (the "License");
@@ -40,6 +40,8 @@ def main():
     context = core.context_create()
     assert(context is not None)
     try :
+        print("setting severity")
+        core.gxf_set_severity(context, args.severity)
         print("loading extensions...")
         core.load_extensions(context, manifest_filenames=args.manifest)
         print("loading graph file...")

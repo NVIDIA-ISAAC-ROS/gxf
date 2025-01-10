@@ -86,7 +86,7 @@ function install_pip_package() {
 }
 
 install_apt_package curl python3-gi python3-pip clang-format \
-    g++-9-aarch64-linux-gnu gcc-9-aarch64-linux-gnu unzip git \
+    g++-11-aarch64-linux-gnu gcc-11-aarch64-linux-gnu unzip git \
     gir1.2-gstreamer-1.0 libgstreamer1.0-dev libffi-dev bison flex \
     libmount-dev gstreamer1.0-x autopoint gettext bison flex meson ninja-build
 

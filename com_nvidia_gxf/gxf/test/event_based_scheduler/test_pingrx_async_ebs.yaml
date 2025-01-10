@@ -1,0 +1,73 @@
+%YAML 1.2
+# SPDX-FileCopyrightText: Copyright (c) 2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+---
+name: tx
+components:
+- name: signal
+  type: nvidia::gxf::test::MockTransmitter
+- type: nvidia::gxf::DownstreamReceptiveSchedulingTerm
+  parameters:
+    transmitter: signal
+    min_size: 1
+- type: nvidia::gxf::PingTx
+  parameters:
+    signal: signal
+- type: nvidia::gxf::CountSchedulingTerm
+  parameters:
+    count: 100
+- type: nvidia::gxf::test::StepCount
+  parameters:
+    use_assert: true
+    expected_count: 100
+---
+name: rx
+components:
+- name: signal
+  type: nvidia::gxf::test::MockReceiver
+- type: nvidia::gxf::MessageAvailableSchedulingTerm
+  parameters:
+    receiver: signal
+    min_size: 1
+- type: nvidia::gxf::test::AsyncPingRx
+  parameters:
+    signal: signal
+    delay: 10
+    scheduling_term: async_st
+- name: async_st
+  type: nvidia::gxf::AsynchronousSchedulingTerm
+---
+components:
+- type: nvidia::gxf::Connection
+  parameters:
+    source: tx/signal
+    target: rx/signal
+---
+components:
+- name: clock
+  type: nvidia::gxf::RealtimeClock
+- type: nvidia::gxf::EventBasedScheduler
+  parameters:
+    clock: clock
+    stop_on_deadlock: true
+    stop_on_deadlock_timeout: 100
+    check_recession_period_ms: 0
+    worker_thread_number: 1
+    max_duration_ms : 10000
+- type: nvidia::gxf::test::EntityMonitor
+- type: nvidia::gxf::JobStatistics
+  parameters:
+    clock: clock
+    codelet_statistics: true

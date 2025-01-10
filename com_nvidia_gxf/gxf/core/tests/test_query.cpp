@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+Copyright (c) 2018-2024, NVIDIA CORPORATION. All rights reserved.
 
 NVIDIA CORPORATION and its licensors retain all intellectual property
 and proprietary rights in and to this software, related documentation
@@ -8,6 +8,8 @@ distribution of this software and related documentation without an express
 license agreement from NVIDIA CORPORATION is strictly prohibited.
 */
 #include "gxf/core/gxf.h"
+
+#include <complex>
 
 #include <string.h>
 
@@ -21,7 +23,7 @@ TEST(Query, Query) {
   gxf_runtime_info info;
   info.num_extensions = 0;
   ASSERT_EQ(GxfRuntimeInfo(context, &info), GXF_SUCCESS);
-  ASSERT_EQ(strcmp(info.version, "3.0.0"), 0);
+  ASSERT_EQ(strcmp(info.version, "4.1.0"), 0);
   ASSERT_EQ(info.num_extensions, 0);
 
   // Extension Info
@@ -50,7 +52,7 @@ TEST(Query, Query) {
   ASSERT_GT(ext_info.num_components, 20);
   ASSERT_EQ(strcmp(ext_info.author, "NVIDIA"), 0);
   ASSERT_EQ(strcmp(ext_info.name, "StandardExtension"), 0);
-  ASSERT_EQ(strcmp(ext_info.version, "2.3.0"), 0);
+  ASSERT_EQ(strcmp(ext_info.version, "2.6.0"), 0);
 
   // Component Info
   const gxf_tid_t comp_tid = ext_info.components[15];  // DoubleBufferTransmitter
@@ -144,7 +146,7 @@ TEST(Query, Query) {
   ASSERT_GE(test_ext_info.num_components, 18);
   ASSERT_EQ(strcmp(test_ext_info.author, "NVIDIA"), 0);
   ASSERT_EQ(strcmp(test_ext_info.name, "TestHelperExtension"), 0);
-  ASSERT_EQ(strcmp(test_ext_info.version, "2.3.0"), 0);
+  ASSERT_EQ(strcmp(test_ext_info.version, "2.6.0"), 0);
 
   // Component Info
   const gxf_tid_t test_comp_tid = test_ext_info.components[1];  // RegisterParameterInterfaceTest
@@ -203,6 +205,18 @@ TEST(Query, Query) {
   ASSERT_EQ(*static_cast<const double*>(test_param_info.numeric_max), 10.0);
   ASSERT_TRUE(test_param_info.numeric_step);
   ASSERT_EQ(*static_cast<const double*>(test_param_info.numeric_step), 1.0);
+
+  ASSERT_EQ(GxfParameterInfo(context, test_comp_tid, "complex64",
+                             &test_param_info), GXF_SUCCESS);
+  ASSERT_TRUE(test_param_info.default_value);
+  ASSERT_EQ((*static_cast<const std::complex<float>*>(test_param_info.default_value)).real(), 7.5);
+  ASSERT_EQ((*static_cast<const std::complex<float>*>(test_param_info.default_value)).imag(), 3.0);
+
+  ASSERT_EQ(GxfParameterInfo(context, test_comp_tid, "complex128",
+                             &test_param_info), GXF_SUCCESS);
+  ASSERT_TRUE(test_param_info.default_value);
+  ASSERT_EQ((*static_cast<const std::complex<double>*>(test_param_info.default_value)).real(), 1.234);
+  ASSERT_EQ((*static_cast<const std::complex<double>*>(test_param_info.default_value)).imag(), 5.678);
 
   ASSERT_EQ(GxfParameterInfo(context, test_comp_tid, "custom_parameter",
                              &test_param_info), GXF_SUCCESS);
@@ -309,6 +323,16 @@ TEST(Query, Shapes) {
   ASSERT_EQ(test_param_info.rank, 3);
   ASSERT_EQ(test_param_info.type, GXF_PARAMETER_TYPE_UINT64);
 
+  ASSERT_EQ(GxfParameterInfo(context, test_comp_tid, "complex64",
+                             &test_param_info), GXF_SUCCESS);
+  ASSERT_EQ(test_param_info.rank, 0);
+  ASSERT_EQ(test_param_info.type, GXF_PARAMETER_TYPE_COMPLEX64);
+
+  ASSERT_EQ(GxfParameterInfo(context, test_comp_tid, "complex128",
+                             &test_param_info), GXF_SUCCESS);
+  ASSERT_EQ(test_param_info.rank, 0);
+  ASSERT_EQ(test_param_info.type, GXF_PARAMETER_TYPE_COMPLEX128);
+
   ASSERT_EQ(GxfParameterInfo(context, test_comp_tid, "vector_of_handles",
                              &test_param_info), GXF_SUCCESS);
   ASSERT_EQ(test_param_info.rank, 1);
@@ -316,6 +340,12 @@ TEST(Query, Shapes) {
   ASSERT_EQ(static_cast<int32_t>(test_param_info.shape[0]), -1); // std::vector<Handle<T>>
   ASSERT_EQ(test_param_info.handle_tid.hash1, 0x3cdd82d023264867); // nvidia::gxf::Allocator
   ASSERT_EQ(test_param_info.handle_tid.hash2, 0x8de2d565dbe28e03);
+
+  ASSERT_EQ(GxfParameterInfo(context, test_comp_tid, "rank_1_array",
+                             &test_param_info), GXF_SUCCESS);
+  ASSERT_EQ(test_param_info.rank, 1);
+  ASSERT_EQ(test_param_info.type, GXF_PARAMETER_TYPE_INT32);
+  ASSERT_EQ(static_cast<int32_t>(test_param_info.shape[0]), 2); // std::array<T,N>
 
   ASSERT_EQ(GxfParameterInfo(context, test_comp_tid, "rank_2_array",
                              &test_param_info), GXF_SUCCESS);

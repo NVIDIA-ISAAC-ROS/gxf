@@ -1,5 +1,5 @@
 """
- SPDX-FileCopyrightText: Copyright (c) 2021-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ SPDX-FileCopyrightText: Copyright (c) 2021-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  SPDX-License-Identifier: Apache-2.0
 
  Licensed under the Apache License, Version 2.0 (the "License");
@@ -37,9 +37,13 @@ cc_library(
         "type_name.hpp",
         "type_name_gnuc.hpp",
         "type_utils.hpp",
+        "yaml_parser.hpp",
     ],
     visibility = ["//visibility:public"],
-    deps = ["//third_party:nvtx"],
+    deps = [
+        "//third_party:nvtx",
+        "//gxf/logger:logger",
+    ],
     linkopts = [
         "-ldl",
     ],

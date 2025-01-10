@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2021, NVIDIA CORPORATION. All rights reserved.
+Copyright (c) 2021-2024, NVIDIA CORPORATION. All rights reserved.
 
 NVIDIA CORPORATION and its licensors retain all intellectual property
 and proprietary rights in and to this software, related documentation
@@ -93,6 +93,8 @@ TEST(audio, wrapMemory) {
   ASSERT_TRUE(maybe_allocator.has_value());
 
   auto allocator = maybe_allocator.value();
+
+  ASSERT_EQ(allocator->is_available_abi(kBlockSize), GXF_INVALID_LIFECYCLE_STAGE);
 
   ASSERT_EQ(allocator->initialize(), GXF_SUCCESS);
 

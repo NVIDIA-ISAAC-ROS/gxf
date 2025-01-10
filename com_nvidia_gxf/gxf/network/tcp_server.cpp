@@ -36,7 +36,11 @@ Expected<void> TcpServer::reconnectSockets() {
 }
 
 Expected<void> TcpServer::closeSockets() {
-  return client_socket_.close().and_then([&]() { return server_socket_.close(); });
+  if (client_socket_.connected()) {
+    auto result = client_socket_.close();
+    if (!result) { return result; }
+  }
+  return server_socket_.close();
 }
 
 }  // namespace gxf

@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2021,2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-FileCopyrightText: Copyright (c) 2021-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * SPDX-License-Identifier: Apache-2.0
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -33,11 +33,11 @@ class PingTx : public Codelet {
   gxf_result_t registerInterface(Registrar* registrar) override;
   gxf_result_t start() override;
   gxf_result_t tick() override;
-  gxf_result_t stop() override { return GXF_SUCCESS; }
 
  private:
   Parameter<Handle<Transmitter>> signal_;
   Parameter<Handle<Clock>> clock_;
+  Parameter<int64_t> trigger_interrupt_after_ms_;
   Resource<Handle<GPUDevice>> gpu_device_;
   int count = 1;
 };

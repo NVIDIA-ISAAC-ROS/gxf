@@ -1,0 +1,290 @@
+# SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+%YAML 1.2
+---
+application:
+  name: deepstream-ucx-client
+---
+dependencies:
+- extension: NvDsBaseExt
+  uuid: 56d7e3ec-62c6-4652-bcc8-4f1c3b00df03
+  version: 1.5.0
+- extension: StandardExtension
+  uuid: 8ec2d5d6-b5df-48bf-8dee-0252606fdd7e
+  version: 2.6.0
+- extension: TestHelperExtension
+  uuid: 1b99ffeb-c250-4ced-8117-62ac05969a50
+  version: 2.6.0
+- extension: UcxExtension
+  uuid: 525f8a1a-dfb5-426b-8ddb-00c3ac839994
+  version: 0.8.0
+- extension: NvDsSourceExt
+  uuid: a632d022-3425-4848-9074-e6483ef74366
+  version: 1.4.0
+- extension: NvDsMuxDemuxExt
+  uuid: 89b8398c-5820-4051-835c-a91f2d49766b
+  version: 1.4.0
+- extension: NvDsInferenceExt
+  uuid: 0b02963e-c24e-4c13-ace0-c4cdf36c7c71
+  version: 1.4.0
+- extension: NvDsSampleModelsExt
+  uuid: 909dc1ea-c654-44c1-97a3-0b8fec12141a
+  version: 1.4.0
+- extension: SerializationExtension
+  uuid: bc573c2f-89b3-d4b0-8061-2da8b11fe79a
+  version: 2.6.0
+---
+components:
+- name: DeepStream To GXF Bridge4
+  parameters:
+    allocator: mock_allocator21
+    data-tx: double_buffer_transmitter8
+    frame-tx: double_buffer_transmitter7
+    in: Static Data Input5
+    scheduling-term: asynchronous_scheduling_term13
+    sync: true
+  type: nvidia::deepstream::NvDsToGxfBridge
+- name: Static Data Input5
+  type: nvidia::deepstream::NvDsStaticInput
+- name: asynchronous_scheduling_term13
+  type: nvidia::gxf::AsynchronousSchedulingTerm
+- name: mock_allocator21
+  type: nvidia::gxf::test::MockAllocator
+- name: double_buffer_transmitter7
+  type: nvidia::gxf::DoubleBufferTransmitter
+- name: double_buffer_transmitter8
+  type: nvidia::gxf::DoubleBufferTransmitter
+- name: downstream_receptive_scheduling_term17
+  parameters:
+    min_size: 1
+    transmitter: double_buffer_transmitter8
+  type: nvidia::gxf::DownstreamReceptiveSchedulingTerm
+- name: downstream_receptive_scheduling_term18
+  parameters:
+    min_size: 1
+    transmitter: double_buffer_transmitter7
+  type: nvidia::gxf::DownstreamReceptiveSchedulingTerm
+- name: nv_ds_gxf_object_data_translator23
+  type: nvidia::deepstream::NvDsGxfObjectDataTranslator
+name: DeepStream To GXF Bridge
+ui_property:
+  position:
+    x: 244.22091674804688
+    y: 188.72308349609375
+---
+components:
+- name: multi_thread_scheduler11
+  parameters:
+    clock: realtime_clock12
+    stop_on_deadlock: false
+    worker_thread_number: 1
+  type: nvidia::gxf::MultiThreadScheduler
+- name: realtime_clock12
+  type: nvidia::gxf::RealtimeClock
+name: MultiThreadScheduler
+ui_property:
+  position:
+    x: 620.44482421875
+    y: 427.1016540527344
+---
+components:
+- name: ucx_context26
+  parameters:
+    serializer: ucx_entity_serializer27
+  type: nvidia::gxf::UcxContext
+- name: ucx_entity_serializer27
+  parameters:
+    component_serializers:
+    - ucx_component_serializer28
+  type: nvidia::gxf::UcxEntitySerializer
+- name: ucx_component_serializer28
+  parameters:
+    allocator: mock_allocator29
+  type: nvidia::gxf::UcxComponentSerializer
+- name: mock_allocator29
+  type: nvidia::gxf::test::MockAllocator
+name: UcxContext
+ui_property:
+  position:
+    x: 28.504058837890625
+    y: 382.3994445800781
+---
+components:
+- name: Deepstream Scheduler2
+  type: nvidia::deepstream::NvDsScheduler
+name: scheduler
+ui_property:
+  position:
+    x: -24.364688873291016
+    y: 298.6782531738281
+---
+components:
+- name: Single Source Input33
+  parameters:
+    audio-out-%u: Dynamic Data Output35
+    file-loop: true
+    uri: file:///opt/nvidia/deepstream/deepstream/samples/streams/sample_1080p_h265.mp4
+    video-out-%u: Dynamic Data Output34
+  type: nvidia::deepstream::NvDsSingleSrcInput
+- name: Dynamic Data Output34
+  type: nvidia::deepstream::NvDsDynamicOutput
+- name: Dynamic Data Output35
+  type: nvidia::deepstream::NvDsDynamicOutput
+name: Single Source Input
+ui_property:
+  position:
+    x: -112.05593872070312
+    y: 107.39804077148438
+---
+components:
+- name: Stream Muxer36
+  parameters:
+    batch-size: 1
+    batched-push-timeout: 1
+    height: 1080
+    video-in-%u: On Request Data Input37
+    video-out: Static Data Output38
+    width: 1920
+  type: nvidia::deepstream::NvDsStreamMux
+- name: On Request Data Input37
+  type: nvidia::deepstream::NvDsOnRequestInput
+- name: Static Data Output38
+  type: nvidia::deepstream::NvDsStaticOutput
+name: Stream Muxer
+ui_property:
+  position:
+    x: 13.788091659545898
+    y: -73.81233978271484
+---
+components:
+- name: Video Inference39
+  parameters:
+    infer-model-config: 4-class Detector45
+    video-in: Static Data Input41
+    video-out: Static Data Output40
+  type: nvidia::deepstream::NvDsInferVideo
+- name: Static Data Output40
+  type: nvidia::deepstream::NvDsStaticOutput
+- name: Static Data Input41
+  type: nvidia::deepstream::NvDsStaticInput
+- name: 4-class Detector45
+  type: nvidia::deepstream::NvDsResnet10_4ClassDetectorModel
+name: Video Inference
+ui_property:
+  position:
+    x: 278.5894470214844
+    y: -54.60432052612305
+---
+components:
+- name: Deepstream Data Connection42
+  parameters:
+    source: Single Source Input/Dynamic Data Output34
+    target: Stream Muxer/On Request Data Input37
+  type: nvidia::deepstream::NvDsConnection
+name: node10
+---
+components:
+- name: Deepstream Data Connection43
+  parameters:
+    source: Stream Muxer/Static Data Output38
+    target: Video Inference/Static Data Input41
+  type: nvidia::deepstream::NvDsConnection
+name: node11
+---
+components:
+- name: Deepstream Data Connection44
+  parameters:
+    source: Video Inference/Static Data Output40
+    target: DeepStream To GXF Bridge/Static Data Input5
+  type: nvidia::deepstream::NvDsConnection
+name: node12
+---
+components:
+- name: forward3
+  parameters:
+    in: double_buffer_receiver4
+    out: ucx_transmitter22
+  type: nvidia::gxf::Forward
+- name: double_buffer_receiver4
+  type: nvidia::gxf::DoubleBufferReceiver
+- name: mock_allocator12
+  type: nvidia::gxf::test::MockAllocator
+- name: serialization_buffer11
+  parameters:
+    allocator: mock_allocator12
+    buffer_size: 8192
+  type: nvidia::gxf::UcxSerializationBuffer
+- name: message_available_scheduling_term20
+  parameters:
+    min_size: 1
+    receiver: double_buffer_receiver4
+  type: nvidia::gxf::MessageAvailableSchedulingTerm
+- name: ucx_transmitter22
+  parameters:
+    buffer: serialization_buffer11
+    port: '13338'
+  type: nvidia::gxf::UcxTransmitter
+name: Forward
+ui_property:
+  position:
+    x: 620.4141235351562
+    y: 182.30609130859375
+---
+components:
+- name: forward3
+  parameters:
+    in: double_buffer_receiver4
+    out: ucx_transmitter10
+  type: nvidia::gxf::Forward
+- name: double_buffer_receiver4
+  type: nvidia::gxf::DoubleBufferReceiver
+- name: ucx_transmitter10
+  parameters:
+    buffer: serialization_buffer11
+  type: nvidia::gxf::UcxTransmitter
+- name: serialization_buffer11
+  parameters:
+    allocator: mock_allocator12
+    buffer_size: 8192
+  type: nvidia::gxf::UcxSerializationBuffer
+- name: mock_allocator12
+  type: nvidia::gxf::test::MockAllocator
+- name: message_available_scheduling_term19
+  parameters:
+    min_size: 1
+    receiver: double_buffer_receiver4
+  type: nvidia::gxf::MessageAvailableSchedulingTerm
+name: Forward0
+ui_property:
+  position:
+    x: 606.6903076171875
+    y: -69.26338195800781
+---
+components:
+- name: connection13
+  parameters:
+    source: DeepStream To GXF Bridge/double_buffer_transmitter8
+    target: Forward/double_buffer_receiver4
+  type: nvidia::gxf::Connection
+name: node2
+---
+components:
+- name: connection16
+  parameters:
+    source: DeepStream To GXF Bridge/double_buffer_transmitter7
+    target: Forward0/double_buffer_receiver4
+  type: nvidia::gxf::Connection
+name: node3

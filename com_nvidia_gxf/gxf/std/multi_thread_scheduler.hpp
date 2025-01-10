@@ -1,12 +1,20 @@
 /*
-Copyright (c) 2021-2023, NVIDIA CORPORATION. All rights reserved.
+ * SPDX-FileCopyrightText: Copyright (c) 2021-2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
-NVIDIA CORPORATION and its licensors retain all intellectual property
-and proprietary rights in and to this software, related documentation
-and any modifications thereto. Any use, reproduction, disclosure or
-distribution of this software and related documentation without an express
-license agreement from NVIDIA CORPORATION is strictly prohibited.
-*/
 #ifndef NVIDIA_GXF_STD_MUTLI_THREAD_SCHEDULER_HPP_
 #define NVIDIA_GXF_STD_MUTLI_THREAD_SCHEDULER_HPP_
 
@@ -26,20 +34,18 @@ license agreement from NVIDIA CORPORATION is strictly prohibited.
 #include "gxf/core/entity.hpp"
 #include "gxf/core/handle.hpp"
 #include "gxf/std/clock.hpp"
-#include "gxf/std/codelet.hpp"
 #include "gxf/std/cpu_thread.hpp"
-#include "gxf/std/entity_executor.hpp"
 #include "gxf/std/gems/event_list/event_list.hpp"
 #include "gxf/std/gems/staging_queue/staging_queue.hpp"
 #include "gxf/std/gems/timed_job_list/timed_job_list.hpp"
-#include "gxf/std/receiver.hpp"
-#include "gxf/std/resources.hpp"
 #include "gxf/std/scheduler.hpp"
-#include "gxf/std/scheduling_terms.hpp"
-#include "gxf/std/system.hpp"
+#include "gxf/std/scheduling_condition.hpp"
 
 namespace nvidia {
 namespace gxf {
+
+// Forward declarations
+class EntityExecutor;
 
 constexpr int64_t kMsToNs = 1'000'000l;      // Convenient constant of 1 ms = 1e6 ns
 constexpr int64_t kMaxSlipNs = 1 * kMsToNs;  // Max slip tolerance set to 1 ms
@@ -60,9 +66,15 @@ class MultiThreadScheduler : public Scheduler {
   gxf_result_t runAsync_abi() override;
   gxf_result_t stop_abi() override;
   gxf_result_t wait_abi() override;
-  gxf_result_t event_notify_abi(gxf_uid_t eid) override;
+  gxf_result_t event_notify_abi(gxf_uid_t eid, gxf_event_t event) override;
 
  private:
+  std::atomic<uint64_t> workerExecTime { 0 };
+  std::atomic<uint64_t> workerWaitTime { 0};
+  std::atomic<uint64_t> workerExecCount { 0 };
+  uint64_t dispatcherExecTime = 0;
+  uint64_t dispatcherWaitTime = 0;
+  uint64_t dispatcherExecCount = 0;
   // Entrance for dispatcher threads
   void dispatcherThreadEntrance();
   // Entrance for async event handler thread
@@ -118,6 +130,9 @@ class MultiThreadScheduler : public Scheduler {
 
   // A thread to dispatch jobs to worker pool
   std::thread dispatcher_thread_;
+
+  // Mutex to synchronize dispatcher thread
+  std::mutex dispatcher_sync_mutex_;
 
   // instances of dispatcher/worker threads. 0 index would be async event handler thread.
   std::vector<std::thread> async_threads_;

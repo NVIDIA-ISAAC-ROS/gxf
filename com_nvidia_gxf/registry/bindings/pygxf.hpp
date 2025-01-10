@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2020-2022, NVIDIA CORPORATION. All rights reserved.
+Copyright (c) 2020-2024, NVIDIA CORPORATION. All rights reserved.
 
 NVIDIA CORPORATION and its licensors retain all intellectual property
 and proprietary rights in and to this software, related documentation
@@ -11,10 +11,12 @@ license agreement from NVIDIA CORPORATION is strictly prohibited.
 #ifndef PYGXF_HPP
 #define PYGXF_HPP
 
+#include <complex>
 #include <sstream>
 
 #include "common/logger.hpp"
 #include "gxf/core/gxf.h"
+#include "pybind11/complex.h"
 #include "pybind11/pybind11.h"
 #include "pybind11/pytypes.h"
 #include "pybind11/stl.h"
@@ -195,7 +197,7 @@ void destruct_component_info(gxf_component_info_t& info) {
 }
 
 /**
- * @brief Resize the dyamic memory allocted in component info
+ * @brief Resize the dyamic memory allocated in component info
  *
  * @param info gxf_component_info to be resized
  * @param count new number of expected parameters
@@ -230,9 +232,9 @@ py::object gxf_context_create() {
 }
 
 /**
- * @brief Destorys a context which was created using gxf_context_create()
+ * @brief Destroys a context which was created using gxf_context_create()
  *
- * @param context py::capsule object containting a pointer to a valid gxf
+ * @param context py::capsule object containing a pointer to a valid gxf
  * context
  */
 bool gxf_context_destroy(py::capsule& context) {
@@ -245,7 +247,7 @@ bool gxf_context_destroy(py::capsule& context) {
  * @brief Registers a component type which can be used for GXF core
  *
  * @param context gxf context created using gxf_context_create()
- * @param uuid uuid sting of format 85f64c84-8236-4035-9b9a-3843a6a2026f
+ * @param uuid uuid string of format 85f64c84-8236-4035-9b9a-3843a6a2026f
  * @param name name of the component
  * @param base_name valid name of the base type component which has been
  registered with the context
@@ -266,7 +268,9 @@ void gxf_register_component(py::capsule& context, std::string& uuid,
  */
 bool gxf_load_ext(py::capsule& context, std::string& filename) {
   gxf_context_t ctx = static_cast<gxf_context_t>(context);
-  gxf_result_t result = GxfLoadExtension(ctx, filename.c_str());
+  const char* kExtension[] = {filename.c_str()};
+  const GxfLoadExtensionsInfo info{kExtension, 1, nullptr, 0, nullptr};
+  gxf_result_t result = GxfLoadExtensions(ctx, &info);
   return result == GXF_SUCCESS ? true : false;
 }
 
@@ -283,7 +287,9 @@ bool gxf_load_ext(py::capsule& context, std::string& filename) {
  */
 bool gxf_load_ext_manifest(py::capsule& context, std::string& filename) {
   gxf_context_t ctx = static_cast<gxf_context_t>(context);
-  gxf_result_t result = GxfLoadExtensionManifest(ctx, filename.c_str());
+  const char* manifest[] = {filename.c_str()};
+  const GxfLoadExtensionsInfo info{nullptr, 0, manifest, 1, nullptr};
+  gxf_result_t result = GxfLoadExtensions(ctx, &info);
   return result == GXF_SUCCESS ? true : false;
 }
 
@@ -457,7 +463,7 @@ py::object get_ext_list(py::capsule& context) {
  *
  * @param context gxf context created using gxf_context_create()
  * @param uuid valid extension uuid obtained using get_ext_list()
- * @return py::dict Dict containing extension metatdata
+ * @return py::dict Dict containing extension metadata
  */
 py::object get_ext_info(py::capsule& context, std::string& uuid) {
   gxf_context_t ctx = static_cast<gxf_context_t>(context);
@@ -523,7 +529,7 @@ py::object get_comp_list(py::capsule& context, std::string& uuid) {
  *
  * @param context gxf context created using gxf_context_create()
  * @param uuid valid component uuid obtained using get_comp_list()
- * @return py::dict Dict containing component metatdata
+ * @return py::dict Dict containing component metadata
  */
 py::object get_comp_info(py::capsule& context, std::string& uuid) {
   gxf_context_t ctx = static_cast<gxf_context_t>(context);
@@ -579,13 +585,40 @@ py::object get_param_list(py::capsule& context, std::string& uuid) {
 }
 
 /**
+ * @brief Casts default value into the correct type using shape and rank
+ *
+ * @param gxf_parameter_info_t contains parameter information
+ * @return std::variant containing correct vector
+ */
+template <typename T>
+std::variant<T,
+std::vector<T>,
+std::vector<std::vector<T>>,
+std::vector<std::vector<std::vector<T>>>> processDefaultValue(gxf_parameter_info_t info) {
+    if (info.rank == 0) {
+        T value = *static_cast<const T*>(info.default_value);
+        return value;
+    } else if (info.rank == 1 && info.shape[0] == -1) {
+        const std::vector<T> value = *static_cast<const std::vector<T>*>(info.default_value);
+        return value;
+    } else if (info.rank == 2 && info.shape[0] == -1 && info.shape[1] == -1) {
+        const std::vector<std::vector<T>> value = *static_cast<const std::vector<std::vector<T>>*>(info.default_value);
+        return value;
+    } else if (info.rank == 3 && info.shape[0] == -1 && info.shape[1] == -1 && info.shape[2] == -1){
+        const std::vector<std::vector<std::vector<T>>> value = *static_cast<const std::vector<std::vector<std::vector<T>>>*>(info.default_value);
+        return value;
+    }
+    return std::variant<T, std::vector<T>, std::vector<std::vector<T>>, std::vector<std::vector<std::vector<T>>>>{};
+}
+
+/**
  * @brief Get parameter specific metadata such as key, headline, description,
  * gxf_parameter_type, flags, handle_type, default_value
  *
  * @param context gxf context created using gxf_context_create()
  * @param uuid valid component uuid obtained using get_comp_list()
  * @param key valid parameter key obtained using get_param_list()
- * @return py::dict Dict containing parameter metatdata
+ * @return py::dict Dict containing parameter metadata
  */
 py::object get_param_info(py::capsule& context, std::string& uuid,
                         std::string& key) {
@@ -631,43 +664,36 @@ py::object get_param_info(py::capsule& context, std::string& uuid,
   } else
     result["handle_type"] = "N/A";
 
-    // Default value
+  // Default value
   if(info.default_value) {
     if(info.type == GXF_PARAMETER_TYPE_INT8) {
-      int8_t value = *static_cast<const int8_t*>(info.default_value);
-      result["default"] = value;
+      result["default"] = processDefaultValue<int8_t>(info);
     } else if (info.type == GXF_PARAMETER_TYPE_INT16) {
-      int16_t value = *static_cast<const int16_t*>(info.default_value);
-      result["default"] = value;
+      result["default"] = processDefaultValue<int16_t>(info);
     } else if(info.type == GXF_PARAMETER_TYPE_INT32) {
-      int32_t value = *static_cast<const int32_t*>(info.default_value);
-      result["default"] = value;
+      result["default"] = processDefaultValue<int32_t>(info);
     } else if (info.type == GXF_PARAMETER_TYPE_INT64) {
-      int64_t value = *static_cast<const int64_t*>(info.default_value);
-      result["default"] = value;
+      result["default"] = processDefaultValue<int64_t>(info);
     } else if(info.type == GXF_PARAMETER_TYPE_UINT8) {
-      uint8_t value = *static_cast<const uint8_t*>(info.default_value);
-      result["default"] = value;
+      result["default"] = processDefaultValue<uint8_t>(info);
     } else if (info.type == GXF_PARAMETER_TYPE_UINT16) {
-      uint16_t value = *static_cast<const uint16_t*>(info.default_value);
-      result["default"] = value;
+      result["default"] = processDefaultValue<uint16_t>(info);
     } else if(info.type == GXF_PARAMETER_TYPE_UINT32) {
-      uint32_t value = *static_cast<const uint32_t*>(info.default_value);
-      result["default"] = value;
+      result["default"] = processDefaultValue<uint32_t>(info);
     } else if (info.type == GXF_PARAMETER_TYPE_UINT64) {
-      uint64_t value = *static_cast<const uint64_t*>(info.default_value);
-      result["default"] = value;
+      result["default"] = processDefaultValue<uint64_t>(info);
     } else if (info.type == GXF_PARAMETER_TYPE_FLOAT32) {
-      float value = *static_cast<const float*>(info.default_value);
-      result["default"] = value;
+      result["default"] = processDefaultValue<float>(info);
     } else if (info.type == GXF_PARAMETER_TYPE_FLOAT64) {
-      double value = *static_cast<const double*>(info.default_value);
-      result["default"] = value;
+      result["default"] = processDefaultValue<double>(info);
+    } else if (info.type == GXF_PARAMETER_TYPE_COMPLEX64) {
+      result["default"] = processDefaultValue<std::complex<float>>(info);
+    } else if (info.type == GXF_PARAMETER_TYPE_COMPLEX128) {
+      result["default"] = processDefaultValue<std::complex<double>>(info);
     } else if (info.type == GXF_PARAMETER_TYPE_STRING) {
       result["default"] = std::string(static_cast<const char*>(info.default_value));
     } else if (info.type == GXF_PARAMETER_TYPE_BOOL) {
-      bool value = *static_cast<const bool*>(info.default_value);
-      result["default"] = value;
+      result["default"] = processDefaultValue<bool>(info);
     } else if (info.type == GXF_PARAMETER_TYPE_FILE) {
       result["default"] = std::string(static_cast<const char*>(info.default_value));
     } else {
@@ -709,6 +735,12 @@ py::object get_param_info(py::capsule& context, std::string& uuid,
     } else if (info.type == GXF_PARAMETER_TYPE_FLOAT64) {
       double value = *static_cast<const double*>(info.numeric_max);
       result["max_value"] = value;
+    } else if (info.type == GXF_PARAMETER_TYPE_COMPLEX64) {
+      std::complex<float> value = *static_cast<const std::complex<float>*>(info.numeric_max);
+      result["max_value"] = value;
+    } else if (info.type == GXF_PARAMETER_TYPE_COMPLEX128) {
+      std::complex<double> value = *static_cast<const std::complex<double>*>(info.numeric_max);
+      result["max_value"] = value;
     }
   }
 
@@ -744,6 +776,12 @@ py::object get_param_info(py::capsule& context, std::string& uuid,
     } else if (info.type == GXF_PARAMETER_TYPE_FLOAT64) {
       double value = *static_cast<const double*>(info.numeric_min);
       result["min_value"] = value;
+    } else if (info.type == GXF_PARAMETER_TYPE_COMPLEX64) {
+      std::complex<float> value = *static_cast<const std::complex<float>*>(info.numeric_min);
+      result["min_value"] = value;
+    } else if (info.type == GXF_PARAMETER_TYPE_COMPLEX128) {
+      std::complex<double> value = *static_cast<const std::complex<double>*>(info.numeric_min);
+      result["min_value"] = value;
     }
   }
 
@@ -778,6 +816,12 @@ py::object get_param_info(py::capsule& context, std::string& uuid,
       result["step_value"] = value;
     } else if (info.type == GXF_PARAMETER_TYPE_FLOAT64) {
       double value = *static_cast<const double*>(info.numeric_step);
+      result["step_value"] = value;
+    } else if (info.type == GXF_PARAMETER_TYPE_COMPLEX64) {
+      std::complex<float> value = *static_cast<const std::complex<float>*>(info.numeric_step);
+      result["step_value"] = value;
+    } else if (info.type == GXF_PARAMETER_TYPE_COMPLEX128) {
+      std::complex<double> value = *static_cast<const std::complex<double>*>(info.numeric_step);
       result["step_value"] = value;
     }
   }

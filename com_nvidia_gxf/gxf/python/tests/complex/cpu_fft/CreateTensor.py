@@ -35,34 +35,43 @@ class CreateTensor(CodeletAdapter):
 
     def start(self):
         self.params = self.get_params()
-        self.tx = Transmitter.get(self.context(), self.cid(), self.params[f"transmitter0"])
-        self.allocator = Allocator.get(self.context(), self.cid(), self.params[f"allocator0"])
+        self.tx = Transmitter.get(self.context(), self.cid(), self.params["transmitter0"])
+        self.allocator = Allocator.get(self.context(), self.cid(), self.params["allocator0"])
+        self.use_dlpack = bool(self.params["use_dlpack"])
 
         return
 
     def tick(self):
+        # create random complex64 data
+        rng = np.random.default_rng(1234)
+        size = 640
+        random_array = rng.standard_normal(size, dtype=np.float32)
+        random_array = rng.standard_normal(size, dtype=np.float32) + 1j * rng.standard_normal(size, dtype=np.float32)
         host_msg = MessageEntity(self.context())
-        host_tensor_description = TensorDescription(
-            name="host_tensor",
-            storage_type=MemoryStorageType.kHost,
-            shape=Shape([640]),
-            element_type=PrimitiveType.kComplex64,
-            bytes_per_element=8,
-            strides=[8]
-        )
 
-        host_tensor = Tensor.add_to_entity(host_msg, host_tensor_description.name)
-        host_tensor.reshape(host_tensor_description, self.allocator)
+        if self.use_dlpack:
+            # zero-copy Tensor initialization from a NumPy array
+            host_tensor = Tensor.from_dlpack(random_array)
+            Tensor.add_to_entity(host_msg, host_tensor, "host_tensor")
+        else:
+            host_tensor_description = TensorDescription(
+                name="host_tensor",
+                storage_type=MemoryStorageType.kHost,
+                shape=Shape([random_array.size]),
+                element_type=PrimitiveType.kComplex64,
+                bytes_per_element=random_array.itemsize,
+                strides=[random_array.strides[0]]
+            )
+            host_tensor = Tensor.add_to_entity(host_msg, host_tensor_description.name)
+            host_tensor.reshape(host_tensor_description, self.allocator)
 
-        numpy_array = np.array(host_tensor, copy=False)
-        print(numpy_array.dtype)
+            numpy_array = np.array(host_tensor, copy=False)
+            print(numpy_array.dtype)
 
-        # Assuming interleaved data
-        numpy_array[:] = np.random.randn(640)
+            numpy_array[:] = random_array
 
-        print("First 10 elements of transmitted tensor: ", numpy_array[0::2] + 1j*numpy_array[1::2])
+        print("First 10 elements of transmitted tensor: ", random_array[:10])
         self.tx.publish(host_msg)
-
         return
 
     def stop(self):

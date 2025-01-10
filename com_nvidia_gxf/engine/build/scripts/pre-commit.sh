@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #####################################################################################
-# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2024, NVIDIA CORPORATION. All rights reserved.
 
 # NVIDIA CORPORATION and its licensors retain all intellectual property
 # and proprietary rights in and to this software, related documentation
@@ -12,7 +12,7 @@
 ## Client side pre-commit hook
 # To enable, copy or symlink this file into your
 # .git/hooks folder
-# cp engine/build/sripts/pre-commit.sh .git/hooks/pre-commit
+# cp engine/build/scripts/pre-commit.sh .git/hooks/pre-commit
 # ln -s `pwd`/engine/build/scripts/pre-commit.sh .git/hooks/pre-commit
 
 ## Exit on errors
@@ -27,11 +27,25 @@
 
 # If there are whitespace errors, print the offending file names and fail.
 # See https://git-scm.com/docs/git-diff-index#Documentation/git-diff-index.txt---check
+
+# Source the helper functions
+source "engine/build/scripts/utility_functions.sh"
+
+change_to_workspace_dir
+
 git diff-index --check --cached HEAD --
 
-echo "Reformatting files"
-engine/build/scripts/before_commit.sh
+log_message "Reformatting files"
+if ! ./engine/build/scripts/before_commit.sh; then
+    log_error "engine/build/scripts/before_commit.sh script failed. Please check the output and fix any issues."
+    exit 1
+fi
 
-echo "Checking for linter errors"
-bazel test --config=lint ... > /dev/null
+
+log_message "Checking for linter errors"
+if ! bazel test //... --config lint; then
+    log_error "Linting errors detected."
+    log_error "Please remove linting errors before committing."
+    exit 1
+fi
 exit 0

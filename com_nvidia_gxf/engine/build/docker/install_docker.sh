@@ -20,10 +20,10 @@ sudo apt-get update
 sudo apt-get install -y docker-ce docker-ce-cli containerd.io
 sudo pkill -HUP dockerd
 
-# Allow your username to use Docker. To run Docker without root priviledges.
+# Allow your username to use Docker. To run Docker without root privileges.
 sudo usermod -aG docker ${USER}
 
-# If you want to update group priviledges without logging out and back in, you can run:
+# If you want to update group privileges without logging out and back in, you can run:
 #su - ${USER}
 
 # If you want to check Docker's service status, you can run:

@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2020-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2020-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -26,3 +26,5 @@ extensions:
 - gxf/behavior_tree/libgxf_behavior_tree.so
 - gxf/stream/libgxf_stream.so
 - gxf/stream/tests/libgxf_test_stream_sync_cuda.so
+- gxf/ucx/libgxf_ucx.so
+- gxf/rmm/libgxf_rmm.so

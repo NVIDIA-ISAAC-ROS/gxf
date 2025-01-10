@@ -18,14 +18,15 @@ def filter_packages(terms,num_builds_to_preserve):
     do_not_purge = []
     for package_type in PACKAGES:
         corresponding_packages = list(filter((lambda x: x["name"].count(package_type) or x["type"] != "file"), terms))
-        corresponding_packages = corresponding_packages[-num_builds_to_preserve:]
+        corresponding_packages = sorted(corresponding_packages, key=lambda x: x['modified'], reverse=True)
+        corresponding_packages = corresponding_packages[:num_builds_to_preserve - 1]
         do_not_purge += corresponding_packages
 
     return do_not_purge
 
 def purgelist(artifactory):
 
-    purgable = []
+    purgeable = []
 
     # purge anything other than last 30 builds in sw-isaac-gxf-generic-local/nightly/master
     num_nightly_builds = 30
@@ -34,7 +35,7 @@ def purgelist(artifactory):
     ]
     nightly_master_terms = artifactory.filter(terms=compute_nightly_master_terms, depth=None, item_type="any")
 
-    purgable += [i for i in nightly_master_terms if i not in filter_packages(nightly_master_terms,num_nightly_builds)]
+    purgeable += [i for i in nightly_master_terms if i not in filter_packages(nightly_master_terms,num_nightly_builds)]
 
     # purge anything other than last 30 builds in sw-isaac-gxf-generic-local/nightly/release-
         # 2.3
@@ -53,26 +54,26 @@ def purgelist(artifactory):
         ]
         nightly_release_terms = artifactory.filter(terms=compute_nightly_release_terms, depth=None, item_type="any")
 
-        purgable += [i for i in nightly_release_terms if i not in filter_packages(nightly_release_terms,num_release_builds)]
+        purgeable += [i for i in nightly_release_terms if i not in filter_packages(nightly_release_terms,num_release_builds)]
 
-    # purge anything created more than 7 nightly runs ago in sw-isaac-gxf-generic-local/nightly/pipeline-testing
+    # purge anything created more than 7 nightly runs ago in sw-isaac-gxf-generic-local/nightly/verification
     num_nightly_test_builds = 7
     compute_nightly_test_terms = [
-        {"path": {"$match": "nightly/pipeline-testing"}}
+        {"path": {"$match": "nightly/verification"}}
     ]
     nightly_test_terms = artifactory.filter(terms=compute_nightly_test_terms, depth=None)
 
-    purgable += [i for i in nightly_test_terms if i not in filter_packages(nightly_test_terms,num_nightly_test_builds)]
+    purgeable += [i for i in nightly_test_terms if i not in filter_packages(nightly_test_terms,num_nightly_test_builds)]
 
     # trim list of items to be purged with the rule:
     # if name is like xxx_public.tar
     # do not purge anything that starts with xxx_
     do_not_purge = [will_purge["name"].partition("public.tar")[0]
-        for will_purge in purgable
+        for will_purge in purgeable
             if will_purge["name"].endswith("public.tar")]
-    purgable = [will_purge
-        for will_purge in purgable
+    purgeable = [will_purge
+        for will_purge in purgeable
             if not any(will_purge["name"].startswith(no_purge)
                 for no_purge in do_not_purge)]
 
-    return purgable
+    return purgeable

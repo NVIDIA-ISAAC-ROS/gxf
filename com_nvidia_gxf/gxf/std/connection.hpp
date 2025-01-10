@@ -25,6 +25,24 @@ class Connection : public Component {
   Handle<Transmitter> source() const;
   Handle<Receiver> target() const;
 
+  // Set the target parameter
+  Expected<void> setReceiver(Handle<Receiver> value) {
+    if (!value) {
+      GXF_LOG_ERROR("Attempting to set null handle for Rx of Connection component [%s]", name());
+      return Unexpected{GXF_ARGUMENT_NULL};
+    }
+    return target_.set(value);
+  }
+
+  // Set the source parameter
+  Expected<void> setTransmitter(Handle<Transmitter> value) {
+    if (!value) {
+      GXF_LOG_ERROR("Attempting to set null handle for Tx of Connection component [%s]", name());
+      return Unexpected{GXF_ARGUMENT_NULL};
+    }
+    return source_.set(value);
+  }
+
  private:
   Parameter<Handle<Transmitter>> source_;
   Parameter<Handle<Receiver>> target_;

@@ -1,5 +1,5 @@
 """
-Copyright (c) 2020-2022, NVIDIA CORPORATION. All rights reserved.
+Copyright (c) 2020-2024, NVIDIA CORPORATION. All rights reserved.
 
 NVIDIA CORPORATION and its licensors retain all intellectual property
 and proprietary rights in and to this software, related documentation
@@ -29,10 +29,10 @@ alias(
         # pygxf bindings is used by registry cli to register cross platform targets on x86 hosts
         # Use dummy targets to avoid loading cross platform binaries on x86
         ("disable_pygxf",
-         "//engine/build:platform_hp11_sbsa",
-         "//engine/build:platform_hp20_sbsa",
+         "//engine/build:platform_hp21ga_sbsa",
          "//engine/build:platform_hp21ea_sbsa",
-         "//engine/build:platform_jetpack51") : "pygxf_dummy",
+         "//engine/build:platform_jetpack60",
+         "//engine/build:platform_jetpack61") : "pygxf_dummy",
         # pygxf is enabled for all x86 builds
         "//conditions:default" : "pygxf"
     }),

@@ -1,6 +1,6 @@
 #!/bin/bash
 #####################################################################################
-# SPDX-FileCopyrightText: Copyright (c) 2021-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2021-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -41,7 +41,6 @@ warn() {
 UNAME=$USER
 REMOTE_USER=nvidia #if no username provided
 REMOTE_USER_SET=false
-ENABLE_CXX17=false
 BAZEL_CONFIGS=""
 
 # get command line arguments
@@ -74,8 +73,8 @@ while [ $# -gt 0 ]; do
     --deploy_path)
         DEPLOY_PATH="$2"
         ;;
-    --cxx17)
-        ENABLE_CXX17=true
+    --debug)
+        ENABLE_DEBUG=true
         shift
         continue
         ;;
@@ -88,11 +87,11 @@ while [ $# -gt 0 ]; do
 done
 
 if [ -z "$DEVICE" ]; then
-    error_and_exit "Desired target device must be specified with -d DEVICE. Valid choices: 'hp11_sbsa', 'jetpack51' 'x86_64'"
+    error_and_exit "Desired target device must be specified with -d DEVICE. Valid choices: 'hp21ea_sbsa' 'hp21ga_sbsa' 'jetpack60' 'jetpack61' 'x86_64'"
 fi
 
-if [ "$ENABLE_CXX17" = true ]; then
-    BAZEL_CONFIGS=" --config=cxx17 "
+if [ "$ENABLE_DEBUG" = true ]; then
+    BAZEL_CONFIGS=" --config=debug "
 fi
 
 #create the necessary files & folders
@@ -109,14 +108,12 @@ mkdir executables || rm -rf executables/*
 mkdir bazel-bin-copy || rm -rf bazel-bin-copy/*
 
 # find all the tests that are written for the given configuration, except for the ones tagged "host", "manual", "pytest", "performance"
-bazel query 'attr(tags, "pytest", tests(...)) except attr(tags, "host|manual|performance", ...)'>>python_tests
-bazel query 'tests(...) except attr(tags, "host|manual|pytest|performance", ...)'>>all_tests
+bazel query 'attr(tags, "pytest", tests(...)) except attr(tags, "host|manual|performance|coverity|cpplint|gxflint", ...)'>>python_tests
+bazel query 'tests(...) except attr(tags, "host|manual|pytest|performance|coverity|cpplint|gxflint", ...)'>>all_tests
 # string manipulation to feed the tests to the bazel build
 sed -i 's/\s.*$//' ./all_tests
 
 # remove the tests that we do not want to run on jetson
-sed -i '/cpplint/d' ./all_tests
-sed -i '/gxflint/d' ./all_tests
 sed -i '/_check_json/d' ./all_tests
 
 tests_to_build=$(cat all_tests)
@@ -149,8 +146,6 @@ cut -c 24- uniq_dep_tmp > uniq_dep
 ###################################################################################################
 ### do the same steps for python tests, with the only difference of using aquery for dependencies
 sed -i 's/\s.*$//' ./python_tests
-sed -i '/cpplint/d' ./python_tests
-sed -i '/gxflint/d' ./python_tests
 sed -i '/_check_json/d' ./python_tests
 
 pytests_to_build=$(cat python_tests)
@@ -194,7 +189,7 @@ bazel_cache=$(bazel info output_base)
 EXCLUDE_STR='-not -path "*x86_64*" -not -path "*.sym" '
 case "$DEVICE" in
 
-  "hp11_sbsa" | "hp20_sbsa" | "hp21ea_sbsa" | "jetpack51")
+  "hp21ea_sbsa" | "jetpack60")
     EXCLUDE_STR+='-not -path "*qnx*"'
     ;;
 

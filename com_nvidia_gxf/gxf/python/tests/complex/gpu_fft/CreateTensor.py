@@ -14,9 +14,13 @@
  See the License for the specific language governing permissions and
  limitations under the License.
 """
+import os
+
+import ctypes
+import cupy as cp
+
 from gxf.core import MessageEntity
 from gxf.std import Allocator
-from gxf.std import Clock
 from gxf.std import TensorDescription
 from gxf.std import Tensor
 from gxf.std import Transmitter
@@ -24,8 +28,8 @@ from gxf.std import MemoryStorageType
 from gxf.std import Shape
 from gxf.std import PrimitiveType
 from gxf.python_codelet import CodeletAdapter
-import ctypes
-import cupy
+
+os.environ["CUPY_CACHE_IN_MEMORY"] = "1"
 
 
 def get_cupy_ndarray_from_tensor(tensor):
@@ -37,12 +41,13 @@ def get_cupy_ndarray_from_tensor(tensor):
     ctypes.pythonapi.PyCapsule_GetPointer.restype = ctypes.c_void_p
     ctypes.pythonapi.PyCapsule_GetPointer.argtypes = [
         ctypes.py_object, ctypes.c_char_p]
-    unowned_mem_ptr = cupy.cuda.UnownedMemory(
+    unowned_mem_ptr = cp.cuda.UnownedMemory(
         ctypes.pythonapi.PyCapsule_GetPointer(data_ptr, None), data_size, None)
-    mem_ptr = cupy.cuda.MemoryPointer(unowned_mem_ptr, 0)
-    cupy_array = cupy.ndarray(
-        shape=shape, dtype=data_type, memptr=mem_ptr, strides=strides, order='C')
+    mem_ptr = cp.cuda.MemoryPointer(unowned_mem_ptr, 0)
+    cupy_array = cp.ndarray(
+        shape=shape, dtype=data_type, memptr=mem_ptr, strides=strides, order="C")
     return cupy_array
+
 
 class CreateTensor(CodeletAdapter):
     """ Python codelet to generate a stream of tensors on tick()
@@ -53,31 +58,40 @@ class CreateTensor(CodeletAdapter):
 
     def start(self):
         self.params = self.get_params()
-        self.tx = Transmitter.get(self.context(), self.cid(), self.params[f"transmitter0"])
-        self.allocator = Allocator.get(self.context(), self.cid(), self.params[f"allocator0"])
+        self.tx = Transmitter.get(self.context(), self.cid(), self.params["transmitter0"])
+        self.allocator = Allocator.get(self.context(), self.cid(), self.params["allocator0"])
+        self.use_dlpack = bool(self.params["use_dlpack"])
         return
 
     def tick(self):
+        # create random complex64 data
+        rng = cp.random.default_rng(1234)
+        size = 640
+        random_array = rng.standard_normal(size, dtype=cp.float32)
+        random_array = random_array + 1j * rng.standard_normal(size, dtype=cp.float32)
         cuda_msg = MessageEntity(self.context())
-        cuda_tensor_description = TensorDescription(
-            name="cuda_tensor",
-            storage_type=MemoryStorageType.kDevice,
-            shape=Shape([640]),
-            element_type=PrimitiveType.kComplex64,
-            bytes_per_element=8,
-            strides=[8]
-        )
 
-        cuda_tensor = Tensor.add_to_entity(cuda_msg, cuda_tensor_description.name)
-        cuda_tensor.reshape(cuda_tensor_description, self.allocator)
+        if self.use_dlpack:
+            # zero-copy Tensor initialization from a NumPy array
+            cuda_tensor = Tensor.from_dlpack(random_array)
+            Tensor.add_to_entity(cuda_msg, cuda_tensor, "cuda_tensor")
+        else:
+            cuda_tensor_description = TensorDescription(
+                name="cuda_tensor",
+                storage_type=MemoryStorageType.kDevice,
+                shape=Shape([size]),
+                element_type=PrimitiveType.kComplex64,
+                bytes_per_element=random_array.itemsize,
+                strides=[random_array.strides[0]]
+            )
+            cuda_tensor = Tensor.add_to_entity(cuda_msg, cuda_tensor_description.name)
+            cuda_tensor.reshape(cuda_tensor_description, self.allocator)
 
-        cupy_array = get_cupy_ndarray_from_tensor(cuda_tensor)
-        # Assuming interleaved data
-        cupy_array[:] = cupy.random.randn(640)
+            cupy_array = get_cupy_ndarray_from_tensor(cuda_tensor)
+            cupy_array[:] = random_array
 
-        print("First 10 elements of transmitted tensor: ", cupy_array[0::2] + 1j*cupy_array[1::2])
+        print("First 10 elements of transmitted tensor: ", random_array[:10])
         self.tx.publish(cuda_msg)
-
         return
 
     def stop(self):

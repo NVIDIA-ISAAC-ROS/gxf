@@ -66,13 +66,13 @@ def _impl(ctx):
         ),
     ]
 
-    cpp14_feature = feature(
-        name = "c++14",
+    cpp17_feature = feature(
+        name = "c++17",
         enabled = True,
         flag_sets = [
             flag_set(
                 actions = [ACTION_NAMES.cpp_compile],
-                flag_groups = [flag_group(flags = ["-std=c++14"])],
+                flag_groups = [flag_group(flags = ["-std=c++17"])],
             ),
         ],
     )
@@ -185,12 +185,12 @@ def _impl(ctx):
         target_cpu = "k8",
         target_libc = "glibc-2.19",
         compiler = "nvcc-11.6-gcc-9.3.0",
-        abi_version = "gcc-9.3.0",
+        abi_version = "gcc-11.3.0",
         abi_libc_version = "glibc-2.19",
         tool_paths = tool_paths,
         cxx_builtin_include_directories = ctx.attr.cxx_builtin_include_directories,
         features = [
-            cpp14_feature,
+            cpp17_feature,
             cxx_compile_opts_feature,
             opt_feature,
             dbg_feature,

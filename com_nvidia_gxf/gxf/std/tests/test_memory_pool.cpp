@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2020-2023, NVIDIA CORPORATION. All rights reserved.
+Copyright (c) 2020-2024, NVIDIA CORPORATION. All rights reserved.
 
 NVIDIA CORPORATION and its licensors retain all intellectual property
 and proprietary rights in and to this software, related documentation
@@ -14,6 +14,7 @@ license agreement from NVIDIA CORPORATION is strictly prohibited.
 
 #include "gtest/gtest.h"
 #include "gxf/core/gxf.h"
+#include "gxf/std/gems/pool/fixed_pool_uint64.hpp"
 
 namespace nvidia {
 namespace gxf {
@@ -76,6 +77,16 @@ TEST(MemoryPool, Test1) {
         ASSERT_EQ(mp->is_available_abi(kBlockSize), GXF_FAILURE);
       }
     }
+  }
+
+  {
+    std::unique_ptr<FixedPoolUint64> memoryPoolstack = std::make_unique<FixedPoolUint64>();
+    GXF_ASSERT_FALSE(memoryPoolstack->pop().has_value());
+    GXF_ASSERT_TRUE(memoryPoolstack->allocate(2).has_value());
+    GXF_ASSERT_TRUE(memoryPoolstack->allocate(0).has_value());
+    GXF_ASSERT_TRUE(memoryPoolstack->allocate(5).has_value());
+    GXF_ASSERT_TRUE(memoryPoolstack->pop().has_value());
+    GXF_ASSERT_FALSE(memoryPoolstack->push(11).has_value());
   }
 
   mp->deinitialize();

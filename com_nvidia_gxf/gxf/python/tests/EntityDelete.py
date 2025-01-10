@@ -65,7 +65,7 @@ class EntityDelete(CodeletAdapter):
             storage_type=MemoryStorageType.kDevice,
             shape=Shape([1024, 1]),
             element_type=PrimitiveType.kFloat32,
-            bytes_per_element=32
+            bytes_per_element=4
         )
         test_tensor = Tensor.add_to_entity(
             test_msg, test_tensor_description.name)
@@ -76,7 +76,7 @@ class EntityDelete(CodeletAdapter):
             storage_type=MemoryStorageType.kHost,
             shape=Shape([1024, 1]),
             element_type=PrimitiveType.kFloat32,
-            bytes_per_element=32
+            bytes_per_element=4
         )
         host_tensor = Tensor.add_to_entity(
             host_msg, host_tensor_description.name)
@@ -95,7 +95,7 @@ class EntityDelete(CodeletAdapter):
             storage_type=MemoryStorageType.kDevice,
             shape=Shape([1024, 1]),
             element_type=PrimitiveType.kFloat32,
-            bytes_per_element=32
+            bytes_per_element=4
         )
         dev_tensor = Tensor.add_to_entity(dev_msg, dev_tensor_description.name)
         dev_tensor.reshape(dev_tensor_description, self.allocators[1])

@@ -1,5 +1,5 @@
 """
- SPDX-FileCopyrightText: Copyright (c) 2020-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ SPDX-FileCopyrightText: Copyright (c) 2020-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  SPDX-License-Identifier: Apache-2.0
 
  Licensed under the Apache License, Version 2.0 (the "License");
@@ -23,21 +23,22 @@ cuda_deps()
 
 nvsci_deps()
 
-# Select python version based on target platform (default: python 3.8)
+# Select python version based on target platform (default: python 3.10)
 alias(
   name = "python_aarch64",
   actual = select({
-    "//engine/build:compiler_gcc_9": "@python_aarch64_3_8",
-    "//conditions:default": "@python_aarch64_3_8",
+    "//engine/build:compiler_gcc_11": "@python_aarch64_3_10",
+    "//conditions:default": "@python_aarch64_3_10",
     }),
   visibility = ["//visibility:public"],
 )
 
 alias(
-  name = "python_x86_64_x_y",
+  name = "python_x86_64",
   actual = select({
-    "//engine/build:python3_7": "@python_x86_64_3_7",
-    "//conditions:default": "@python_x86_64",
+    "//engine/build:ubuntu_python3_10": "@python_x86_64_3_10",
+    "//engine/build:rhel_python3_10": "@python_x86_64_rhel9_3_10",
+    "//conditions:default": "@python_x86_64_3_10",
     }),
   visibility = ["//visibility:public"],
 )
@@ -45,12 +46,13 @@ alias(
 alias(
   name = "python",
   actual = selects.with_or({
-        ("//engine/build:platform_x86_64_cuda_11_8",
-         "//engine/build:platform_x86_64_cuda_12_1") : "//third_party:python_x86_64_x_y",
-        ("//engine/build:platform_hp11_sbsa",
-         "//engine/build:platform_hp20_sbsa",
-         "//engine/build:platform_hp21ea_sbsa",
-         "//engine/build:platform_jetpack51"): "//third_party:python_aarch64",
+        ("//engine/build:platform_x86_64_cuda_12_2",
+         "//engine/build:platform_x86_64_cuda_12_6",
+         "//engine/build:platform_x86_64_rhel9_cuda_12_2") : "//third_party:python_x86_64",
+        ("//engine/build:platform_hp21ea_sbsa",
+         "//engine/build:platform_hp21ga_sbsa",
+         "//engine/build:platform_jetpack60",
+         "//engine/build:platform_jetpack61"): "//third_party:python_aarch64",
         }),
   visibility = ["//visibility:public"],
 )
