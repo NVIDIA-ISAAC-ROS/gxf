@@ -30,17 +30,17 @@ set(_GRPC_CPP_PLUGIN_EXECUTABLE $<TARGET_FILE:gRPC::grpc_cpp_plugin>)
 ###################################################################################################
 
 find_package(gRPC CONFIG REQUIRED)
-include(FetchContent)
-set(grpc_health_SOURCE_DIR "${CMAKE_BINARY_DIR}/_deps/grpc_health_proto-src")
-set(grpc_health_BUILD_DIR "${CMAKE_BINARY_DIR}/_deps/grpc_health_proto-build")
-FetchContent_Declare(
-    grpc_health_proto
-    URM_HASH "MD5=93c62f9d6b1925cf3e8822d590484589"
-    DOWNLOAD_NO_EXTRACT TRUE
-    SOURCE_DIR ${grpc_health_SOURCE_DIR}
-    URL "https://raw.githubusercontent.com/grpc/grpc/v${gRPC_VERSION}/src/proto/grpc/health/v1/health.proto"
-)
-FetchContent_MakeAvailable(grpc_health_proto)
+  include(FetchContent)
+  set(grpc_health_SOURCE_DIR "${CMAKE_BINARY_DIR}/_deps/grpc_health_proto-src")
+  set(grpc_health_BUILD_DIR "${CMAKE_BINARY_DIR}/_deps/grpc_health_proto-build")
+  FetchContent_Declare(
+      grpc_health_proto
+      URM_HASH "MD5=93c62f9d6b1925cf3e8822d590484589"
+      DOWNLOAD_NO_EXTRACT TRUE
+      SOURCE_DIR ${grpc_health_SOURCE_DIR}
+      URL "https://raw.githubusercontent.com/grpc/grpc/v${gRPC_VERSION}/src/proto/grpc/health/v1/health.proto"
+  )
+    FetchContent_MakeAvailable(grpc_health_proto)
 
 set(grpc_health_proto_SOURCES ${grpc_health_SOURCE_DIR}/health.proto)
 set(grpc_health_GEN_SOURCES
