@@ -13,7 +13,7 @@ license agreement from NVIDIA CORPORATION is strictly prohibited.
 #include "gxf/core/entity_item.hpp"
 #include "gxf/core/gxf.h"
 
-TEST(Create_Entity, NULL_Value) {
+TEST(Create_Entity, GetItem_NULL_Value) {
   gxf_uid_t eid = kNullUid;
   const GxfEntityCreateInfo entity_create_info = {0};
   void* item_ptr = nullptr;
@@ -22,7 +22,7 @@ TEST(Create_Entity, NULL_Value) {
   ASSERT_EQ(GxfContextDestroy(NULL), GXF_CONTEXT_INVALID);
 }
 
-TEST(Create_Entity, valid_context) {
+TEST(Create_Entity, GetItem_valid_context) {
   gxf_context_t context = kNullContext;
   ASSERT_EQ(GxfContextCreate(&context), GXF_SUCCESS);
   gxf_uid_t eid = kNullUid;
@@ -34,7 +34,7 @@ TEST(Create_Entity, valid_context) {
   ASSERT_EQ(GxfContextDestroy(context), GXF_SUCCESS);
 }
 
-TEST(Create_Entity, NULL_GxfEntityCreateInfo) {
+TEST(Create_Entity, GetItem_NULL_GxfEntityCreateInfo) {
   gxf_context_t context = kNullContext;
   GXF_ASSERT_SUCCESS(GxfContextCreate(&context));
   gxf_uid_t eid = kNullUid;
@@ -43,7 +43,7 @@ TEST(Create_Entity, NULL_GxfEntityCreateInfo) {
   ASSERT_EQ(item_ptr, nullptr);
 }
 
-TEST(Create_Entity, Invalid_GxfEntityCreateInfo) {
+TEST(Create_Entity, GetItem_Invalid_GxfEntityCreateInfo) {
   gxf_context_t context = kNullContext;
   const char* InValid_Entity_Name = "__Entity1";
   const GxfEntityCreateInfo entity_create_info{InValid_Entity_Name};
@@ -57,7 +57,7 @@ TEST(Create_Entity, Invalid_GxfEntityCreateInfo) {
   ASSERT_EQ(GxfContextDestroy(context), GXF_SUCCESS);
 }
 
-TEST(Create_Entity, Multiple_Entity_with_same_name) {
+TEST(Create_Entity, GetItem_Multiple_Entity_with_same_name) {
   gxf_context_t context = kNullContext;
   gxf_uid_t eid = kNullUid;
   gxf_uid_t eid1 = kNullUid;
@@ -77,7 +77,7 @@ TEST(Create_Entity, Multiple_Entity_with_same_name) {
   ASSERT_EQ(GxfContextDestroy(context), GXF_SUCCESS);
 }
 
-TEST(Create_Entity, NULL_eid) {
+TEST(Create_Entity, GetItem_NULL_eid) {
   gxf_context_t context = kNullContext;
   const char* Valid_Entity_Name = "Entity";
   GXF_ASSERT_SUCCESS(GxfContextCreate(&context));

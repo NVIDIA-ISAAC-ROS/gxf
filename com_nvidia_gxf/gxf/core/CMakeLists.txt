@@ -125,8 +125,16 @@ target_link_libraries(core
 )
 add_library(GXF::core ALIAS core)
 
+#######################################################################################
+# Pybind11 extensions
+#######################################################################################
+
+pybind11_add_module(core_pybind SHARED "bindings/core.cpp")
+target_link_libraries(core_pybind PUBLIC GXF::core)
+
+
 install(
-    TARGETS core_c_api;core_internal;core
+    TARGETS core_c_api;core_internal;core;core_pybind
     EXPORT gxfCoreTargets
     PUBLIC_HEADER
         DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/gxf/core

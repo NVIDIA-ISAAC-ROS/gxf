@@ -18,12 +18,34 @@ gxf_core_add_extension_library(
     SOURCES
         py_codelet.cpp
         python_codelet.cpp
-        pydata.hpp
     PUBLIC_HEADERS
+        pydata.hpp
         py_codelet.hpp
     PUBLIC_DEPENDS
         GXF::core
         GXF::std
         pybind11::pybind11
         Python3::Python
+)
+
+#######################################################################################
+# Pybind11 extensions
+#######################################################################################
+
+pybind11_add_module(pycodelet SHARED "bindings/pycodelet.cpp")
+target_link_libraries(pycodelet PUBLIC GXF::core GXF::std GXF::python_codelet)
+
+pybind11_add_module(pydata_pybind SHARED "bindings/pydata.cpp")
+target_link_libraries(pydata_pybind PUBLIC GXF::core GXF::std)
+
+install(
+    TARGETS pycodelet;pydata_pybind
+    EXPORT gxfCoreTargets
+    PUBLIC_HEADER
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/gxf/multimedia
+    ARCHIVE
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/gxf/multimedia
+    LIBRARY
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/gxf/multimedia
+    COMPONENT Core
 )

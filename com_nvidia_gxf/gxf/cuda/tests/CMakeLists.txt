@@ -20,9 +20,9 @@ gxf_core_add_extension_library(
     PUBLIC_HEADERS test_cuda_helper.hpp
     PUBLIC_DEPENDS
         CUDA::cublas
+        GXF::cuda
         GXF::common
         GXF::core
-        GXF::cuda
         GXF::std
         GTest::gtest_main
     NO_INSTALL
@@ -35,9 +35,9 @@ gxf_add_gtests(
         test_cuda_stream_dotproduct.yaml
         test_cuda_unit.yaml
     DEPENDS
+        GXF::cuda
         GXF::common
         GXF::core
-        GXF::cuda
         GXF::std
         GTest::gtest_main
 )

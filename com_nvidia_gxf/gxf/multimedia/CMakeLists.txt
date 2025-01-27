@@ -28,6 +28,29 @@ gxf_core_add_extension_library(
         GXF::std
 )
 
+
+#######################################################################################
+# Pybind11 extensions
+#######################################################################################
+
+pybind11_add_module(video_pybind SHARED "bindings/video.cpp")
+target_link_libraries(video_pybind PUBLIC GXF::core GXF::std)
+
+pybind11_add_module(camera_pybind SHARED "bindings/camera.cpp")
+target_link_libraries(camera_pybind PUBLIC GXF::core GXF::std)
+
+install(
+    TARGETS video_pybind;camera_pybind
+    EXPORT gxfCoreTargets
+    PUBLIC_HEADER
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/gxf/multimedia
+    ARCHIVE
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/gxf/multimedia
+    LIBRARY
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/gxf/multimedia
+    COMPONENT Core
+)
+
 if(BUILD_TESTING)
     add_subdirectory(tests)
 endif()

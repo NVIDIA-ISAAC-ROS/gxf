@@ -42,6 +42,26 @@ gxf_core_add_extension_library(
         CUDA::cudart
 )
 
+#######################################################################################
+# Pybind11 extensions
+#######################################################################################
+
+pybind11_add_module(cuda_pybind SHARED "bindings/cuda.cpp")
+target_link_libraries(cuda_pybind PUBLIC GXF::common GXF::core GXF::std CUDA::cudart)
+
+
+install(
+    TARGETS cuda_pybind
+    EXPORT gxfCoreTargets
+    PUBLIC_HEADER
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/gxf/cuda
+    ARCHIVE
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/gxf/cuda
+    LIBRARY
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/gxf/cuda
+    COMPONENT Core
+)
+
 if(BUILD_TESTING)
     add_subdirectory(tests)
 endif()

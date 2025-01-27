@@ -224,8 +224,42 @@ target_link_libraries(std
 add_library(GXF::std ALIAS std)
 set(GXF_EXTENSION_LIBRARY_TARGETS "std;${GXF_EXTENSION_LIBRARY_TARGETS}" PARENT_SCOPE)
 
+#######################################################################################
+# Pybind11 extensions
+#######################################################################################
+
+pybind11_add_module(vault_pybind SHARED "bindings/vault.cpp")
+target_link_libraries(vault_pybind PUBLIC GXF::core GXF::std)
+
+pybind11_add_module(allocator_pybind SHARED "bindings/allocator.cpp")
+target_link_libraries(allocator_pybind PUBLIC GXF::core GXF::std)
+
+pybind11_add_module(clock_pybind SHARED "bindings/clock.cpp")
+target_link_libraries(clock_pybind PUBLIC GXF::core GXF::std)
+
+pybind11_add_module(receiver_pybind SHARED "bindings/receiver.cpp")
+target_link_libraries(receiver_pybind PUBLIC GXF::core GXF::std)
+
+pybind11_add_module(tensor_pybind SHARED "bindings/tensor.cpp")
+target_link_libraries(tensor_pybind PUBLIC GXF::core GXF::std)
+
+pybind11_add_module(scheduling_terms_pybind SHARED "bindings/scheduling_terms.cpp")
+target_link_libraries(scheduling_terms_pybind PUBLIC GXF::core GXF::std)
+
+pybind11_add_module(timestamp_pybind SHARED "bindings/timestamp.cpp")
+target_link_libraries(timestamp_pybind PUBLIC GXF::core GXF::std)
+
+pybind11_add_module(eos_pybind SHARED "bindings/eos.cpp")
+target_link_libraries(eos_pybind PUBLIC GXF::core GXF::std)
+
+pybind11_add_module(transmitter_pybind SHARED "bindings/transmitter.cpp")
+target_link_libraries(transmitter_pybind PUBLIC GXF::core GXF::std)
+
+pybind11_add_module(scheduling_condition_pybind SHARED "bindings/scheduling_condition.cpp")
+target_link_libraries(scheduling_condition_pybind PUBLIC GXF::core GXF::std)
+
 install(
-    TARGETS std_internal;std
+    TARGETS std_internal;std;vault_pybind;allocator_pybind;clock_pybind;receiver_pybind;tensor_pybind;scheduling_terms_pybind;timestamp_pybind;eos_pybind;transmitter_pybind;scheduling_condition_pybind
     EXPORT gxfCoreTargets
     PUBLIC_HEADER
         DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/gxf/std
