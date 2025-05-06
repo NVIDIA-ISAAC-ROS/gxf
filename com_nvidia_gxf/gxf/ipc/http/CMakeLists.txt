@@ -31,6 +31,17 @@ gxf_core_add_extension_library(
         GXF::std
 )
 
+install(
+  TARGETS http
+  PUBLIC_HEADER
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/gxf/ipc/http
+  ARCHIVE
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/gxf/ipc/http
+  LIBRARY
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/gxf/ipc/http
+  COMPONENT http
+)
+
 if(BUILD_TESTING)
     add_subdirectory(tests)
 endif()

@@ -48,8 +48,13 @@ find_file(
     PATHS
         "${breakpad_ROOT}/client/linux/handler"
         "${breakpad_ROOT}/include/client/linux/handler"
+        "${breakpad_ROOT}/include/breakpad/client/linux/handler"
     REQUIRED
 )
+
+cmake_path(GET breakpad_exception_handler_header PARENT_PATH breakpad_exception_handler_include_dir)
+cmake_path(APPEND breakpad_exception_handler_include_dir ../../..)
+cmake_path(ABSOLUTE_PATH breakpad_exception_handler_include_dir NORMALIZE OUTPUT_VARIABLE breakpad_INCLUDE_DIR)
 
 add_library(breakpad STATIC IMPORTED)
 set_target_properties(breakpad

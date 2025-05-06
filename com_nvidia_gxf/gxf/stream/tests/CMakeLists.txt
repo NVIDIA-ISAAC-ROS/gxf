@@ -27,6 +27,13 @@ gxf_core_add_extension_library(
         GXF::stream
 )
 
+install(
+  TARGETS test_stream_sync_cuda
+  PUBLIC_HEADER
+  DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/gxf/stream/tests
+  COMPONENT test
+)
+
 gxf_add_gtests(
     EXT_NAME Stream
     SOURCES

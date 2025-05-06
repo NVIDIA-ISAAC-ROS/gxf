@@ -98,7 +98,9 @@ if(NOT TARGET CUDA::nvtx3)
 endif()
 
 find_package(yaml-cpp REQUIRED)
-add_library(yaml-cpp::yaml-cpp ALIAS yaml-cpp)
+if(NOT TARGET yaml-cpp::yaml-cpp)
+  add_library(yaml-cpp::yaml-cpp ALIAS yaml-cpp)
+endif()
 find_package(nlohmann_json REQUIRED)
 find_package(breakpad REQUIRED)
 find_package(gflags REQUIRED)
@@ -115,17 +117,27 @@ find_package(rmm 24.04 REQUIRED)
  # https://cmake.org/cmake/help/latest/manual/cmake-packages.7.html
 unset(PACKAGE_VERSION)
 
-find_package(Python3
-    COMPONENTS Interpreter Development
-    REQUIRED
-)
+# Need to find Python early to ensure consistent lookup between sub-projects and
+# functions
+find_package(Python REQUIRED COMPONENTS Interpreter Development)
+
+# Ensure that even other packages that use find_package(Python3 ...) will find
+# the same Python
+set(Python3_EXECUTABLE
+    "${Python_EXECUTABLE}"
+    CACHE FILEPATH "Path to the Python interpreter" FORCE)
+set(PYTHON_EXECUTABLE
+    "${Python_EXECUTABLE}"
+    CACHE FILEPATH "Path to the Python interpreter" FORCE)
+mark_as_advanced(Python3_EXECUTABLE PYTHON_EXECUTABLE)
+find_package(Python3 REQUIRED COMPONENTS Interpreter Development)
 find_package(pybind11 REQUIRED)
 
 find_package(GTest REQUIRED)
 find_package(gRPC CONFIG REQUIRED)
 
 if(BUILD_TESTING OR GXF_BUILD_TESTING)
-    enable_testing()
+  enable_testing()
 endif()
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")

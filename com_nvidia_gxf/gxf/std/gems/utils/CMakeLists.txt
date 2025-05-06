@@ -13,11 +13,12 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-set(STD_GEMS_UTILS_SOURCES time.cpp)
+set(STD_GEMS_UTILS_SOURCES time.cpp storage_size.cpp)
 set(STD_GEMS_UTILS_HEADERS
     exponential_moving_average.hpp
     fast_running_median.hpp
     time.hpp
+    storage_size.hpp
 )
 
 add_library(std_gems_utils_internal OBJECT ${STD_GEMS_UTILS_SOURCES})

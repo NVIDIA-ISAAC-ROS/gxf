@@ -14,18 +14,28 @@
 #  limitations under the License.
 
 gxf_core_add_extension_library(
-    NAME test_extension
-    SOURCES
-        test.cpp
-    PUBLIC_HEADERS
-        test_helpers.hpp
-        test_metric.hpp
-        test_parameters.hpp
-    PUBLIC_DEPENDS
-        GTest::gtest_main
-        GXF::common
-        GXF::core
-        GXF::std
-    PRIVATE_DEPENDS
-        GXF::test::components
+  NAME test_extension
+  SOURCES
+  test.cpp
+  PUBLIC_HEADERS
+  test_helpers.hpp
+  test_metric.hpp
+  test_parameters.hpp
+  PUBLIC_DEPENDS
+  GTest::gtest_main
+  GXF::common
+  GXF::core
+  GXF::std
+  PRIVATE_DEPENDS
+  GXF::test::components
+)
+set_target_properties(test_extension PROPERTIES OUTPUT_NAME "gxf_test")
+
+install(
+  TARGETS test_extension
+  ARCHIVE
+  DESTINATION ${CMAKE_INSTALL_LIBDIR}/gxf/test/extensions
+  LIBRARY
+  DESTINATION ${CMAKE_INSTALL_LIBDIR}/gxf/test/extensions
+  COMPONENT test
 )

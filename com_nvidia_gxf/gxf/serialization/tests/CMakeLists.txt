@@ -27,6 +27,13 @@ gxf_core_add_extension_library(
         GXF::std
 )
 
+install(
+  TARGETS serialization_test_extension
+  PUBLIC_HEADER
+  DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/gxf/serialization/tests
+  COMPONENT test
+)
+
 gxf_add_gtests(
     EXT_NAME Serialization
     SOURCES

@@ -11,6 +11,7 @@
             "hidden": true,
             "generator": "Ninja",
             "cacheVariables": {
+                "CMAKE_POLICY_DEFAULT_CMP0167": "OLD",
                 "CMAKE_BUILD_TYPE": "Release",
                 "BUILD_TESTING": {
                     "type": "BOOL",

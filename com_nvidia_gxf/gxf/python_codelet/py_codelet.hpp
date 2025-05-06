@@ -36,7 +36,7 @@ namespace gxf {
 
 /// C++ side bridge of python codelet. This is the type which all python codelets register.
 /// Mandatory params - codelet_name_, codelet_filepath_
-class __attribute__((visibility("hidden"))) PyCodeletV0 : public Codelet {
+class PyCodeletV0 : public Codelet {
  public:
   gxf_result_t registerInterface(Registrar* registrar) override;
   gxf_result_t start() override;

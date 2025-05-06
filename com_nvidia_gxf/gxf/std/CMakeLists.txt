@@ -111,6 +111,7 @@ set(GXF_STD_INTERNAL_PUBLIC_HEADERS
     graph_driver.hpp
     graph_driver_worker_common.hpp
     graph_worker.hpp
+    ipc_client.hpp
     ipc_server.hpp
     job_statistics.hpp
     memory_buffer.hpp
@@ -220,12 +221,57 @@ target_link_libraries(std
         GXF::common
         GXF::core
         GXF::std_internal
+        dlpack::dlpack
 )
 add_library(GXF::std ALIAS std)
 set(GXF_EXTENSION_LIBRARY_TARGETS "std;${GXF_EXTENSION_LIBRARY_TARGETS}" PARENT_SCOPE)
 
+#######################################################################################
+# Pybind11 extensions
+#######################################################################################
+
+pybind11_add_module(vault_pybind SHARED WITHOUT_SOABI "bindings/vault.cpp")
+set_target_properties(vault_pybind PROPERTIES OUTPUT_NAME "vault_pybind" PREFIX "")
+target_link_libraries(vault_pybind PUBLIC GXF::core GXF::std)
+
+pybind11_add_module(allocator_pybind SHARED WITHOUT_SOABI "bindings/allocator.cpp")
+set_target_properties(allocator_pybind PROPERTIES OUTPUT_NAME "allocator_pybind" PREFIX "")
+target_link_libraries(allocator_pybind PUBLIC GXF::core GXF::std)
+
+pybind11_add_module(clock_pybind SHARED WITHOUT_SOABI "bindings/clock.cpp")
+set_target_properties(clock_pybind PROPERTIES OUTPUT_NAME "clock_pybind" PREFIX "")
+target_link_libraries(clock_pybind PUBLIC GXF::core GXF::std)
+
+pybind11_add_module(receiver_pybind SHARED WITHOUT_SOABI "bindings/receiver.cpp")
+set_target_properties(receiver_pybind PROPERTIES OUTPUT_NAME "receiver_pybind" PREFIX "")
+target_link_libraries(receiver_pybind PUBLIC GXF::core GXF::std)
+
+pybind11_add_module(tensor_pybind SHARED WITHOUT_SOABI "bindings/tensor.cpp")
+set_target_properties(tensor_pybind PROPERTIES OUTPUT_NAME "tensor_pybind" PREFIX "")
+target_link_libraries(tensor_pybind PUBLIC GXF::core GXF::std)
+
+pybind11_add_module(scheduling_terms_pybind SHARED WITHOUT_SOABI "bindings/scheduling_terms.cpp")
+set_target_properties(scheduling_terms_pybind PROPERTIES OUTPUT_NAME "scheduling_terms_pybind" PREFIX "")
+target_link_libraries(scheduling_terms_pybind PUBLIC GXF::core GXF::std)
+
+pybind11_add_module(timestamp_pybind SHARED WITHOUT_SOABI "bindings/timestamp.cpp")
+set_target_properties(timestamp_pybind PROPERTIES OUTPUT_NAME "timestamp_pybind" PREFIX "")
+target_link_libraries(timestamp_pybind PUBLIC GXF::core GXF::std)
+
+pybind11_add_module(eos_pybind SHARED WITHOUT_SOABI "bindings/eos.cpp")
+set_target_properties(eos_pybind PROPERTIES OUTPUT_NAME "eos_pybind" PREFIX "")
+target_link_libraries(eos_pybind PUBLIC GXF::core GXF::std)
+
+pybind11_add_module(transmitter_pybind SHARED WITHOUT_SOABI "bindings/transmitter.cpp")
+set_target_properties(transmitter_pybind PROPERTIES OUTPUT_NAME "transmitter_pybind" PREFIX "")
+target_link_libraries(transmitter_pybind PUBLIC GXF::core GXF::std)
+
+pybind11_add_module(scheduling_condition_pybind SHARED WITHOUT_SOABI "bindings/scheduling_condition.cpp")
+set_target_properties(scheduling_condition_pybind PROPERTIES OUTPUT_NAME "scheduling_condition_pybind" PREFIX "")
+target_link_libraries(scheduling_condition_pybind PUBLIC GXF::core GXF::std)
+
 install(
-    TARGETS std_internal;std
+    TARGETS std_internal;std;vault_pybind;allocator_pybind;clock_pybind;receiver_pybind;tensor_pybind;scheduling_terms_pybind;timestamp_pybind;eos_pybind;transmitter_pybind;scheduling_condition_pybind
     EXPORT gxfCoreTargets
     PUBLIC_HEADER
         DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/gxf/std
